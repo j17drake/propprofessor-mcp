@@ -4,6 +4,10 @@ Standalone Model Context Protocol server for PropProfessor, plus a small query C
 
 ## Quick start
 
+- [Auth guide](./AUTH.md)
+- [Config guide](./CONFIG.md)
+
+
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
 cd propprofessor-mcp

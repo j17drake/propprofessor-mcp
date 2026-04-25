@@ -13,6 +13,8 @@
     "lib/",
     "scripts/",
     "README.md",
+    "AUTH.md",
+    "CONFIG.md",
     "LICENSE"
   ],
   "repository": {
