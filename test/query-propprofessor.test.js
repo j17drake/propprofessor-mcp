@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const { main } = require('../scripts/query-propprofessor');
 
-describe('query-propprofessor tennis command', () => {
+describe('query-propprofessor ranking commands', () => {
   it('supports a tennis ranking command that uses the sharper screen helper', async () => {
     const logs = [];
     const client = {
@@ -64,4 +64,157 @@ describe('query-propprofessor tennis command', () => {
     assert.equal(output.sample[0].hasConsensus, true);
     assert.ok(output.freshness);
   });
+
+  it('supports nba as a shorthand screen command', async () => {
+    const logs = [];
+    const seen = [];
+    const client = {
+      queryScreenOddsBestComps: async filters => {
+        seen.push(filters);
+        return { game_data: [{ league: 'NBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 3.1 }] };
+      }
+    };
+
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args) => logs.push(args.join(' '));
+    console.error = (...args) => logs.push(args.join(' '));
+
+    try {
+      await main({
+        argv: ['node', 'query-propprofessor.js', 'nba'],
+        client,
+        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+      });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    assert.equal(seen[0].league, 'NBA');
+    const output = JSON.parse(logs[0]);
+    assert.equal(output.command, 'nba');
+    assert.ok(Array.isArray(output.sample));
+  });
+
+  it('supports soccer as a shorthand screen command', async () => {
+    const logs = [];
+    const seen = [];
+    const client = {
+      queryScreenOddsBestComps: async filters => {
+        seen.push(filters);
+        return { game_data: [{ league: 'SOCCER', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.1 }] };
+      }
+    };
+
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args) => logs.push(args.join(' '));
+    console.error = (...args) => logs.push(args.join(' '));
+
+    try {
+      await main({
+        argv: ['node', 'query-propprofessor.js', 'soccer'],
+        client,
+        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+      });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    assert.equal(seen[0].league, 'SOCCER');
+    const output = JSON.parse(logs[0]);
+    assert.equal(output.command, 'soccer');
+    assert.ok(Array.isArray(output.sample));
+  });
+
+  it('supports wnba as a shorthand screen command', async () => {
+    const logs = [];
+    const seen = [];
+    const client = {
+      queryScreenOddsBestComps: async filters => {
+        seen.push(filters);
+        return { game_data: [{ league: 'WNBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.4 }] };
+      }
+    };
+
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args) => logs.push(args.join(' '));
+    console.error = (...args) => logs.push(args.join(' '));
+
+    try {
+      await main({
+        argv: ['node', 'query-propprofessor.js', 'wnba'],
+        client,
+        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+      });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    assert.equal(seen[0].league, 'WNBA');
+    const output = JSON.parse(logs[0]);
+    assert.equal(output.command, 'wnba');
+    assert.ok(Array.isArray(output.sample));
+  });
+
+  it('supports sport as a generic shorthand screen command', async () => {
+    const logs = [];
+    const seen = [];
+    const client = {
+      queryScreenOddsBestComps: async filters => {
+        seen.push(filters);
+        return { game_data: [{ league: 'WNBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.4 }] };
+      }
+    };
+
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args) => logs.push(args.join(' '));
+    console.error = (...args) => logs.push(args.join(' '));
+
+    try {
+      await main({
+        argv: ['node', 'query-propprofessor.js', 'sport', '--league', 'WNBA'],
+        client,
+        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+      });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    assert.equal(seen[0].league, 'WNBA');
+    const output = JSON.parse(logs[0]);
+    assert.equal(output.command, 'sport');
+    assert.ok(Array.isArray(output.sample));
+  });
+
+  it('supports list as a command inventory shortcut', async () => {
+    const logs = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args) => logs.push(args.join(' '));
+    console.error = (...args) => logs.push(args.join(' '));
+
+    try {
+      await main({
+        argv: ['node', 'query-propprofessor.js', 'list'],
+        client: {},
+        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+      });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    const output = JSON.parse(logs[0]);
+    assert.equal(output.command, 'list');
+    assert.ok(output.commands.includes('wnba'));
+    assert.ok(output.aliases.sport);
+  });
+
 });

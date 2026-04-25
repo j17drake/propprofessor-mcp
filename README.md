@@ -1,6 +1,6 @@
 # PropProfessor MCP
 
-Standalone Model Context Protocol server for PropProfessor, plus a small query CLI for local analysis.
+Standalone MCP server for PropProfessor, plus a small query CLI for local analysis.
 
 ![npm version](https://img.shields.io/badge/version-1.0.2-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -36,7 +36,24 @@ Run the query CLI:
 npm run query -- screen --league NBA --market Moneyline
 # or
 pp-query tennis --market Moneyline --limit 10
+# or
+pp-query screen --league NBA --market Points
+# or
+pp-query sport --league WNBA --market Moneyline
+# or
+pp-query wnba --market Moneyline
 ```
+
+You can also use these aliases directly:
+
+- NBA, `query_nba_screen` or `pp-query nba`
+- WNBA, `query_wnba_screen` or `pp-query wnba`
+- MLB, `query_mlb_screen` or `pp-query mlb`
+- NFL, `query_nfl_screen` or `pp-query nfl`
+- NHL, `query_nhl_screen` or `pp-query nhl`
+- Soccer, `query_soccer_screen` or `pp-query soccer`
+- NCAAB, `query_ncaab_screen` or `pp-query ncaab`
+- NCAAF, `query_ncaaf_screen` or `pp-query ncaaf`
 
 ## npm link workflow
 
@@ -47,6 +64,27 @@ npm link
 pp-mcp
 pp-query health
 ```
+
+## pp-query command inventory
+
+- `opinion`, analyze a single prop from the sportsbook screen
+- `sportsbook`, fetch sportsbook +EV rows
+- `smart`, fetch smart money rows
+- `fantasy`, fetch fantasy rows
+- `tennis`, query and rank tennis screen rows
+- `screen`, query any sport screen with `--league`
+- `sport`, alias for `screen`, use `--league` to pick the sport
+- `nba`, NBA screen shorthand
+- `wnba`, WNBA screen shorthand
+- `mlb`, MLB screen shorthand
+- `nfl`, NFL screen shorthand
+- `nhl`, NHL screen shorthand
+- `soccer`, Soccer screen shorthand
+- `ncaab`, NCAAB screen shorthand
+- `ncaaf`, NCAAF screen shorthand
+- `presets`, show the active league presets
+- `list`, show the command inventory
+- `health`, check auth and endpoint health
 
 ## MCP config example
 
@@ -75,6 +113,15 @@ If you prefer a direct repo path instead of a global link, use the local file pa
 - `query_fantasy_sorted`
 - `query_screen_odds_best_comps`
 - `query_screen_odds_ranked`
+- `query_sport_screen`
+- `query_nba_screen`
+- `query_wnba_screen`
+- `query_mlb_screen`
+- `query_nfl_screen`
+- `query_nhl_screen`
+- `query_soccer_screen`
+- `query_ncaab_screen`
+- `query_ncaaf_screen`
 - `query_tennis_screen`
 - `hide_fantasy_row`
 - `hide_ev_row`

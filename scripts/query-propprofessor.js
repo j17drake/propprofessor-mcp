@@ -49,7 +49,36 @@ function extractRows(payload) {
 async function main({ argv = process.argv, client = createPropProfessorClient(), logger = console } = {}) {
   const { command, opts } = parseArgs(argv);
   if (command === 'help') {
-    logger.log('Usage: node scripts/query-propprofessor.js opinion --player "James Harden" --market "Points" --line 18.5 --side over');
+    logger.log([
+      'Usage: node scripts/query-propprofessor.js <command> [options]',
+      '',
+      'Commands:',
+      '  opinion   Analyze a single prop from the sportsbook screen',
+      '  sportsbook  Fetch sportsbook +EV rows',
+      '  smart     Fetch smart money rows',
+      '  fantasy   Fetch fantasy rows',
+      '  tennis    Query and rank tennis screen rows',
+      '  screen    Query any sport screen with --league',
+      '  sport     Alias for screen, use --league to pick the sport',
+      '  nba       NBA screen shorthand',
+      '  wnba      WNBA screen shorthand',
+      '  mlb       MLB screen shorthand',
+      '  nfl       NFL screen shorthand',
+      '  nhl       NHL screen shorthand',
+      '  soccer    Soccer screen shorthand',
+      '  ncaab     NCAAB screen shorthand',
+      '  ncaaf     NCAAF screen shorthand',
+      '  presets   Show the active league presets',
+      '  list      Show the command inventory',
+      '  health    Check auth and endpoint health',
+      '',
+      'Examples:',
+      '  pp-query nba --market Moneyline',
+      '  pp-query wnba --market Moneyline',
+      '  pp-query sport --league WNBA --market Moneyline',
+      '  pp-query tennis --market Moneyline --limit 10',
+      '  pp-query opinion --player "James Harden" --market Points --line 18.5 --side over'
+    ].join('\n'));
     process.exitCode = 0;
     return;
   }
@@ -81,17 +110,48 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
       is_live: Boolean(opts.live)
     });
-  } else if (command === 'screen') {
+  } else if (command === 'screen' || command === 'sport' || command === 'nba' || command === 'mlb' || command === 'nfl' || command === 'nhl' || command === 'soccer' || command === 'ncaab' || command === 'ncaaf' || command === 'wnba') {
+    const leagueMap = {
+      screen: opts.league || 'NBA',
+      sport: opts.league || 'NBA',
+      nba: 'NBA',
+      wnba: 'WNBA',
+      mlb: 'MLB',
+      nfl: 'NFL',
+      nhl: 'NHL',
+      soccer: 'SOCCER',
+      ncaab: 'NCAAB',
+      ncaaf: 'NCAAF'
+    };
+    const league = leagueMap[command];
     payload = await client.queryScreenOddsBestComps({
-      league: opts.league || 'NBA',
+      league,
       market: opts.market || 'Moneyline',
       books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
       is_live: Boolean(opts.live)
     });
   } else if (command === 'presets') {
-    const leagues = ['NBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
+    const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
     const presets = leagues.map(league => getLeagueRankingPreset(league));
     console.log(JSON.stringify({ command, presets }, null, 2));
+    return;
+  } else if (command === 'list') {
+    console.log(JSON.stringify({
+      command,
+      commands: ['sportsbook', 'smart', 'fantasy', 'screen', 'sport', 'nba', 'wnba', 'mlb', 'nfl', 'nhl', 'soccer', 'ncaab', 'ncaaf', 'tennis', 'presets', 'health', 'opinion'],
+      aliases: {
+        screen: 'Generic screen query, defaults to NBA unless --league is set',
+        sport: 'Generic screen query, defaults to NBA unless --league is set',
+        nba: 'NBA screen shorthand',
+        wnba: 'WNBA screen shorthand',
+        mlb: 'MLB screen shorthand',
+        nfl: 'NFL screen shorthand',
+        nhl: 'NHL screen shorthand',
+        soccer: 'Soccer screen shorthand',
+        ncaab: 'NCAAB screen shorthand',
+        ncaaf: 'NCAAF screen shorthand'
+      }
+    }, null, 2));
     return;
   } else if (command === 'health') {
     const result = await client.healthStatus();

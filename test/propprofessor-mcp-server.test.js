@@ -110,10 +110,19 @@ describe('propprofessor MCP server stdio contract', () => {
         'league_presets',
         'query_fantasy',
         'query_fantasy_sorted',
+        'query_mlb_screen',
+        'query_nba_screen',
+        'query_ncaab_screen',
+        'query_ncaaf_screen',
+        'query_nfl_screen',
+        'query_nhl_screen',
         'query_screen_odds',
         'query_screen_odds_best_comps',
         'query_screen_odds_ranked',
+        'query_soccer_screen',
+        'query_sport_screen',
         'query_tennis_screen',
+        'query_wnba_screen',
         'unhide_bet'
       ]);
     } finally {

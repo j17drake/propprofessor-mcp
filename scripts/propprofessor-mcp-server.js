@@ -98,6 +98,161 @@ function buildToolDefinitions() {
       }
     },
     {
+      name: 'query_sport_screen',
+      description: 'Query /screen for any supported sport using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          league: { type: 'string', description: 'Sport or league such as NBA, WNBA, MLB, NFL, NHL, SOCCER, NCAAB, NCAAF, or TENNIS' },
+          market: { type: 'string', description: 'Odds screen market, for example Moneyline or Player Points' },
+          limit: { type: 'number', description: 'Max number of ranked rows to return' },
+          games: { type: 'array', items: { type: 'string' }, description: 'Optional game ids from the screen dropdown' },
+          participants: { type: 'array', items: { type: 'string' }, description: 'Optional participant filters' },
+          books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
+          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
+          is_live: { type: 'boolean', description: 'Whether to query live odds' }
+        },
+        required: ['league'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_nba_screen',
+      description: 'Query /screen for NBA using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string', description: 'Odds screen market, for example Moneyline or Player Points' },
+          limit: { type: 'number', description: 'Max number of ranked rows to return' },
+          games: { type: 'array', items: { type: 'string' }, description: 'Optional game ids from the screen dropdown' },
+          participants: { type: 'array', items: { type: 'string' }, description: 'Optional participant filters' },
+          books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
+          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
+          is_live: { type: 'boolean', description: 'Whether to query live odds' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_wnba_screen',
+      description: 'Query /screen for WNBA using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string', description: 'Odds screen market, for example Moneyline or Player Points' },
+          limit: { type: 'number', description: 'Max number of ranked rows to return' },
+          games: { type: 'array', items: { type: 'string' }, description: 'Optional game ids from the screen dropdown' },
+          participants: { type: 'array', items: { type: 'string' }, description: 'Optional participant filters' },
+          books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
+          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
+          is_live: { type: 'boolean', description: 'Whether to query live odds' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_mlb_screen',
+      description: 'Query /screen for MLB using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string' },
+          limit: { type: 'number' },
+          games: { type: 'array', items: { type: 'string' } },
+          participants: { type: 'array', items: { type: 'string' } },
+          books: { type: 'array', items: { type: 'string' } },
+          includeAll: { type: 'boolean' },
+          is_live: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_nfl_screen',
+      description: 'Query /screen for NFL using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string' },
+          limit: { type: 'number' },
+          games: { type: 'array', items: { type: 'string' } },
+          participants: { type: 'array', items: { type: 'string' } },
+          books: { type: 'array', items: { type: 'string' } },
+          includeAll: { type: 'boolean' },
+          is_live: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_nhl_screen',
+      description: 'Query /screen for NHL using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string' },
+          limit: { type: 'number' },
+          games: { type: 'array', items: { type: 'string' } },
+          participants: { type: 'array', items: { type: 'string' } },
+          books: { type: 'array', items: { type: 'string' } },
+          includeAll: { type: 'boolean' },
+          is_live: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_soccer_screen',
+      description: 'Query /screen for Soccer using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string' },
+          limit: { type: 'number' },
+          games: { type: 'array', items: { type: 'string' } },
+          participants: { type: 'array', items: { type: 'string' } },
+          books: { type: 'array', items: { type: 'string' } },
+          includeAll: { type: 'boolean' },
+          is_live: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_ncaab_screen',
+      description: 'Query /screen for NCAAB using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string' },
+          limit: { type: 'number' },
+          games: { type: 'array', items: { type: 'string' } },
+          participants: { type: 'array', items: { type: 'string' } },
+          books: { type: 'array', items: { type: 'string' } },
+          includeAll: { type: 'boolean' },
+          is_live: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_ncaaf_screen',
+      description: 'Query /screen for NCAAF using the best-comps default comparison set.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          market: { type: 'string' },
+          limit: { type: 'number' },
+          games: { type: 'array', items: { type: 'string' } },
+          participants: { type: 'array', items: { type: 'string' } },
+          books: { type: 'array', items: { type: 'string' } },
+          includeAll: { type: 'boolean' },
+          is_live: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
       name: 'query_tennis_screen',
       description: 'Query /screen for tennis, rank the results by consensus edge and CLV proxy, and return the top tennis plays.',
       inputSchema: {
@@ -207,6 +362,27 @@ function buildLeaguePresetSummary() {
 
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
+  function queryScreenWithLeague(league, args = {}) {
+    return client.queryScreenOddsBestComps({
+      market: args.market || 'Moneyline',
+      league,
+      games: Array.isArray(args.games) ? args.games : [],
+      participants: Array.isArray(args.participants) ? args.participants : [],
+      books: Array.isArray(args.books) ? args.books : [],
+      is_live: Boolean(args.is_live)
+    }).then(payload => {
+      const rows = extractScreenRows(payload);
+      const ranked = rankLeagueScreenRows(rows, {
+        league,
+        limit: Number.isFinite(Number(args.limit)) ? Number(args.limit) : 12,
+        books: Array.isArray(args.books) && args.books.length ? args.books : undefined,
+        includeAll: args.includeAll !== undefined ? Boolean(args.includeAll) : true,
+        maxAgeMs: Number.isFinite(Number(args.maxAgeMs)) ? Number(args.maxAgeMs) : null
+      });
+      return { ok: true, result: ranked, freshness: summarizeFreshness(rows) };
+    });
+  }
+
   return {
     async query_screen_odds(args = {}) {
       const payload = await client.queryScreenOdds({
@@ -278,6 +454,34 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         maxAgeMs: Number.isFinite(Number(args.maxAgeMs)) ? Number(args.maxAgeMs) : null
       });
       return { ok: true, result: ranked, freshness: summarizeFreshness(rows) };
+    },
+    async query_sport_screen(args = {}) {
+      const league = String(args.league || '').trim();
+      if (!league) {
+        throw new Error('league is required for query_sport_screen');
+      }
+      return queryScreenWithLeague(league, args);
+    },
+    async query_nba_screen(args = {}) {
+      return queryScreenWithLeague('NBA', args);
+    },
+    async query_mlb_screen(args = {}) {
+      return queryScreenWithLeague('MLB', args);
+    },
+    async query_nfl_screen(args = {}) {
+      return queryScreenWithLeague('NFL', args);
+    },
+    async query_nhl_screen(args = {}) {
+      return queryScreenWithLeague('NHL', args);
+    },
+    async query_soccer_screen(args = {}) {
+      return queryScreenWithLeague('SOCCER', args);
+    },
+    async query_ncaab_screen(args = {}) {
+      return queryScreenWithLeague('NCAAB', args);
+    },
+    async query_ncaaf_screen(args = {}) {
+      return queryScreenWithLeague('NCAAF', args);
     },
     async query_tennis_screen(args = {}) {
       const preferredBook = String(args.book || 'NoVigApp').trim() || 'NoVigApp';
