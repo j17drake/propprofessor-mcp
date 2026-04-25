@@ -1,9 +1,37 @@
 {
   "name": "propprofessor-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Standalone PropProfessor MCP server and query client",
   "type": "commonjs",
-  "private": true,
+  "private": false,
+  "main": "scripts/propprofessor-mcp-server.js",
+  "bin": {
+    "pp-mcp": "scripts/propprofessor-mcp-server.js",
+    "pp-query": "scripts/query-propprofessor.js"
+  },
+  "files": [
+    "lib/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/j17drake/propprofessor-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/j17drake/propprofessor-mcp/issues"
+  },
+  "homepage": "https://github.com/j17drake/propprofessor-mcp#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "propprofessor",
+    "sports-betting",
+    "cli"
+  ],
+  "author": "James Drake",
+  "license": "MIT",
   "engines": {
     "node": ">=18"
   },

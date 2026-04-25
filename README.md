@@ -2,9 +2,31 @@
 
 Standalone Model Context Protocol server for PropProfessor, plus a small query CLI for local analysis.
 
-This repo is intentionally minimal and private, so it can be versioned independently without dragging in the full dashboard and monitoring stack.
+## Install
 
-## What it provides
+```bash
+npm install
+```
+
+## Usage
+
+Run the MCP server over stdio:
+
+```bash
+npm run mcp
+# or, if installed globally or via npm link
+pp-mcp
+```
+
+Run the query CLI:
+
+```bash
+npm run query -- screen --league NBA --market Moneyline
+# or
+pp-query tennis --market Moneyline --limit 10
+```
+
+## Available tools
 
 - `query_screen_odds`
 - `query_fantasy`
@@ -20,44 +42,21 @@ This repo is intentionally minimal and private, so it can be versioned independe
 - `league_presets`
 - `health_status`
 
-## Setup
+## Requirements
 
-```bash
-npm install
-```
+- Node.js 18 or newer
+- A saved PropProfessor browser session at `auth.json` in the repo root
 
-You also need a saved PropProfessor browser session at `auth.json` in the repo root.
-That session is created by logging into PropProfessor in a browser and saving the browser storage state.
+## Publishing
 
-## Run the MCP server
+This repo is configured for npm packaging and private GitHub release tags.
 
-```bash
-npm run mcp
-```
-
-The server speaks MCP over stdio.
-
-## Query from the terminal
-
-```bash
-npm run query -- screen --league NBA --market Moneyline
-npm run query -- tennis --market Moneyline --limit 10
-npm run query -- health
-```
+- `main` points at the MCP server entrypoint
+- `pp-mcp` and `pp-query` are exposed as binaries
+- `npm test` runs the node:test suite
 
 ## Repository layout
 
-- `lib/propprofessor-api.js`, PropProfessor auth and request client
-- `lib/propprofessor-analysis.js`, ranking and parsing helpers
-- `scripts/propprofessor-mcp-server.js`, MCP stdio server
-- `scripts/query-propprofessor.js`, terminal query CLI
+- `lib/`, PropProfessor auth, requests, and analysis helpers
+- `scripts/`, MCP stdio server and CLI
 - `test/`, node:test coverage for the API, MCP contract, and CLI
-
-## Notes
-
-- The client uses the saved PropProfessor cookies in `auth.json` to fetch a short-lived access token.
-- The standalone repo intentionally keeps the surface area small so it is easy to install, test, and version independently.
-
-## Packaging
-
-The package is ready to publish later if you want to turn it into an npm package. For now it stays private and installable from GitHub.
