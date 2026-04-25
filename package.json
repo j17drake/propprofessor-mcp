@@ -1,0 +1,19 @@
+{
+  "name": "propprofessor-mcp",
+  "version": "1.0.0",
+  "description": "Standalone PropProfessor MCP server and query client",
+  "type": "commonjs",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "mcp": "node scripts/propprofessor-mcp-server.js",
+    "query": "node scripts/query-propprofessor.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "got-scraping": "^4.1.1",
+    "superjson": "^2.2.6"
+  }
+}
