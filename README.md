@@ -2,11 +2,14 @@
 
 Standalone Model Context Protocol server for PropProfessor, plus a small query CLI for local analysis.
 
+![npm version](https://img.shields.io/badge/version-1.0.2-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+![node](https://img.shields.io/badge/node-%3E%3D18-339933)
+
 ## Quick start
 
 - [Auth guide](./AUTH.md)
 - [Config guide](./CONFIG.md)
-
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
