@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+
+- Added WNBA sport support across the MCP server, CLI, and ranking presets
+- Added a generic `query_sport_screen` MCP tool and `pp-query sport` CLI alias
+- Added `pp-query list` and expanded CLI help to document the command inventory
+- Tightened README wording and examples for the new sport aliases
+
 ## 1.0.2
 
 - Public repo release polish
