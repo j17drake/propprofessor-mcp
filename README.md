@@ -2,6 +2,8 @@
 
 Standalone Model Context Protocol server for PropProfessor, plus a small query CLI for local analysis.
 
+This repo is intentionally minimal and private, so it can be versioned independently without dragging in the full dashboard and monitoring stack.
+
 ## What it provides
 
 - `query_screen_odds`
@@ -55,3 +57,7 @@ npm run query -- health
 
 - The client uses the saved PropProfessor cookies in `auth.json` to fetch a short-lived access token.
 - The standalone repo intentionally keeps the surface area small so it is easy to install, test, and version independently.
+
+## Packaging
+
+The package is ready to publish later if you want to turn it into an npm package. For now it stays private and installable from GitHub.
