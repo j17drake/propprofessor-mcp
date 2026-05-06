@@ -2,6 +2,14 @@
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
 const { extractScreenRows, normalizeTennisMarketQuery, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, summarizeFreshness, getLeagueRankingPreset } = require('../lib/propprofessor-analysis');
+const { getSharpBookComparisonSet, getSharpBookContext } = require('../lib/propprofessor-sharp-books');
+const {
+  categorizeError,
+  createJsonRpcSuccess,
+  createJsonRpcError,
+  encodeMessage,
+  createStdioMessageReader
+} = require('../lib/propprofessor-mcp-stdio');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = '0.1.0';
@@ -357,7 +365,29 @@ function buildToolDefinitions() {
 // league preset inspector
 function buildLeaguePresetSummary() {
   const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
-  return leagues.map(league => getLeagueRankingPreset(league));
+  return leagues.map(league => {
+    const preset = getLeagueRankingPreset(league);
+    const isSharpLeague = ['NBA', 'NFL', 'MLB'].includes(league);
+    const sharpMainMarkets = isSharpLeague
+      ? getSharpBookComparisonSet({ league, market: 'Moneyline' })
+      : undefined;
+    const sharpProps = isSharpLeague
+      ? getSharpBookComparisonSet({ league, market: league === 'MLB' ? 'Player Strikeouts' : 'Player Points' })
+      : undefined;
+
+    return {
+      ...preset,
+      sharpMainMarkets,
+      sharpProps,
+      sharpBookVariants: isSharpLeague
+        ? {
+            mainMarkets: sharpMainMarkets,
+            playerProps: sharpProps
+          }
+        : undefined,
+      sharpBookResearch: getSharpBookContext({ league, market: league === 'MLB' ? 'Moneyline' : undefined })
+    };
+  });
 }
 
 
@@ -431,10 +461,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         league: args.league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : [],
+        books: Array.isArray(args.books) ? args.books : undefined,
         is_live: Boolean(args.is_live)
       });
-      return { ok: true, result: payload };
+      return {
+        ok: true,
+        result: payload,
+        comparisonBooks: getSharpBookComparisonSet({
+          league: args.league || 'NBA',
+          market: args.market,
+          requestedBooks: Array.isArray(args.books) ? args.books : undefined
+        }),
+        sharpBookResearch: getSharpBookContext({ league: args.league || 'NBA', market: args.market })
+      };
     },
     async query_screen_odds_ranked(args = {}) {
       const payload = await client.queryScreenOddsBestComps({
@@ -653,19 +692,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   };
 }
 
-function createJsonRpcSuccess(id, result) {
-  return { jsonrpc: '2.0', id, result };
-}
-
-function createJsonRpcError(id, code, message) {
-  return { jsonrpc: '2.0', id, error: { code, message } };
-}
-
-function encodeMessage(payload) {
-  const body = JSON.stringify(payload);
-  return `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`;
-}
-
 function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = buildToolDefinitions() } = {}) {
   const toolMap = new Map(toolDefinitions.map(tool => [tool.name, tool]));
   let initialized = false;
@@ -707,8 +733,19 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
           structuredContent: result
         });
       } catch (error) {
+        const categorized = categorizeError(error);
+        const failure = {
+          ok: false,
+          error: {
+            code: categorized.code,
+            message: categorized.message,
+            category: categorized.category,
+            status: categorized.status
+          }
+        };
         return createJsonRpcSuccess(id, {
-          content: [{ type: 'text', text: error.message || String(error) }],
+          content: [{ type: 'text', text: JSON.stringify(failure, null, 2) }],
+          structuredContent: failure,
           isError: true
         });
       }
@@ -722,51 +759,6 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
       return handleRequest(message);
     },
     toolDefinitions
-  };
-}
-
-function createStdioMessageReader(onMessage, { allowNewlineJson = process.env.PROPPROFESSOR_MCP_DEBUG_NDJSON === 'true' } = {}) {
-  let buffer = '';
-
-  return function onData(chunk) {
-    buffer += chunk.toString('utf8');
-
-    while (buffer.length > 0) {
-      const separator = '\r\n\r\n';
-      const headerEnd = buffer.indexOf(separator);
-
-      if (headerEnd === -1) {
-        if (allowNewlineJson) {
-          const newlineIdx = buffer.indexOf('\n');
-          if (newlineIdx === -1) return;
-          const line = buffer.slice(0, newlineIdx).trim();
-          buffer = buffer.slice(newlineIdx + 1);
-          if (line) onMessage(JSON.parse(line));
-          continue;
-        }
-        return;
-      }
-
-      const headerText = buffer.slice(0, headerEnd);
-      const contentLengthLine = headerText
-        .split('\r\n')
-        .find(line => /^content-length\s*:/i.test(line));
-      if (!contentLengthLine) {
-        throw new Error('Missing Content-Length header');
-      }
-      const contentLength = Number(contentLengthLine.split(':').slice(1).join(':').trim());
-      if (!Number.isFinite(contentLength) || contentLength <= 0) {
-        throw new Error(`Invalid Content-Length header: ${contentLengthLine}`);
-      }
-
-      const bodyStart = headerEnd + separator.length;
-      const bodyEnd = bodyStart + contentLength;
-      if (buffer.length < bodyEnd) return;
-
-      const body = buffer.slice(bodyStart, bodyEnd);
-      buffer = buffer.slice(bodyEnd);
-      onMessage(JSON.parse(body));
-    }
   };
 }
 
@@ -785,6 +777,10 @@ async function serveStdio(options = {}) {
       .catch(error => {
         process.stderr.write((error.stack || error.message || String(error)) + '\n');
       });
+  });
+
+  process.stdin.on('end', () => {
+    process.exit(0);
   });
 
   process.stdin.resume();
