@@ -138,7 +138,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   } else if (command === 'list') {
     console.log(JSON.stringify({
       command,
-      commands: ['sportsbook', 'smart', 'fantasy', 'screen', 'sport', 'nba', 'wnba', 'mlb', 'nfl', 'nhl', 'soccer', 'ncaab', 'ncaaf', 'tennis', 'presets', 'health', 'opinion'],
+      commands: ['sportsbook', 'smart', 'fantasy', 'screen', 'sport', 'nba', 'wnba', 'mlb', 'nfl', 'nhl', 'soccer', 'ncaab', 'ncaaf', 'tennis', 'presets', 'list', 'health', 'opinion'],
       aliases: {
         screen: 'Generic screen query, defaults to NBA unless --league is set',
         sport: 'Generic screen query, defaults to NBA unless --league is set',
@@ -178,7 +178,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     return;
   }
 
-  if (command === 'screen') {
+  if (command === 'screen' || command === 'sport') {
     const ranked = rankLeagueScreenRows(rows, { league: opts.league || 'NBA', limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
     console.log(JSON.stringify({
       command,

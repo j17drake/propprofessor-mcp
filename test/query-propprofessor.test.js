@@ -167,7 +167,16 @@ describe('query-propprofessor ranking commands', () => {
     const client = {
       queryScreenOddsBestComps: async filters => {
         seen.push(filters);
-        return { game_data: [{ league: 'WNBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.4 }] };
+        return {
+          game_data: [{
+            league: 'WNBA',
+            participant: 'Player A',
+            market: 'Moneyline',
+            odds: 110,
+            value: 2.4,
+            updatedAt: new Date('2026-05-06T12:00:00.000Z').toISOString()
+          }]
+        };
       }
     };
 
@@ -191,6 +200,8 @@ describe('query-propprofessor ranking commands', () => {
     const output = JSON.parse(logs[0]);
     assert.equal(output.command, 'sport');
     assert.ok(Array.isArray(output.sample));
+    assert.ok(output.sample.length > 0);
+    assert.ok(output.freshness);
   });
 
   it('supports list as a command inventory shortcut', async () => {
@@ -213,6 +224,7 @@ describe('query-propprofessor ranking commands', () => {
 
     const output = JSON.parse(logs[0]);
     assert.equal(output.command, 'list');
+    assert.ok(output.commands.includes('list'));
     assert.ok(output.commands.includes('wnba'));
     assert.ok(output.aliases.sport);
   });
