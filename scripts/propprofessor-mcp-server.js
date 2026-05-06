@@ -356,7 +356,7 @@ function buildToolDefinitions() {
 
 // league preset inspector
 function buildLeaguePresetSummary() {
-  const leagues = ['NBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
+  const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
   return leagues.map(league => getLeagueRankingPreset(league));
 }
 
@@ -464,6 +464,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
     async query_nba_screen(args = {}) {
       return queryScreenWithLeague('NBA', args);
+    },
+    async query_wnba_screen(args = {}) {
+      return queryScreenWithLeague('WNBA', args);
     },
     async query_mlb_screen(args = {}) {
       return queryScreenWithLeague('MLB', args);
@@ -639,6 +642,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async clear_hidden_bets() {
       const result = await client.clearHiddenBets();
       return { ok: true, result };
+    },
+    async league_presets() {
+      return { ok: true, result: buildLeaguePresetSummary() };
     },
     async health_status() {
       const result = await client.healthStatus();

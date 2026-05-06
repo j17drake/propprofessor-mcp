@@ -5,6 +5,11 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { spawn } = require('child_process');
 
+const {
+  createMcpHandlers,
+  createMcpServer
+} = require('../scripts/propprofessor-mcp-server');
+
 const serverPath = path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js');
 
 function createJsonRpcMessage(id, method, params) {
@@ -78,6 +83,44 @@ function waitForJsonRpcMessage(proc, timeoutMs = 5000) {
   });
 }
 
+function createMockClient() {
+  return {
+    queryScreenOdds: async filters => ({
+      game_data: [
+        {
+          league: filters?.league || 'NBA',
+          participant: 'Player A',
+          market: filters?.market || 'Moneyline',
+          value: 2.4,
+          odds: 110,
+          updatedAt: new Date('2026-05-06T12:00:00.000Z').toISOString()
+        }
+      ]
+    }),
+    queryScreenOddsBestComps: async filters => ({
+      game_data: [
+        {
+          league: filters?.league || 'NBA',
+          participant: 'Player A',
+          market: filters?.market || 'Moneyline',
+          value: 2.4,
+          odds: 110,
+          updatedAt: new Date('2026-05-06T12:00:00.000Z').toISOString()
+        }
+      ]
+    }),
+    queryFantasyPicks: async () => ([]),
+    queryFantasyPicksSorted: async () => ([]),
+    querySportsbook: async () => ([]),
+    querySmartMoney: async () => ([]),
+    getHiddenBets: async () => ([]),
+    unhideBet: async () => ({ ok: true }),
+    clearHiddenBets: async () => ({ ok: true }),
+    healthStatus: async () => ({ ok: true }),
+    hideBet: async () => ({ ok: true })
+  };
+}
+
 describe('propprofessor MCP server stdio contract', () => {
   it('responds to initialize and lists the expected tools', async () => {
     const proc = spawn(process.execPath, [serverPath], {
@@ -128,5 +171,71 @@ describe('propprofessor MCP server stdio contract', () => {
     } finally {
       proc.kill('SIGTERM');
     }
+  });
+
+  it('has a handler for every advertised tool', () => {
+    const handlers = createMcpHandlers({ client: createMockClient() });
+    const server = createMcpServer({ handlers });
+    const toolNames = server.toolDefinitions.map(tool => tool.name).sort();
+    const handlerNames = Object.keys(handlers).sort();
+
+    assert.deepEqual(handlerNames, toolNames);
+  });
+
+  it('calls league_presets successfully', async () => {
+    const server = createMcpServer({
+      handlers: createMcpHandlers({ client: createMockClient() })
+    });
+
+    await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'test-client', version: '1.0.0' }
+      }
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'league_presets', arguments: {} }
+    });
+
+    assert.equal(response.id, 2);
+    assert.equal(response.result.structuredContent.ok, true);
+    assert.ok(Array.isArray(response.result.structuredContent.result));
+    assert.ok(response.result.structuredContent.result.some(row => row.league === 'WNBA'));
+  });
+
+  it('calls query_wnba_screen successfully', async () => {
+    const server = createMcpServer({
+      handlers: createMcpHandlers({ client: createMockClient() })
+    });
+
+    await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'test-client', version: '1.0.0' }
+      }
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'query_wnba_screen', arguments: {} }
+    });
+
+    assert.equal(response.id, 2);
+    assert.equal(response.result.structuredContent.ok, true);
+    assert.ok(Array.isArray(response.result.structuredContent.result));
   });
 });
