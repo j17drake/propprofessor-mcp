@@ -10,6 +10,8 @@ const {
   buildPropProfessorCookieHeader,
   createPropProfessorClient,
   fetchAccessToken,
+  getOddsHistoryStartTimestamp,
+  normalizeSelectionId,
   readAuthState
 } = require('../lib/propprofessor-api');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
@@ -47,6 +49,20 @@ describe('buildPropProfessorCookieHeader', () => {
     });
 
     assert.equal(header, 'a=1; b=2');
+  });
+});
+
+describe('odds-history helpers', () => {
+  it('normalizes selection ids from prefixed screen payloads', () => {
+    assert.equal(normalizeSelectionId('nba:12345:over'), '12345:over');
+    assert.equal(normalizeSelectionId('plain-selection'), 'plain-selection');
+    assert.equal(normalizeSelectionId(''), '');
+  });
+
+  it('computes a fallback odds-history start timestamp', () => {
+    const nowMs = Date.parse('2026-04-20T12:00:00.000Z');
+    const ts = getOddsHistoryStartTimestamp({ lookbackHours: 6, nowMs });
+    assert.equal(ts, Math.floor((nowMs - (6 * 60 * 60 * 1000)) / 1000));
   });
 });
 
@@ -178,6 +194,71 @@ describe('createPropProfessorClient', () => {
       assert.equal(JSON.parse(fetchCalls[0].options.body).books[0], 'FanDuel');
       assert.equal(JSON.parse(fetchCalls[0].options.body).market, 'Moneyline');
       assert.equal(rows[0].id, 'row-1');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('normalizes screen league casing and applies sharp-book defaults for best comps', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const fetchCalls = [];
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt-screen', exp: Math.floor(Date.now() / 1000) + 600, perm: { sportsbook: true } }),
+        statusCode: 200
+      }),
+      fetchImpl: async (url, options) => {
+        fetchCalls.push({ url, options });
+        return { ok: true, status: 200, json: async () => ({ game_data: [] }) };
+      }
+    });
+
+    try {
+      await client.queryScreenOdds({ league: 'soccer', market: 'Moneyline' });
+      await client.queryScreenOddsBestComps({ league: 'NBA', market: 'Player Points' });
+      const firstBody = JSON.parse(fetchCalls[0].options.body);
+      const secondBody = JSON.parse(fetchCalls[1].options.body);
+      assert.equal(firstBody.league, 'Soccer');
+      assert.deepEqual(secondBody.books, ['FanDuel', 'BookMaker', 'PropBuilder', 'NoVigApp', 'Pinnacle']);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('posts odds-history requests with normalized selection ids and derived start timestamp', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const fetchCalls = [];
+    const nowMs = Date.parse('2026-04-20T22:58:00.000Z');
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt-history', exp: Math.floor(Date.now() / 1000) + 600, perm: { sportsbook: true } }),
+        statusCode: 200
+      }),
+      fetchImpl: async (url, options) => {
+        fetchCalls.push({ url, options });
+        return { ok: true, status: 200, json: async () => ({ history: [] }) };
+      },
+      now: () => nowMs
+    });
+
+    try {
+      await client.queryOddsHistory({ gameId: 'game-1', selectionId: 'nba:sel-1:over', lookbackHours: 2, sportsbooks: ['Pinnacle'] });
+      assert.equal(fetchCalls[0].url, 'https://backend.propprofessor.com/odds_history_new');
+      const body = JSON.parse(fetchCalls[0].options.body);
+      assert.equal(body.gameId, 'game-1');
+      assert.equal(body.selectionId, 'sel-1:over');
+      assert.equal(body.startTimestamp, Math.floor((nowMs - (2 * 60 * 60 * 1000)) / 1000));
+      assert.deepEqual(body.sportsbooks, ['Pinnacle']);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -373,6 +454,32 @@ describe('createPropProfessorClient', () => {
     assert.ok(result.result[0].rankingReason.includes('consensus edge'));
     assert.equal(typeof result.result[0].scoreBreakdown, 'object');
     assert.equal(typeof result.result[0].scoreBreakdown.total, 'number');
+  });
+
+  it('healthStatus reports screen endpoint status and errors only', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt-health', exp: Math.floor(Date.now() / 1000) + 600, perm: { sportsbook: true } }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({ ok: false, status: 503, text: async () => 'backend down' })
+    });
+
+    try {
+      const result = await client.healthStatus();
+      assert.equal(result.ok, false);
+      assert.deepEqual(result.endpoints, { screen: 'error' });
+      assert.match(result.errors.screen, /503/);
+      assert.equal(result.freshness.screen.rowCount, 0);
+      assert.equal('fantasy' in result.endpoints, false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('sorts fantasy rows by value descending', async () => {
