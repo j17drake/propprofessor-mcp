@@ -1,6 +1,6 @@
 # PropProfessor MCP
 
-Standalone MCP server for PropProfessor, plus a small query CLI for local analysis.
+Standalone MCP server for PropProfessor's screen endpoints, plus a small query CLI for local analysis.
 
 ![npm version](https://img.shields.io/badge/version-1.0.3-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -19,6 +19,8 @@ npm install
 
 You also need a saved PropProfessor browser session at `auth.json` in the repo root.
 That file is ignored by git, so copy it from your existing setup or save a fresh browser session into this repo.
+
+This repo now exposes a strict screen-first MCP surface. Fantasy, sportsbook +EV, smart money, and hidden-bet mutation flows stay available only in the local query client or underlying library helpers, not the MCP contract.
 
 ## Run locally
 
@@ -67,6 +69,8 @@ pp-query health
 
 ## pp-query command inventory
 
+The local `pp-query` CLI intentionally keeps a broader maintenance surface than the MCP server. Use the MCP server for screen-first ranked queries, and use `pp-query` when you want local-only helpers for sportsbook, smart money, or fantasy inspection.
+
 - `opinion`, analyze a single prop from the sportsbook screen
 - `sportsbook`, fetch sportsbook +EV rows
 - `smart`, fetch smart money rows
@@ -106,11 +110,11 @@ Add this to your Hermes or Claude MCP config when you want to use the local repo
 
 If you prefer a direct repo path instead of a global link, use the local file path to `scripts/propprofessor-mcp-server.js` as the command target in your MCP launcher.
 
-## Available tools
+## Available MCP tools
+
+The MCP server is strict screen-only. These are the full tool names it now exposes:
 
 - `query_screen_odds`
-- `query_fantasy`
-- `query_fantasy_sorted`
 - `query_screen_odds_best_comps`
 - `query_screen_odds_ranked`
 - `query_sport_screen`
@@ -123,11 +127,6 @@ If you prefer a direct repo path instead of a global link, use the local file pa
 - `query_ncaab_screen`
 - `query_ncaaf_screen`
 - `query_tennis_screen`
-- `hide_fantasy_row`
-- `hide_ev_row`
-- `get_hidden_bets`
-- `unhide_bet`
-- `clear_hidden_bets`
 - `league_presets`
 - `health_status`
 
