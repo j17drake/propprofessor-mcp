@@ -21,7 +21,10 @@ describe('query-propprofessor tennis command', () => {
               market: 'Moneyline',
               value: 4.2,
               odds: 110,
-              lineHistory: [130, 110],
+              lineHistory: [
+                { book: 'Pinnacle', odds: 130, time: Date.now() - 5 * 60 * 60 * 1000 },
+                { book: 'Pinnacle', odds: 110, time: Date.now() - 60 * 60 * 1000 }
+              ],
               oddsHistory: [130, 110],
               selections: {
                 a: {
@@ -72,6 +75,8 @@ describe('query-propprofessor tennis command', () => {
     assert.ok(output.sample.length > 0);
     assert.ok(output.sample[0].rankingReason);
     assert.equal(output.sample[0].hasConsensus, true);
+    assert.equal(output.sample[0].movementMode, 'same_book');
+    assert.equal(Array.isArray(output.sample[0].historySportsbooksRequested), true);
     assert.ok(output.freshness);
   });
 

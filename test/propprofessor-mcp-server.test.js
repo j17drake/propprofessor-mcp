@@ -19,7 +19,31 @@ function makeEmptyScreenPayload() {
 }
 
 function createRankedScreenClientStub({
-  rankedPayload = makeEmptyScreenPayload(),
+      rankedPayload = {
+        game_data: [{
+          gameId: 'stub-game-1',
+          league: 'NBA',
+          market: 'Moneyline',
+          updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+          homeTeam: 'Stub Home',
+          awayTeam: 'Stub Away',
+          selections: {
+            a: {
+              selection1: 'Stub Home',
+              participant1: 'Stub Home',
+              selection1Id: 'Moneyline:Stub_Home',
+              selection2: 'Stub Away',
+              participant2: 'Stub Away',
+              selection2Id: 'Moneyline:Stub_Away',
+              odds: {
+                NoVigApp: { odds1: -118, odds2: 104 },
+                Polymarket: { odds1: -125, odds2: 110 }
+              }
+            }
+          },
+          defaultKey: 'a'
+        }]
+      },
   rawPayload = { ok: true, rows: [] },
   healthPayload = { ok: true, screen: { reachable: true } }
 } = {}) {
@@ -40,7 +64,10 @@ function createRankedScreenClientStub({
         calls.queryScreenOddsBestComps.push(filters);
         return rankedPayload;
       },
-      queryOddsHistory: async () => ({}),
+      queryOddsHistory: async () => ({
+        NoVigApp: [{ odds: -118, start_ts: 1 }, { odds: -130, start_ts: 2 }],
+        Polymarket: [{ odds: -125, start_ts: 3 }]
+      }),
       healthStatus: async () => {
         calls.healthStatus += 1;
         return healthPayload;
@@ -429,15 +456,43 @@ describe('propprofessor MCP server stdio contract', () => {
   }
 
   it('query_screen_odds_ranked returns a structured ranked response', async () => {
-    const { client, calls } = createRankedScreenClientStub();
+    const rankedPayload = {
+      game_data: [{
+        gameId: 'game-1',
+        league: 'NBA',
+        market: 'Moneyline',
+        updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+        homeTeam: 'Lakers',
+        awayTeam: 'Warriors',
+        selections: {
+          a: {
+            selection1: 'Lakers',
+            participant1: 'Lakers',
+            selection1Id: 'Moneyline:Lakers',
+            selection2: 'Warriors',
+            participant2: 'Warriors',
+            selection2Id: 'Moneyline:Warriors',
+            odds: {
+              NoVigApp: { odds1: -118, odds2: 104 },
+              Polymarket: { odds1: -125, odds2: 110 }
+            }
+          }
+        },
+        defaultKey: 'a'
+      }]
+    };
+    const { client, calls } = createRankedScreenClientStub({ rankedPayload });
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', includeAll: true });
+    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', includeAll: true, books: ['NoVigApp'] });
 
     assert.equal(calls.queryScreenOddsBestComps.length, 1);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
     assertBasicRankedResponse(result, 'NBA');
+    assert.equal(result.result[0].movementMode, 'same_book');
+    assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
+    assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
   });
 
   it('query_sport_screen routes non-tennis leagues through the ranked league flow', async () => {

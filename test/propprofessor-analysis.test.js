@@ -20,6 +20,7 @@ const {
   getMarketPriorityScore,
   passesLeagueRankingGate
 } = require('../lib/propprofessor-screen-utils');
+const { summarizeSharpMovement } = require('../lib/propprofessor-sharp-history');
 
 describe('normalizeMarketName', () => {
   it('normalizes common prop market names', () => {
@@ -166,6 +167,26 @@ describe('tennis screen ranking helpers', () => {
     assert.equal(americanOddsToImpliedProbability(-120) > americanOddsToImpliedProbability(-105), true);
   });
 
+  it('summarizes same-book movement with explicit quality metadata', () => {
+    const summary = summarizeSharpMovement({
+      lineHistory: [
+        { book: 'Pinnacle', odds: -142, time: 1 },
+        { book: 'Pinnacle', odds: -150, time: 2 },
+        { book: 'Polymarket', odds: -9900, time: 3 }
+      ],
+      preferredBook: 'NoVigApp',
+      sharpBooks: ['Pinnacle', 'Polymarket', 'Kalshi'],
+      options: { recentWindowHours: 6 }
+    });
+
+    assert.equal(summary.movementSourceBook, 'Pinnacle');
+    assert.equal(summary.movementMode, 'same_book');
+    assert.equal(summary.movementQuality, 'high');
+    assert.equal(summary.lineHistoryUsable, true);
+    assert.equal(summary.droppedHistoryPointCount, 1);
+    assert.equal(summary.movementLabel, 'supportive');
+  });
+
   it('derives consensus edge from nested /screen odds rows with a preferred book', () => {
     const rows = [
       {
@@ -239,6 +260,7 @@ describe('tennis screen ranking helpers', () => {
   });
 
   it('ranks general screen rows with consensus and movement metadata', () => {
+    const nowMs = Date.now();
     const rows = [
       {
         league: 'NBA',
@@ -246,7 +268,11 @@ describe('tennis screen ranking helpers', () => {
         book: 'NoVigApp',
         value: 2.1,
         odds: -110,
-        lineHistory: [-120, -110]
+        lineHistory: [
+          { book: 'NoVigApp', odds: -100, time: nowMs - 4 * 60 * 60 * 1000 },
+          { book: 'NoVigApp', odds: -105, time: nowMs - 2 * 60 * 60 * 1000 },
+          { book: 'NoVigApp', odds: -110, time: nowMs - 30 * 60 * 1000 }
+        ]
       },
       {
         league: 'NBA',
@@ -261,6 +287,11 @@ describe('tennis screen ranking helpers', () => {
     assert.equal(ranked[0].screenScore >= ranked[1].screenScore, true);
     assert.equal(typeof ranked[0].screenMarket, 'string');
     assert.equal(typeof ranked[0].scoreBreakdown.total, 'number');
+    assert.equal(ranked[0].lineHistoryUsable, true);
+    assert.equal(ranked[0].movementMode, 'same_book');
+    assert.equal(ranked[0].movementSourceBook, 'NoVigApp');
+    assert.equal(typeof ranked[0].recentClvPct, 'number');
+    assert.equal(typeof ranked[0].movementQualityScore, 'number');
   });
 
   it('filters out weak rows when includeAll is false', () => {

@@ -4,6 +4,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { findBestHistoryRow, normalizeHistoryPayload, resolveHistoryForEntity } = require('../lib/propprofessor-history');
+const { getSharpBookComparisonSet } = require('../lib/propprofessor-sharp-books');
 
 describe('propprofessor history matching', () => {
   it('does not resolve odds history from a weak book-only row match', async () => {
@@ -87,19 +88,23 @@ describe('propprofessor history matching', () => {
     assert.equal(result[2].book, 'FanDuel');
   });
 
-  it('resolves odds history from sportsbook-keyed payloads returned by the backend', async () => {
+  it('passes preferred and sharp sportsbooks into odds-history hydration requests', async () => {
+    const calls = [];
+    const sharpBooks = getSharpBookComparisonSet({ league: 'NBA', market: 'Moneyline' });
     const result = await resolveHistoryForEntity({
       client: {},
-      target: { book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Baltimore Orioles vs Boston Red Sox', odds: '-130' },
-      rows: [{ book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Baltimore Orioles vs Boston Red Sox', odds: '-130', gameId: 'game-1', selectionId: 'selection-1' }],
-      queryHistoryFn: async () => ({
-        NoVigApp: [{ odds: -120, start_ts: 1 }, { odds: -130, start_ts: 2 }],
-        FanDuel: [{ odds: -125, start_ts: 3 }]
-      })
+      target: { book: 'NoVigApp', pick: 'Boston Celtics', game: 'Boston Celtics vs Miami Heat', odds: '-142' },
+      rows: [{ book: 'NoVigApp', pick: 'Boston Celtics', game: 'Boston Celtics vs Miami Heat', odds: '-142', gameId: 'game-1', selectionId: 'Moneyline:Boston_Celtics' }],
+      preferredBook: 'NoVigApp',
+      sharpBooks,
+      queryHistoryFn: async params => {
+        calls.push(params);
+        return { NoVigApp: [{ odds: -150, start_ts: 1 }, { odds: -142, start_ts: 2 }] };
+      }
     });
 
     assert.equal(result.lineHistoryAvailable, true);
-    assert.equal(result.lineHistory.length, 3);
-    assert.equal(result.lineHistory[0].book, 'NoVigApp');
+    assert.deepEqual(calls[0].sportsbooks, ['NoVigApp', ...sharpBooks]);
+    assert.deepEqual(result.historySportsbooksRequested, ['NoVigApp', ...sharpBooks]);
   });
 });

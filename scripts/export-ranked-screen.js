@@ -91,6 +91,16 @@ function toCandidateRows(rankedRows) {
     clv_proxy_pct: row.clvProxyPct ?? null,
     screen_score: row.screenScore ?? null,
     is_actionable: Boolean(row.isActionable),
+    lineHistoryUsable: row.lineHistoryUsable ?? false,
+    movementSourceBook: row.movementSourceBook ?? null,
+    movementMode: row.movementMode ?? null,
+    movementLabel: row.movementLabel ?? null,
+    recentClvPct: row.recentClvPct ?? null,
+    movementQuality: row.movementQuality ?? null,
+    movementPointCount: row.movementPointCount ?? null,
+    filteredHistoryPointCount: row.filteredHistoryPointCount ?? null,
+    droppedHistoryPointCount: row.droppedHistoryPointCount ?? null,
+    historySportsbooksRequested: row.historySportsbooksRequested ?? [],
     ranking_reason: row.rankingReason || null,
     notes: [
       row.gateReason ? `gate=${row.gateReason}` : null,
@@ -128,7 +138,13 @@ async function main(argv = process.argv) {
   const client = createPropProfessorClient();
   const rows = extractScreenRows(payload);
   rowsLoaded = rowsLoaded || rows.length;
-  const hydratedRows = await hydrateScreenRowsWithHistory(rows, { client, lookbackHours: 12 });
+  const hydratedRows = await hydrateScreenRowsWithHistory(rows, {
+    client,
+    lookbackHours: 12,
+    preferredBook: opts.books?.[0] || 'Pinnacle',
+    sharpBooks: opts.books || ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
+    historySportsbooks: opts.books || ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']
+  });
   const rankedRows = toRankedRows(hydratedRows, league, opts.limit);
 
   const candidates = toCandidateRows(rankedRows);

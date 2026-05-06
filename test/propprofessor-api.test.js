@@ -535,8 +535,8 @@ describe('createPropProfessorClient', () => {
         },
         queryOddsHistory: async ({ gameId, selectionId }) => ({
           NoVigApp: String(selectionId).includes('Houston_Rockets')
-            ? [{ odds: -140, start_ts: 1 }, { odds: -128, start_ts: 2 }]
-            : [{ odds: 116, start_ts: 1 }, { odds: 104, start_ts: 2 }],
+            ? [{ odds: -128, start_ts: 1 }, { odds: -140, start_ts: 2 }]
+            : [{ odds: 104, start_ts: 1 }, { odds: 116, start_ts: 2 }],
           Polymarket: [{ odds: -126, start_ts: 3 }],
           meta: { gameId }
         })
@@ -593,12 +593,12 @@ describe('createPropProfessorClient', () => {
             }]
           };
         },
-        queryOddsHistory: async ({ gameId, selectionId }) => {
-          historyCalls.push({ gameId, selectionId });
+        queryOddsHistory: async ({ gameId, selectionId, sportsbooks }) => {
+          historyCalls.push({ gameId, selectionId, sportsbooks });
           return {
             NoVigApp: String(selectionId).includes('Boston_Celtics')
-              ? [{ odds: -155, start_ts: 1 }, { odds: -142, start_ts: 2 }]
-              : [{ odds: 135, start_ts: 1 }, { odds: 122, start_ts: 2 }],
+              ? [{ odds: -142, start_ts: 1 }, { odds: -155, start_ts: 2 }]
+              : [{ odds: 122, start_ts: 1 }, { odds: 135, start_ts: 2 }],
             Polymarket: [{ odds: -150, start_ts: 3 }],
             meta: { gameId }
           };
@@ -616,8 +616,13 @@ describe('createPropProfessorClient', () => {
     assert.equal(result.result[0].historyMatchedBy, 'selectionId');
     assert.equal(result.result[0].lineHistoryLookbackHours, 6);
     assert.equal(typeof result.result[0].clvProxyPct, 'number');
+    assert.equal(result.result[0].movementMode, 'same_book');
+    assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
+    assert.equal(result.result[0].lineHistoryUsable, true);
+    assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
     assert.deepEqual(screenCalls[0].books, ['NoVigApp']);
     assert.equal(historyCalls.length >= 1, true);
+    assert.deepEqual(historyCalls[0].sportsbooks, ['NoVigApp']);
   });
 
   it('query_sport_screen reuses the ranked league flow for non-tennis leagues', async () => {

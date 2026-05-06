@@ -140,7 +140,14 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
 
   const rows = extractRows(payload);
   if (command === 'tennis') {
-    const hydratedRows = await hydrateScreenRowsWithHistory(rows, { client, lookbackHours: 12 });
+    const tennisBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const hydratedRows = await hydrateScreenRowsWithHistory(rows, {
+      client,
+      lookbackHours: 12,
+      preferredBook: tennisBooks[0] || 'Pinnacle',
+      sharpBooks: tennisBooks,
+      historySportsbooks: tennisBooks
+    });
     const ranked = rankTennisScreenRows(hydratedRows, { limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
     const normalized = normalizeScreenRowTimes(ranked);
     console.log(JSON.stringify({
@@ -151,7 +158,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       notes: {
         consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
         clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: normalized.some(row => row.clvProxyPct !== null),
+        movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
         timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
       }
     }, null, 2));
@@ -159,7 +166,14 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   }
 
   if (command === 'screen') {
-    const hydratedRows = await hydrateScreenRowsWithHistory(rows, { client, lookbackHours: 12 });
+    const screenBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const hydratedRows = await hydrateScreenRowsWithHistory(rows, {
+      client,
+      lookbackHours: 12,
+      preferredBook: screenBooks[0] || 'NoVigApp',
+      sharpBooks: screenBooks,
+      historySportsbooks: screenBooks
+    });
     const ranked = rankLeagueScreenRows(hydratedRows, { league: opts.league || 'NBA', market: opts.market || 'Moneyline', limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
     const normalized = normalizeScreenRowTimes(ranked);
     console.log(JSON.stringify({
@@ -170,7 +184,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       notes: {
         consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
         clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: normalized.some(row => row.clvProxyPct !== null),
+        movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
         timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
       }
     }, null, 2));
