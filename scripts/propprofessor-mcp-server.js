@@ -34,48 +34,8 @@ function buildToolDefinitions() {
       }
     },
     {
-      name: 'query_fantasy',
-      description: 'Query the live single-play fantasy payload from /fantasy with app, league, EV, and timing filters.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          fantasyApps: { type: 'array', items: { type: 'string' }, description: 'Fantasy apps such as PrizePicks or Underdog' },
-          leagues: { type: 'array', items: { type: 'string' }, description: 'League filters such as NBA' },
-          minOdds: { type: 'number' },
-          maxOdds: { type: 'number' },
-          minLegEV: { type: 'number' },
-          minSlipEV: { type: 'number' },
-          minHoursAway: { type: 'number' },
-          maxHoursAway: { type: 'number' },
-          hiddenBets: { type: 'array', items: { type: 'string' } },
-          liveStatus: { type: 'string', description: 'prematch, live, or all depending on backend support' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_fantasy_sorted',
-      description: 'Query /fantasy and return rows sorted by value descending, best plays first.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          fantasyApps: { type: 'array', items: { type: 'string' } },
-          leagues: { type: 'array', items: { type: 'string' } },
-          minOdds: { type: 'number' },
-          maxOdds: { type: 'number' },
-          minLegEV: { type: 'number' },
-          minSlipEV: { type: 'number' },
-          minHoursAway: { type: 'number' },
-          maxHoursAway: { type: 'number' },
-          hiddenBets: { type: 'array', items: { type: 'string' } },
-          liveStatus: { type: 'string' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
       name: 'query_screen_odds_best_comps',
-      description: 'Query /screen using a sharper default comparison set: NoVigApp, Polymarket, Kalshi, BetOnline, and Circa.',
+      description: 'Query /screen using a market-aware sharp-book comparison set with league-specific defaults.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -107,7 +67,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_sport_screen',
-      description: 'Query /screen for any supported sport using the best-comps default comparison set.',
+      description: 'Query /screen for any supported sport using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -126,7 +86,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_nba_screen',
-      description: 'Query /screen for NBA using the best-comps default comparison set.',
+      description: 'Query /screen for NBA using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -143,7 +103,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_wnba_screen',
-      description: 'Query /screen for WNBA using the best-comps default comparison set.',
+      description: 'Query /screen for WNBA using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -160,7 +120,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_mlb_screen',
-      description: 'Query /screen for MLB using the best-comps default comparison set.',
+      description: 'Query /screen for MLB using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -177,7 +137,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_nfl_screen',
-      description: 'Query /screen for NFL using the best-comps default comparison set.',
+      description: 'Query /screen for NFL using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -194,7 +154,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_nhl_screen',
-      description: 'Query /screen for NHL using the best-comps default comparison set.',
+      description: 'Query /screen for NHL using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -211,7 +171,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_soccer_screen',
-      description: 'Query /screen for Soccer using the best-comps default comparison set.',
+      description: 'Query /screen for Soccer using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -228,7 +188,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_ncaab_screen',
-      description: 'Query /screen for NCAAB using the best-comps default comparison set.',
+      description: 'Query /screen for NCAAB using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -245,7 +205,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'query_ncaaf_screen',
-      description: 'Query /screen for NCAAF using the best-comps default comparison set.',
+      description: 'Query /screen for NCAAF using the market-aware sharp-book default comparison set.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -276,72 +236,6 @@ function buildToolDefinitions() {
       }
     },
     {
-      name: 'hide_fantasy_row',
-      description: 'Hide one /fantasy single-play row by exact id or by matching fantasy app, participant, market, selection type, and line.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', description: 'Exact fantasy row id from the backend payload' },
-          fantasyApp: { type: 'string', description: 'Fantasy app such as DraftKings6 or Underdog' },
-          participant: { type: 'string', description: 'Player name, for example Jaylen Brown' },
-          market: { type: 'string', description: 'Market name, for example Player Points' },
-          selectionType: { type: 'string', description: 'Over or Under' },
-          line: { type: 'number', description: 'Fantasy line, for example 22.5' },
-          leagues: { type: 'array', items: { type: 'string' }, description: 'Optional league filter to narrow the match' },
-          liveStatus: { type: 'string', description: 'prematch, live, or all' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'hide_ev_row',
-      description: 'Hide one /positive_ev row by exact id or by matching book, participant, market, and line.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', description: 'Exact +EV row id from the sportsbook payload' },
-          book: { type: 'string', description: 'Sportsbook name, for example DraftKings or FanDuel' },
-          participant: { type: 'string', description: 'Player or team name' },
-          market: { type: 'string', description: 'Market name, for example Player Points or Point Spread' },
-          selection: { type: 'string', description: 'Selection text, for example Jaylen Brown Over 22.5' },
-          line: { type: 'number', description: 'Line value, for example 22.5' },
-          leagues: { type: 'array', items: { type: 'string' }, description: 'Optional league filter to narrow the match' },
-          userState: { type: 'string', description: 'Optional user state, default tx' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'get_hidden_bets',
-      description: 'Get the current hidden bet list from PropProfessor.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'unhide_bet',
-      description: 'Restore a hidden bet by id.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string', description: 'Hidden bet id to restore' }
-        },
-        required: ['id'],
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'clear_hidden_bets',
-      description: 'Clear all hidden bets from PropProfessor.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false
-      }
-    },
-    {
       name: 'league_presets',
       description: 'Return the current sport-specific ranking presets used by screen ranking.',
       inputSchema: {
@@ -352,7 +246,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'health_status',
-      description: 'Check auth freshness and confirm the PropProfessor screen and fantasy endpoints respond.',
+      description: 'Check auth freshness and confirm the PropProfessor screen endpoint responds.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -422,36 +316,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         participants: Array.isArray(args.participants) ? args.participants : [],
         books: Array.isArray(args.books) ? args.books : [],
         is_live: Boolean(args.is_live)
-      });
-      return { ok: true, result: payload };
-    },
-    async query_fantasy(args = {}) {
-      const payload = await client.queryFantasyPicks({
-        fantasyApps: Array.isArray(args.fantasyApps) ? args.fantasyApps : undefined,
-        leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
-        minOdds: args.minOdds,
-        maxOdds: args.maxOdds,
-        minLegEV: args.minLegEV,
-        minSlipEV: args.minSlipEV,
-        minHoursAway: args.minHoursAway,
-        maxHoursAway: args.maxHoursAway,
-        hiddenBets: Array.isArray(args.hiddenBets) ? args.hiddenBets : undefined,
-        liveStatus: args.liveStatus
-      });
-      return { ok: true, result: payload };
-    },
-    async query_fantasy_sorted(args = {}) {
-      const payload = await client.queryFantasyPicksSorted({
-        fantasyApps: Array.isArray(args.fantasyApps) ? args.fantasyApps : undefined,
-        leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
-        minOdds: args.minOdds,
-        maxOdds: args.maxOdds,
-        minLegEV: args.minLegEV,
-        minSlipEV: args.minSlipEV,
-        minHoursAway: args.minHoursAway,
-        maxHoursAway: args.maxHoursAway,
-        hiddenBets: Array.isArray(args.hiddenBets) ? args.hiddenBets : undefined,
-        liveStatus: args.liveStatus
       });
       return { ok: true, result: payload };
     },
@@ -560,127 +424,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         maxAgeMs
       });
       return { ok: true, result: ranked, freshness: summarizeFreshness(rows) };
-    },
-    async hide_fantasy_row(args = {}) {
-      let match = null;
-      if (args.id) {
-        const rows = await client.queryFantasyPicks({
-          fantasyApps: args.fantasyApp ? [args.fantasyApp] : undefined,
-          leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
-          liveStatus: args.liveStatus
-        });
-        match = (Array.isArray(rows) ? rows : []).find(row => row && row.id === args.id);
-      } else {
-        const rows = await client.queryFantasyPicks({
-          fantasyApps: args.fantasyApp ? [args.fantasyApp] : undefined,
-          leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
-          liveStatus: args.liveStatus
-        });
-        const normalizedParticipant = String(args.participant || '').trim().toLowerCase();
-        const normalizedMarket = String(args.market || '').trim().toLowerCase();
-        const normalizedSelectionType = String(args.selectionType || '').trim().toLowerCase();
-        const normalizedFantasyApp = String(args.fantasyApp || '').trim().toLowerCase();
-        const targetLine = typeof args.line === 'number' ? args.line : Number(args.line);
-        const candidates = (Array.isArray(rows) ? rows : []).filter(row => {
-          if (!row) return false;
-          if (normalizedFantasyApp && String(row.fantasyApp || '').trim().toLowerCase() !== normalizedFantasyApp) return false;
-          if (normalizedParticipant && String(row.participant || '').trim().toLowerCase() !== normalizedParticipant) return false;
-          if (normalizedMarket && String(row.market || '').trim().toLowerCase() !== normalizedMarket) return false;
-          if (normalizedSelectionType && String(row.selectionType || '').trim().toLowerCase() !== normalizedSelectionType) return false;
-          if (Number.isFinite(targetLine) && Number(row.line) !== targetLine) return false;
-          return true;
-        });
-        if (candidates.length > 1) {
-          throw new Error(`Ambiguous fantasy row match: found ${candidates.length} rows. Add id or narrow the filters.`);
-        }
-        match = candidates[0] || null;
-      }
-      if (!match) {
-        throw new Error('Fantasy row not found for hide request.');
-      }
-      const payload = await client.hideBet({
-        id: match.id,
-        gameId: match.gameId,
-        league: match.league,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-        market: match.market,
-        selectionId: match.selectionId,
-        selection: match.selection,
-        book: match.fantasyApp,
-        odds: match.odds,
-        value: match.value,
-        page: 'Fantasy',
-        start: match.start
-      });
-      return { ok: true, matched: match, result: payload };
-    },
-    async hide_ev_row(args = {}) {
-      let match = null;
-      if (args.id) {
-        const rows = await client.querySportsbook({
-          leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
-          userState: args.userState || 'tx'
-        });
-        match = (Array.isArray(rows) ? rows : []).find(row => row && row.id === args.id);
-      } else {
-        const rows = await client.querySportsbook({
-          leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
-          userState: args.userState || 'tx'
-        });
-        const normalizedBook = String(args.book || '').trim().toLowerCase();
-        const normalizedParticipant = String(args.participant || '').trim().toLowerCase();
-        const normalizedMarket = String(args.market || '').trim().toLowerCase();
-        const normalizedSelection = String(args.selection || '').trim().toLowerCase();
-        const targetLine = typeof args.line === 'number' ? args.line : Number(args.line);
-        const candidates = (Array.isArray(rows) ? rows : []).filter(row => {
-          if (!row) return false;
-          if (normalizedBook && String(row.book || '').trim().toLowerCase() !== normalizedBook) return false;
-          if (normalizedParticipant && String(row.participant || '').trim().toLowerCase() !== normalizedParticipant) return false;
-          if (normalizedMarket && String(row.market || '').trim().toLowerCase() !== normalizedMarket) return false;
-          if (normalizedSelection && String(row.selection || '').trim().toLowerCase() !== normalizedSelection) return false;
-          if (Number.isFinite(targetLine) && Number(row.line) !== targetLine) return false;
-          return true;
-        });
-        if (candidates.length > 1) {
-          throw new Error(`Ambiguous +EV row match: found ${candidates.length} rows. Add id or narrow the filters.`);
-        }
-        match = candidates[0] || null;
-      }
-      if (!match) {
-        throw new Error('+EV row not found for hide request.');
-      }
-      const payload = await client.hideBet({
-        id: match.id,
-        gameId: match.gameId,
-        league: match.league,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-        market: match.market,
-        selectionId: match.selectionId || match.selection,
-        selection: match.selection,
-        book: match.book,
-        odds: match.odds,
-        value: match.ev,
-        page: '+EV',
-        start: match.start
-      });
-      return { ok: true, matched: match, result: payload };
-    },
-    async get_hidden_bets() {
-      const result = await client.getHiddenBets();
-      return { ok: true, result };
-    },
-    async unhide_bet(args = {}) {
-      if (!args.id) {
-        throw new Error('id is required');
-      }
-      const result = await client.unhideBet(args.id);
-      return { ok: true, result };
-    },
-    async clear_hidden_bets() {
-      const result = await client.clearHiddenBets();
-      return { ok: true, result };
     },
     async league_presets() {
       return { ok: true, result: buildLeaguePresetSummary() };

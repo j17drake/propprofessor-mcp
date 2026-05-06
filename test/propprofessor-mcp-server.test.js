@@ -109,15 +109,7 @@ function createMockClient() {
         }
       ]
     }),
-    queryFantasyPicks: async () => ([]),
-    queryFantasyPicksSorted: async () => ([]),
-    querySportsbook: async () => ([]),
-    querySmartMoney: async () => ([]),
-    getHiddenBets: async () => ([]),
-    unhideBet: async () => ({ ok: true }),
-    clearHiddenBets: async () => ({ ok: true }),
-    healthStatus: async () => ({ ok: true }),
-    hideBet: async () => ({ ok: true })
+    healthStatus: async () => ({ ok: true })
   };
 }
 
@@ -145,14 +137,8 @@ describe('propprofessor MCP server stdio contract', () => {
       assert.equal(toolsResponse.id, 2);
       const toolNames = toolsResponse.result.tools.map(tool => tool.name).sort();
       assert.deepEqual(toolNames, [
-        'clear_hidden_bets',
-        'get_hidden_bets',
         'health_status',
-        'hide_ev_row',
-        'hide_fantasy_row',
         'league_presets',
-        'query_fantasy',
-        'query_fantasy_sorted',
         'query_mlb_screen',
         'query_nba_screen',
         'query_ncaab_screen',
@@ -165,8 +151,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_soccer_screen',
         'query_sport_screen',
         'query_tennis_screen',
-        'query_wnba_screen',
-        'unhide_bet'
+        'query_wnba_screen'
       ]);
     } finally {
       proc.kill('SIGTERM');
