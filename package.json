@@ -42,6 +42,7 @@
     "mcp": "node scripts/propprofessor-mcp-server.js",
     "query": "node scripts/query-propprofessor.js",
     "export-screen": "node scripts/export-ranked-screen.js",
+    "check:version": "node scripts/check-version-consistency.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
