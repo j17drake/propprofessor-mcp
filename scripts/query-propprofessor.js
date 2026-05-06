@@ -1,7 +1,10 @@
 'use strict';
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
-const { analyzePlayerPropBet, parseBetPrompt, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, summarizeFreshness, getLeagueRankingPreset } = require('../lib/propprofessor-analysis');
+const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
+const { getLocalTimezone } = require('../lib/mcp-runtime-config');
+const { parseBetPrompt, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, summarizeFreshness, getLeagueRankingPreset } = require('../lib/propprofessor-screen-utils');
+const { hydrateScreenRowsWithHistory } = require('../lib/propprofessor-screen-history');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -26,6 +29,9 @@ function parseArgs(argv) {
     } else if (arg === '--limit') {
       opts.limit = next;
       i += 1;
+    } else if (arg === '--max-age-ms' || arg === '--maxAgeMs') {
+      opts.maxAgeMs = next;
+      i += 1;
     } else if (arg === '--league' || arg === '-g') {
       opts.league = next;
       i += 1;
@@ -46,39 +52,40 @@ function extractRows(payload) {
   return extractScreenRows(payload);
 }
 
+function formatLocalStart(value, timeZone = getLocalTimezone()) {
+  if (!value) return null;
+  const raw = String(value);
+  const hasExplicitZone = /([zZ]|[+-]\d\d:?\d\d)$/.test(raw);
+  const date = new Date(hasExplicitZone ? raw : `${raw}Z`);
+  if (Number.isNaN(date.getTime())) return raw;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  }).format(date);
+}
+
+function normalizeScreenRowTimes(rows, timeZone = getLocalTimezone()) {
+  return (Array.isArray(rows) ? rows : []).map(row => {
+    const startLabel = formatLocalStart(row?.start, timeZone);
+    return {
+      ...row,
+      startRaw: row?.start ?? null,
+      startLocal: startLabel,
+      startDisplay: startLabel
+    };
+  });
+}
+
 async function main({ argv = process.argv, client = createPropProfessorClient(), logger = console } = {}) {
   const { command, opts } = parseArgs(argv);
   if (command === 'help') {
-    logger.log([
-      'Usage: node scripts/query-propprofessor.js <command> [options]',
-      '',
-      'Commands:',
-      '  opinion   Analyze a single prop from the sportsbook screen',
-      '  sportsbook  Fetch sportsbook +EV rows',
-      '  smart     Fetch smart money rows',
-      '  fantasy   Fetch fantasy rows',
-      '  tennis    Query and rank tennis screen rows',
-      '  screen    Query any sport screen with --league',
-      '  sport     Alias for screen, use --league to pick the sport',
-      '  nba       NBA screen shorthand',
-      '  wnba      WNBA screen shorthand',
-      '  mlb       MLB screen shorthand',
-      '  nfl       NFL screen shorthand',
-      '  nhl       NHL screen shorthand',
-      '  soccer    Soccer screen shorthand',
-      '  ncaab     NCAAB screen shorthand',
-      '  ncaaf     NCAAF screen shorthand',
-      '  presets   Show the active league presets',
-      '  list      Show the command inventory',
-      '  health    Check auth and endpoint health',
-      '',
-      'Examples:',
-      '  pp-query nba --market Moneyline',
-      '  pp-query wnba --market Moneyline',
-      '  pp-query sport --league WNBA --market Moneyline',
-      '  pp-query tennis --market Moneyline --limit 10',
-      '  pp-query opinion --player "James Harden" --market Points --line 18.5 --side over'
-    ].join('\n'));
+    logger.log('Usage: node scripts/query-propprofessor.js opinion --player "James Harden" --market "Points" --line 18.5 --side over');
     process.exitCode = 0;
     return;
   }
@@ -101,57 +108,27 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     payload = await client.querySportsbook();
   } else if (command === 'smart') {
     payload = await client.querySmartMoney();
-  } else if (command === 'fantasy') {
-    payload = await client.queryFantasyPicks();
   } else if (command === 'tennis') {
-    payload = await client.queryScreenOddsBestComps({
+    const tennisQuery = typeof client.queryScreenOdds === 'function'
+      ? client.queryScreenOdds.bind(client)
+      : client.queryScreenOddsBestComps.bind(client);
+    payload = await tennisQuery({
       league: 'Tennis',
       market: opts.market || 'Moneyline',
       books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
       is_live: Boolean(opts.live)
     });
-  } else if (command === 'screen' || command === 'sport' || command === 'nba' || command === 'mlb' || command === 'nfl' || command === 'nhl' || command === 'soccer' || command === 'ncaab' || command === 'ncaaf' || command === 'wnba') {
-    const leagueMap = {
-      screen: opts.league || 'NBA',
-      sport: opts.league || 'NBA',
-      nba: 'NBA',
-      wnba: 'WNBA',
-      mlb: 'MLB',
-      nfl: 'NFL',
-      nhl: 'NHL',
-      soccer: 'SOCCER',
-      ncaab: 'NCAAB',
-      ncaaf: 'NCAAF'
-    };
-    const league = leagueMap[command];
+  } else if (command === 'screen') {
     payload = await client.queryScreenOddsBestComps({
-      league,
+      league: opts.league || 'NBA',
       market: opts.market || 'Moneyline',
       books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
       is_live: Boolean(opts.live)
     });
   } else if (command === 'presets') {
-    const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
+    const leagues = ['NBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
     const presets = leagues.map(league => getLeagueRankingPreset(league));
     console.log(JSON.stringify({ command, presets }, null, 2));
-    return;
-  } else if (command === 'list') {
-    console.log(JSON.stringify({
-      command,
-      commands: ['sportsbook', 'smart', 'fantasy', 'screen', 'sport', 'nba', 'wnba', 'mlb', 'nfl', 'nhl', 'soccer', 'ncaab', 'ncaaf', 'tennis', 'presets', 'list', 'health', 'opinion'],
-      aliases: {
-        screen: 'Generic screen query, defaults to NBA unless --league is set',
-        sport: 'Generic screen query, defaults to NBA unless --league is set',
-        nba: 'NBA screen shorthand',
-        wnba: 'WNBA screen shorthand',
-        mlb: 'MLB screen shorthand',
-        nfl: 'NFL screen shorthand',
-        nhl: 'NHL screen shorthand',
-        soccer: 'Soccer screen shorthand',
-        ncaab: 'NCAAB screen shorthand',
-        ncaaf: 'NCAAF screen shorthand'
-      }
-    }, null, 2));
     return;
   } else if (command === 'health') {
     const result = await client.healthStatus();
@@ -163,32 +140,38 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
 
   const rows = extractRows(payload);
   if (command === 'tennis') {
-    const ranked = rankTennisScreenRows(rows, { limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
+    const hydratedRows = await hydrateScreenRowsWithHistory(rows, { client, lookbackHours: 12 });
+    const ranked = rankTennisScreenRows(hydratedRows, { limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
+    const normalized = normalizeScreenRowTimes(ranked);
     console.log(JSON.stringify({
       command,
-      count: ranked.length,
-      sample: ranked,
+      count: normalized.length,
+      sample: normalized,
       freshness: summarizeFreshness(rows),
       notes: {
         consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
         clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: ranked.some(row => row.clvProxyPct !== null)
+        movementAvailable: normalized.some(row => row.clvProxyPct !== null),
+        timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
       }
     }, null, 2));
     return;
   }
 
-  if (command === 'screen' || command === 'sport') {
-    const ranked = rankLeagueScreenRows(rows, { league: opts.league || 'NBA', limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
+  if (command === 'screen') {
+    const hydratedRows = await hydrateScreenRowsWithHistory(rows, { client, lookbackHours: 12 });
+    const ranked = rankLeagueScreenRows(hydratedRows, { league: opts.league || 'NBA', market: opts.market || 'Moneyline', limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
+    const normalized = normalizeScreenRowTimes(ranked);
     console.log(JSON.stringify({
       command,
-      count: ranked.length,
-      sample: ranked,
+      count: normalized.length,
+      sample: normalized,
       freshness: summarizeFreshness(rows),
       notes: {
         consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
         clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: ranked.some(row => row.clvProxyPct !== null)
+        movementAvailable: normalized.some(row => row.clvProxyPct !== null),
+        timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
       }
     }, null, 2));
     return;

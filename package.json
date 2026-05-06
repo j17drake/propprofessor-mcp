@@ -41,10 +41,11 @@
   "scripts": {
     "mcp": "node scripts/propprofessor-mcp-server.js",
     "query": "node scripts/query-propprofessor.js",
+    "export-screen": "node scripts/export-ranked-screen.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "got-scraping": "^4.1.1",
+    "got-scraping": "^4.2.1",
     "superjson": "^2.2.6"
   }
 }
