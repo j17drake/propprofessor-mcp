@@ -1,8 +1,8 @@
 # PropProfessor MCP
 
-Standalone MCP server for PropProfessor's screen endpoints, plus a small query CLI for local analysis.
+Screen-first PropProfessor MCP server, plus a broader local query CLI for maintenance and analysis.
 
-![npm version](https://img.shields.io/badge/version-1.0.3-blue)
+![npm version](https://img.shields.io/badge/version-1.0.4-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![node](https://img.shields.io/badge/node-%3E%3D18-339933)
 

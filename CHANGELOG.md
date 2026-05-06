@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.4
+
+- Tightened package metadata to describe the screen-first MCP surface and the broader local CLI split
+- Synced package-lock metadata with package.json after the screen-only cleanup follow-up
+- Added MCP regression coverage for removed fantasy tool names returning `Unknown tool`
+- Fixed `pp-query sport` so it returns ranked screen output like `pp-query screen`
+- Fixed `pp-query list` so the documented `list` command is included in the emitted command inventory
+
 ## 1.0.3
 
 - Added WNBA sport support across the MCP server, CLI, and ranking presets

@@ -223,4 +223,35 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(response.result.structuredContent.ok, true);
     assert.ok(Array.isArray(response.result.structuredContent.result));
   });
+
+  it('returns Unknown tool for removed fantasy MCP methods', async () => {
+    const server = createMcpServer({
+      handlers: createMcpHandlers({ client: createMockClient() })
+    });
+
+    await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'test-client', version: '1.0.0' }
+      }
+    });
+
+    const removedTools = ['query_fantasy', 'query_fantasy_sorted', 'hide_fantasy_row'];
+    for (const toolName of removedTools) {
+      const response = await server.handleRequest({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: toolName, arguments: {} }
+      });
+
+      assert.equal(response.id, 2);
+      assert.equal(response.error.code, -32601);
+      assert.match(response.error.message, new RegExp(`Unknown tool: ${toolName}`));
+    }
+  });
 });
