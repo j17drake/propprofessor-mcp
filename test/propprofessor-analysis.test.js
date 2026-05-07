@@ -16,6 +16,7 @@ const {
   rankScreenRows,
   rankTennisScreenRows,
   rankLeagueScreenRows,
+  summarizeFreshness,
   getLeagueRankingPreset,
   getMarketPriorityScore,
   passesLeagueRankingGate
@@ -454,6 +455,98 @@ describe('tennis screen ranking helpers', () => {
     assert.equal(ranked[0].freshnessMs > 0, true);
     assert.match(ranked[0].rankingReason, /stale data/);
     assert.equal(ranked[0].scoreBreakdown.freshnessPenalty < 0, true);
+  });
+
+  it('summarizeFreshness reports timestamp sources and falls back to response age for undated rows', () => {
+    const now = new Date('2026-04-24T13:00:00.000Z').getTime();
+    const withTimestamps = summarizeFreshness([
+      { updatedAt: new Date(now - 10 * 1000).toISOString() },
+      { payload: { updatedAt: new Date(now - 30 * 1000).toISOString() } },
+      { meta: { timestamp: new Date(now - 20 * 1000).toISOString() } }
+    ], now, { maxAgeMs: 15 * 1000 });
+
+    assert.equal(withTimestamps.rowCount, 3);
+    assert.equal(withTimestamps.newestAgeMs, 10000);
+    assert.equal(withTimestamps.oldestAgeMs, 30000);
+    assert.equal(withTimestamps.staleCount, 2);
+    assert.equal(withTimestamps.stale, true);
+    assert.deepEqual(withTimestamps.timestampSources, {
+      updatedAt: 1,
+      'payload.updatedAt': 1,
+      'meta.timestamp': 1
+    });
+    assert.equal(withTimestamps.freshnessFallbackUsed, false);
+
+    const fallback = summarizeFreshness([{ league: 'NBA' }, { league: 'NFL' }], now);
+    assert.equal(fallback.rowCount, 2);
+    assert.equal(fallback.newestAgeMs, 0);
+    assert.equal(fallback.oldestAgeMs, 0);
+    assert.equal(fallback.freshnessFallbackUsed, true);
+    assert.deepEqual(fallback.timestampSources, { response_received: 2 });
+  });
+
+  it('exposes richer movement debug metadata on ranked rows', () => {
+    const nowMs = Date.now();
+    const ranked = rankScreenRows([
+      {
+        league: 'NBA',
+        market: 'Moneyline',
+        book: 'NoVigApp',
+        value: 2.4,
+        odds: -112,
+        lineHistory: [
+          { book: 'NoVigApp', odds: -104, time: nowMs - 5 * 60 * 60 * 1000 },
+          { book: 'NoVigApp', odds: -104, time: nowMs - 4 * 60 * 60 * 1000 },
+          { book: 'NoVigApp', odds: -112, time: nowMs - 60 * 60 * 1000 },
+          { book: 'Polymarket', odds: -9999, time: nowMs - 30 * 60 * 1000 }
+        ],
+        historySportsbooksRequested: ['NoVigApp', 'Polymarket']
+      }
+    ], { limit: 5, includeAll: true });
+
+    assert.equal(ranked.length, 1);
+    assert.deepEqual(ranked[0].droppedHistoryReasons ?? ranked[0].movementDebug?.droppedHistoryReasons, { duplicate_consecutive: 1, outlier_odds: 1 });
+    assert.equal(Array.isArray(ranked[0].filteredLineHistory), true);
+    assert.equal(Array.isArray(ranked[0].droppedHistoryPoints), true);
+    assert.equal(typeof ranked[0].openToCurrentClvPct, 'number');
+    assert.equal(typeof ranked[0].movementDebug, 'object');
+    assert.equal(ranked[0].movementDebug.movementMode, ranked[0].movementMode);
+    assert.equal(ranked[0].movementDebug.openToCurrentClvPct, ranked[0].openToCurrentClvPct);
+    assert.equal(ranked[0].freshnessSource, 'response_received');
+    assert.equal(ranked[0].freshnessFallbackUsed, true);
+    assert.equal(ranked[0].rankingProvenance.focusBook, 'NoVigApp');
+    assert.equal(ranked[0].rankingProvenance.lineHistorySource, null);
+    assert.deepEqual(ranked[0].historySportsbooksRequested, ['NoVigApp', 'Polymarket']);
+  });
+
+  it('can suppress verbose debug payloads while keeping provenance metadata', () => {
+    const ranked = rankScreenRows([
+      {
+        league: 'NBA',
+        market: 'Moneyline',
+        book: 'NoVigApp',
+        participant: 'Boston Celtics',
+        selection: 'Boston Celtics',
+        pick: 'Boston Celtics',
+        odds: -118,
+        currentOdds: -118,
+        consensusEdge: 2.4,
+        hasConsensus: true,
+        consensusBookCount: 2,
+        lineHistory: [
+          { book: 'NoVigApp', odds: -125, time: Date.now() - 60_000 },
+          { book: 'NoVigApp', odds: -118, time: Date.now() }
+        ],
+        historySportsbooksRequested: ['NoVigApp']
+      }
+    ], { limit: 5, includeAll: true, debug: false });
+
+    assert.equal(ranked.length, 1);
+    assert.equal(Object.prototype.hasOwnProperty.call(ranked[0], 'movementDebug'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(ranked[0], 'filteredLineHistory'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(ranked[0], 'droppedHistoryReasons'), false);
+    assert.ok(ranked[0].rankingProvenance);
+    assert.equal(ranked[0].rankingProvenance.focusBook, 'NoVigApp');
   });
 
   it('maps spread and total market names into tennis screen query groups', () => {

@@ -3,7 +3,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { findBestHistoryRow, normalizeHistoryPayload, resolveHistoryForEntity } = require('../lib/propprofessor-history');
+const { findBestHistoryRow, normalizeHistoryPayload, resolveHistoryForEntity, getOddsHistoryStartTimestamp } = require('../lib/propprofessor-history');
 const { getSharpBookComparisonSet } = require('../lib/propprofessor-sharp-books');
 
 describe('propprofessor history matching', () => {
@@ -35,7 +35,7 @@ describe('propprofessor history matching', () => {
     assert.equal(calls[0].gameId, 'game-1');
   });
 
-  it('queries backend odds history using the last 12 hours by default', async () => {
+  it('queries backend odds history using the configured default lookback window', async () => {
     const calls = [];
     const fixedNowMs = Date.UTC(2026, 3, 26, 12, 0, 0);
     const result = await resolveHistoryForEntity({
@@ -47,7 +47,15 @@ describe('propprofessor history matching', () => {
     });
 
     assert.equal(result.lineHistoryAvailable, true);
-    assert.equal(calls[0].startTimestamp, Math.floor(fixedNowMs / 1000) - 12 * 60 * 60);
+    assert.equal(calls[0].startTimestamp, Math.floor(fixedNowMs / 1000) - 6 * 60 * 60);
+  });
+
+  it('falls back to the default lookback window for invalid values', () => {
+    const fixedNowMs = Date.UTC(2026, 3, 26, 12, 0, 0);
+    assert.equal(
+      getOddsHistoryStartTimestamp({ lookbackHours: 0, nowMs: fixedNowMs }),
+      Math.floor(fixedNowMs / 1000) - 6 * 60 * 60
+    );
   });
 
   it('uses target ids when the best matching backend row is missing resolvable ids', async () => {

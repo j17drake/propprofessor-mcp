@@ -8,7 +8,9 @@ const {
   getLeagueRankingPreset,
   getLimit,
   getMaxAgeMs,
-  normalizeBookList
+  normalizeBookList,
+  getDebugFlag,
+  DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS
 } = require('../lib/propprofessor-mcp-ranked-screen');
 const { getSharpBookComparisonSet, getSharpBookContext } = require('../lib/propprofessor-sharp-books');
 const {
@@ -72,6 +74,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
           includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
           maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
+          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
+          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' },
           is_live: { type: 'boolean', description: 'Whether to query live odds' }
         },
         additionalProperties: false
@@ -89,6 +93,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
           includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
           maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
+          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
+          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' },
           is_live: { type: 'boolean', description: 'Whether to query live odds' }
         },
         required: ['league'],
@@ -106,6 +112,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -122,6 +130,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -138,6 +148,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -154,6 +166,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -170,6 +184,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -186,6 +202,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -202,6 +220,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -218,6 +238,8 @@ function buildToolDefinitions() {
           books: { type: 'array', items: { type: 'string' } },
           includeAll: { type: 'boolean' },
           maxAgeMs: { type: 'number' },
+          lookbackHours: { type: 'number' },
+          debug: { type: 'boolean' },
           is_live: { type: 'boolean' }
         },
         additionalProperties: false
@@ -234,6 +256,8 @@ function buildToolDefinitions() {
           book: { type: 'string', description: 'Preferred book to rank, default Pinnacle. Set to Fliff for Fliff-only results.' },
           books: { type: 'array', items: { type: 'string' }, description: 'Optional book filters for the backend query' },
           maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
+          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
+          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' },
           is_live: { type: 'boolean', description: 'Whether to query live tennis odds' }
         },
         additionalProperties: false
@@ -321,13 +345,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       args,
       league,
       focusBook,
-      rankRows: hydratedRows => rankLeagueScreenRows(hydratedRows, {
+      rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
         league,
         market,
         limit: getLimit(args),
         books: requestedBooks.length ? requestedBooks : undefined,
         includeAll: getIncludeAll(args),
-        maxAgeMs: getMaxAgeMs(args)
+        maxAgeMs: getMaxAgeMs(args),
+        debug
       })
     });
   }
@@ -396,13 +421,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         args,
         league,
         focusBook,
-        rankRows: hydratedRows => rankLeagueScreenRows(hydratedRows, {
+        rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
           league,
           market,
           limit: getLimit(args),
           books: requestedBooks.length ? requestedBooks : undefined,
           includeAll: getIncludeAll(args),
-          maxAgeMs: getMaxAgeMs(args)
+          maxAgeMs: getMaxAgeMs(args),
+          debug
         })
       });
     },
@@ -465,11 +491,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         args,
         league: 'Tennis',
         focusBook: preferredBook,
-        rankRows: hydratedRows => rankTennisScreenRows(hydratedRows, {
+        rankRows: (hydratedRows, { debug } = {}) => rankTennisScreenRows(hydratedRows, {
           limit: getLimit(args),
           preferredBook,
           includeAll: getIncludeAll(args),
-          maxAgeMs: getMaxAgeMs(args)
+          maxAgeMs: getMaxAgeMs(args),
+          debug
         })
       });
     },

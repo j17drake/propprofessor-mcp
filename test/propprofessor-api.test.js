@@ -14,6 +14,7 @@ const {
   readAuthState
 } = require('../lib/propprofessor-api');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
+const { getLookbackHours, DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS } = require('../lib/propprofessor-mcp-ranked-screen');
 
 function makeTempAuthState(payload) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-auth-'));
@@ -126,6 +127,16 @@ describe('fetchAccessToken', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('ranked screen lookback defaults', () => {
+  it('uses the shared default lookback when args omit lookbackHours', () => {
+    assert.equal(getLookbackHours({}), DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS);
+  });
+
+  it('keeps explicit lookbackHours overrides', () => {
+    assert.equal(getLookbackHours({ lookbackHours: 8 }), 8);
   });
 });
 
@@ -423,6 +434,54 @@ describe('createPropProfessorClient', () => {
     }
   });
 
+  it('healthStatus reports non-null freshness ages and timestamp sources for screen rows', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const nowMs = Date.parse('2026-04-20T22:58:00.000Z');
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({
+          token: 'jwt-health-rows',
+          exp: Math.floor(nowMs / 1000) + 600,
+          perm: { sportsbook: true }
+        }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          game_data: [
+            { id: 'row-1', updatedAt: new Date(nowMs - 12 * 1000).toISOString() },
+            { id: 'row-2', payload: { updatedAt: new Date(nowMs - 40 * 1000).toISOString() } },
+            { id: 'row-3', meta: { timestamp: new Date(nowMs - 25 * 1000).toISOString() } }
+          ]
+        })
+      }),
+      now: () => nowMs
+    });
+
+    try {
+      const health = await client.healthStatus();
+      assert.equal(health.ok, true);
+      assert.equal(health.freshness.screen.rowCount, 3);
+      assert.equal(health.freshness.screen.newestAgeMs, 12000);
+      assert.equal(health.freshness.screen.oldestAgeMs, 40000);
+      assert.equal(health.freshness.screen.freshnessFallbackUsed, false);
+      assert.deepEqual(health.freshness.screen.timestampSources, {
+        updatedAt: 1,
+        'payload.updatedAt': 1,
+        'meta.timestamp': 1
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('refreshes the token once it is near expiry', async () => {
     const { dir, file } = makeTempAuthState({
       cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
@@ -609,20 +668,81 @@ describe('createPropProfessorClient', () => {
     const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', books: ['NoVigApp'], lookbackHours: 6 });
     assert.equal(result.ok, true);
     assert.equal(result.freshness.rowCount, 2);
+    assert.equal(result.freshness.newestAgeMs !== null, true);
+    assert.equal(result.resultMeta.lookbackHoursUsed, 6);
+    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['NoVigApp']);
+    assert.equal(result.resultMeta.debugEnabled, true);
+    assert.equal(result.resultMeta.freshnessFallbackUsed, false);
+    assert.deepEqual(result.resultMeta.timestampSources, { updatedAt: 2 });
     assert.equal(result.result[0].lineHistoryAvailable, true);
     assert.equal(result.result[0].lineHistorySource, 'odds_history');
     assert.equal(result.result[0].historyGameId, 'game-ranked-1');
     assert.equal(result.result[0].normalizedSelectionId, 'Moneyline:Boston_Celtics');
     assert.equal(result.result[0].historyMatchedBy, 'selectionId');
     assert.equal(result.result[0].lineHistoryLookbackHours, 6);
+    assert.equal(result.result[0].freshnessSource, 'updatedAt');
+    assert.equal(result.result[0].freshnessFallbackUsed, false);
+    assert.equal(typeof result.result[0].freshnessAgeMs, 'number');
     assert.equal(typeof result.result[0].clvProxyPct, 'number');
     assert.equal(result.result[0].movementMode, 'same_book');
     assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
     assert.equal(result.result[0].lineHistoryUsable, true);
     assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
+    assert.equal(typeof result.result[0].movementDebug, 'object');
+    assert.equal(Array.isArray(result.result[0].filteredLineHistory), true);
+    assert.equal(typeof result.result[0].droppedHistoryReasons, 'object');
+    assert.equal(typeof result.result[0].openToCurrentClvPct, 'number');
+    assert.equal(result.result[0].rankingProvenance.focusBook, 'NoVigApp');
+    assert.equal(result.result[0].rankingProvenance.historyMatchedBy, 'selectionId');
+    assert.equal(result.result[0].rankingProvenance.lineHistorySource, 'odds_history');
+    assert.equal(result.result[0].rankingProvenance.normalizedSelectionId, 'Moneyline:Boston_Celtics');
     assert.deepEqual(screenCalls[0].books, ['NoVigApp']);
     assert.equal(historyCalls.length >= 1, true);
     assert.deepEqual(historyCalls[0].sportsbooks, ['NoVigApp']);
+  });
+
+  it('query_screen_odds_ranked omits verbose movement debug when disabled', async () => {
+    const handlers = createMcpHandlers({
+      client: {
+        queryScreenOddsBestComps: async () => ({
+          game_data: [{
+            gameId: 'game-ranked-2',
+            league: 'NBA',
+            market: 'Moneyline',
+            updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
+            homeTeam: 'Cleveland Cavaliers',
+            awayTeam: 'Detroit Pistons',
+            selections: {
+              a: {
+                selection1: 'Cleveland Cavaliers',
+                participant1: 'Cleveland Cavaliers',
+                selection1Id: 'Moneyline:Cleveland_Cavaliers',
+                selection2: 'Detroit Pistons',
+                participant2: 'Detroit Pistons',
+                selection2Id: 'Moneyline:Detroit_Pistons',
+                odds: {
+                  NoVigApp: { odds1: -130, odds2: 110 },
+                  Polymarket: { odds1: -138, odds2: 118 }
+                }
+              }
+            },
+            defaultKey: 'a'
+          }]
+        }),
+        queryOddsHistory: async ({ gameId }) => ({
+          NoVigApp: [{ odds: -125, start_ts: 1 }, { odds: -130, start_ts: 2 }],
+          meta: { gameId }
+        })
+      }
+    });
+
+    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', books: ['NoVigApp'], debug: false });
+
+    assert.equal(result.resultMeta.debugEnabled, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'movementDebug'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'filteredLineHistory'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'droppedHistoryReasons'), false);
+    assert.ok(result.result[0].rankingProvenance);
   });
 
   it('query_sport_screen reuses the ranked league flow for non-tennis leagues', async () => {
