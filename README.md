@@ -2,7 +2,7 @@
 
 Screen-first PropProfessor MCP server, plus a broader local query CLI for maintenance and analysis.
 
-![npm version](https://img.shields.io/badge/version-1.0.4-blue)
+![npm version](https://img.shields.io/badge/version-1.0.5-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![node](https://img.shields.io/badge/node-%3E%3D18-339933)
 
@@ -57,6 +57,20 @@ You can also use these aliases directly:
 - NCAAB, `query_ncaab_screen` or `pp-query ncaab`
 - NCAAF, `query_ncaaf_screen` or `pp-query ncaaf`
 
+## Runtime environment
+
+Optional environment variables:
+
+- `AUTH_FILE`, path to the saved PropProfessor auth session JSON
+- `LOCAL_TIMEZONE`, display timezone for local CLI formatting, default `America/Chicago`
+- `PROPPROFESSOR_MCP_NDJSON`, set to `true` to use NDJSON framing instead of `Content-Length`
+- `PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS`, default ranked odds-history lookback window in hours, default `6`
+
+Per-request overrides:
+
+- MCP ranked tools accept `lookbackHours` and `debug`
+- Local CLI helpers accept `--lookback-hours` or `--lookbackHours`, plus `--debug` or `--no-debug`
+
 ## npm link workflow
 
 If you want the binaries available on your PATH while developing:
@@ -101,7 +115,8 @@ Add this to your Hermes or Claude MCP config when you want to use the local repo
       "command": "pp-mcp",
       "args": [],
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
       }
     }
   }
@@ -142,6 +157,7 @@ This repo is set up for npm packaging and tagged GitHub releases.
 - `main` points at the MCP server entrypoint
 - `pp-mcp` and `pp-query` are exposed as binaries
 - `npm test` runs the node:test suite
+- `npm run smoke:live` performs a live authenticated ranked `/screen` smoke check before tagging a release
 
 ## Repository layout
 

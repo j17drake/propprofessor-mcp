@@ -2,9 +2,12 @@
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
-const { getLocalTimezone } = require('../lib/mcp-runtime-config');
-const { parseBetPrompt, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, summarizeFreshness, getLeagueRankingPreset } = require('../lib/propprofessor-screen-utils');
-const { hydrateScreenRowsWithHistory } = require('../lib/propprofessor-screen-history');
+const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
+const { parseBetPrompt, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows } = require('../lib/propprofessor-screen-utils');
+const {
+  buildRankedScreenResponse,
+  getDebugFlag
+} = require('../lib/propprofessor-mcp-ranked-screen');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -32,6 +35,9 @@ function parseArgs(argv) {
     } else if (arg === '--max-age-ms' || arg === '--maxAgeMs') {
       opts.maxAgeMs = next;
       i += 1;
+    } else if (arg === '--lookback-hours' || arg === '--lookbackHours') {
+      opts.lookbackHours = next;
+      i += 1;
     } else if (arg === '--league' || arg === '-g') {
       opts.league = next;
       i += 1;
@@ -42,6 +48,10 @@ function parseArgs(argv) {
       opts.live = true;
     } else if (arg === '--json') {
       opts.json = true;
+    } else if (arg === '--debug') {
+      opts.debug = true;
+    } else if (arg === '--no-debug') {
+      opts.debug = false;
     }
   }
 
@@ -139,55 +149,105 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   }
 
   const rows = extractRows(payload);
+  const lookbackHours = getOddsHistoryLookbackHours(opts.lookbackHours);
+  const debug = getDebugFlag(opts.debug, true);
   if (command === 'tennis') {
     const tennisBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
-    const hydratedRows = await hydrateScreenRowsWithHistory(rows, {
+    const queryFn = typeof client.queryScreenOdds === 'function'
+      ? client.queryScreenOdds.bind(client)
+      : client.queryScreenOddsBestComps.bind(client);
+    const payloads = [payload];
+    const result = await buildRankedScreenResponse({
       client,
-      lookbackHours: 12,
-      preferredBook: tennisBooks[0] || 'Pinnacle',
-      sharpBooks: tennisBooks,
-      historySportsbooks: tennisBooks
-    });
-    const ranked = rankTennisScreenRows(hydratedRows, { limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
-    const normalized = normalizeScreenRowTimes(ranked);
-    console.log(JSON.stringify({
-      command,
-      count: normalized.length,
-      sample: normalized,
-      freshness: summarizeFreshness(rows),
-      notes: {
-        consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
-        clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
-        timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+      payloads,
+      args: {
+        books: tennisBooks,
+        historySportsbooks: tennisBooks,
+        limit: opts.limit ? Number(opts.limit) : 12,
+        includeAll: true,
+        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+        lookbackHours,
+        debug
+      },
+      league: 'Tennis',
+      focusBook: tennisBooks[0] || 'Pinnacle',
+      rankRows: (hydratedRows, { debug: rankedDebug } = {}) => rankTennisScreenRows(hydratedRows, {
+        limit: opts.limit ? Number(opts.limit) : 12,
+        includeAll: true,
+        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+        preferredBook: tennisBooks[0] || 'Pinnacle',
+        debug: rankedDebug
+      }),
+      resultMeta: {
+        command,
+        notes: {
+          consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+          clvProxy: 'open odds vs current odds when history fields are present',
+          timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+        }
       }
-    }, null, 2));
+    });
+    const normalized = normalizeScreenRowTimes(result.result);
+    result.result = normalized;
+    result.count = normalized.length;
+    result.sample = normalized;
+    result.notes = {
+      ...(result.notes || {}),
+      movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
+      consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+      clvProxy: 'open odds vs current odds when history fields are present',
+      timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+    };
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 
   if (command === 'screen') {
     const screenBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
-    const hydratedRows = await hydrateScreenRowsWithHistory(rows, {
+    const result = await buildRankedScreenResponse({
       client,
-      lookbackHours: 12,
-      preferredBook: screenBooks[0] || 'NoVigApp',
-      sharpBooks: screenBooks,
-      historySportsbooks: screenBooks
-    });
-    const ranked = rankLeagueScreenRows(hydratedRows, { league: opts.league || 'NBA', market: opts.market || 'Moneyline', limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
-    const normalized = normalizeScreenRowTimes(ranked);
-    console.log(JSON.stringify({
-      command,
-      count: normalized.length,
-      sample: normalized,
-      freshness: summarizeFreshness(rows),
-      notes: {
-        consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
-        clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
-        timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+      payloads: [payload],
+      args: {
+        books: screenBooks,
+        historySportsbooks: screenBooks,
+        limit: opts.limit ? Number(opts.limit) : 12,
+        includeAll: true,
+        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+        lookbackHours,
+        debug
+      },
+      league: opts.league || 'NBA',
+      focusBook: screenBooks[0] || 'NoVigApp',
+      rankRows: (hydratedRows, { debug: rankedDebug } = {}) => rankLeagueScreenRows(hydratedRows, {
+        league: opts.league || 'NBA',
+        market: opts.market || 'Moneyline',
+        limit: opts.limit ? Number(opts.limit) : 12,
+        includeAll: true,
+        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+        books: screenBooks,
+        debug: rankedDebug
+      }),
+      resultMeta: {
+        command,
+        notes: {
+          consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+          clvProxy: 'open odds vs current odds when history fields are present',
+          timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+        }
       }
-    }, null, 2));
+    });
+    const normalized = normalizeScreenRowTimes(result.result);
+    result.result = normalized;
+    result.count = normalized.length;
+    result.sample = normalized;
+    result.notes = {
+      ...(result.notes || {}),
+      movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
+      consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+      clvProxy: 'open odds vs current odds when history fields are present',
+      timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+    };
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
 

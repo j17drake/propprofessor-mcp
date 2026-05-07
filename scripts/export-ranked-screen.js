@@ -5,12 +5,13 @@ const path = require('path');
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
 const {
   extractScreenRows,
-  rankScreenRows,
   rankTennisScreenRows,
   rankLeagueScreenRows,
   summarizeFreshness
 } = require('../lib/propprofessor-screen-utils');
 const { hydrateScreenRowsWithHistory } = require('../lib/propprofessor-screen-history');
+const { getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
+const { getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -42,6 +43,13 @@ function parseArgs(argv) {
     } else if (arg === '--output' || arg === '-o') {
       opts.output = path.resolve(next);
       i += 1;
+    } else if (arg === '--lookback-hours' || arg === '--lookbackHours') {
+      opts.lookbackHours = next;
+      i += 1;
+    } else if (arg === '--debug') {
+      opts.debug = true;
+    } else if (arg === '--no-debug') {
+      opts.debug = false;
     } else if (arg === '--input') {
       opts.input = next;
       i += 1;
@@ -64,12 +72,13 @@ function loadRowsFromFile(inputPath) {
   return null;
 }
 
-function toRankedRows(payload, league, limit) {
+function toRankedRows(payload, league, limit, options = {}) {
   const rows = extractScreenRows(payload);
+  const debug = getDebugFlag(options.debug, true);
   if (league && String(league).toUpperCase() === 'TENNIS') {
-    return rankTennisScreenRows(rows, { limit, includeAll: true });
+    return rankTennisScreenRows(rows, { limit, includeAll: true, debug });
   }
-  return rankLeagueScreenRows(rows, { league, limit, includeAll: true });
+  return rankLeagueScreenRows(rows, { league, limit, includeAll: true, debug });
 }
 
 function toCandidateRows(rankedRows) {
@@ -92,6 +101,9 @@ function toCandidateRows(rankedRows) {
     screen_score: row.screenScore ?? null,
     is_actionable: Boolean(row.isActionable),
     lineHistoryUsable: row.lineHistoryUsable ?? false,
+    freshnessSource: row.freshnessSource ?? null,
+    freshnessAgeMs: row.freshnessAgeMs ?? null,
+    freshnessFallbackUsed: row.freshnessFallbackUsed ?? false,
     movementSourceBook: row.movementSourceBook ?? null,
     movementMode: row.movementMode ?? null,
     movementLabel: row.movementLabel ?? null,
@@ -101,6 +113,7 @@ function toCandidateRows(rankedRows) {
     filteredHistoryPointCount: row.filteredHistoryPointCount ?? null,
     droppedHistoryPointCount: row.droppedHistoryPointCount ?? null,
     historySportsbooksRequested: row.historySportsbooksRequested ?? [],
+    rankingProvenance: row.rankingProvenance ?? null,
     ranking_reason: row.rankingReason || null,
     notes: [
       row.gateReason ? `gate=${row.gateReason}` : null,
@@ -137,15 +150,17 @@ async function main(argv = process.argv) {
 
   const client = createPropProfessorClient();
   const rows = extractScreenRows(payload);
+  const lookbackHours = getOddsHistoryLookbackHours(opts.lookbackHours);
+  const debug = getDebugFlag(opts.debug, true);
   rowsLoaded = rowsLoaded || rows.length;
   const hydratedRows = await hydrateScreenRowsWithHistory(rows, {
     client,
-    lookbackHours: 12,
+    lookbackHours,
     preferredBook: opts.books?.[0] || 'Pinnacle',
     sharpBooks: opts.books || ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
     historySportsbooks: opts.books || ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']
   });
-  const rankedRows = toRankedRows(hydratedRows, league, opts.limit);
+  const rankedRows = toRankedRows(hydratedRows, league, opts.limit, { debug });
 
   const candidates = toCandidateRows(rankedRows);
   const result = {
@@ -154,6 +169,7 @@ async function main(argv = process.argv) {
     rowsLoaded,
     rankedCount: rankedRows.length,
     freshness: summarizeFreshness(rows),
+    debugEnabled: debug,
     candidates,
     rows: rankedRows,
     sample: candidates,

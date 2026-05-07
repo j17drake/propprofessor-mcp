@@ -80,6 +80,8 @@ function assertBasicRankedResponse(result, expectedLeague) {
   assert.equal(result.ok, true);
   assert.ok(Array.isArray(result.result));
   assert.equal(result.league, expectedLeague);
+  assert.ok(result.resultMeta && typeof result.resultMeta === 'object');
+  assert.equal(typeof result.resultMeta.debugEnabled, 'boolean');
 }
 
 function createJsonRpcMessage(id, method, params) {
@@ -490,9 +492,32 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
     assertBasicRankedResponse(result, 'NBA');
+    assert.equal(result.freshness.newestAgeMs !== null, true);
+    assert.equal(result.resultMeta.focusBook, 'NoVigApp');
+    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['NoVigApp']);
+    assert.equal(result.resultMeta.debugEnabled, true);
     assert.equal(result.result[0].movementMode, 'same_book');
     assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
+    assert.equal(result.result[0].freshnessSource, 'updatedAt');
+    assert.equal(result.result[0].freshnessFallbackUsed, false);
+    assert.equal(result.result[0].rankingProvenance.focusBook, 'NoVigApp');
+    assert.equal(result.result[0].rankingProvenance.lineHistorySource, 'odds_history');
     assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
+    assert.equal(typeof result.result[0].movementDebug, 'object');
+    assert.equal(Array.isArray(result.result[0].filteredLineHistory), true);
+  });
+
+  it('query_screen_odds_ranked can disable verbose debug payloads', async () => {
+    const { client } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', includeAll: true, books: ['NoVigApp'], debug: false });
+
+    assert.equal(result.resultMeta.debugEnabled, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'movementDebug'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'filteredLineHistory'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'droppedHistoryReasons'), false);
+    assert.ok(result.result[0].rankingProvenance);
   });
 
   it('query_sport_screen routes non-tennis leagues through the ranked league flow', async () => {
@@ -535,14 +560,30 @@ describe('propprofessor MCP server stdio contract', () => {
   });
 
   it('health_status returns the client health payload', async () => {
-    const healthPayload = { ok: true, screen: { reachable: true } };
+    const healthPayload = {
+      ok: true,
+      endpoints: { screen: 'ok' },
+      freshness: {
+        screen: {
+          rowCount: 2,
+          newestAgeMs: 1500,
+          oldestAgeMs: 4200,
+          staleCount: 0,
+          stale: false,
+          freshnessFallbackUsed: false,
+          timestampSources: { updatedAt: 2 }
+        }
+      }
+    };
     const { client, calls } = createRankedScreenClientStub({ healthPayload });
     const handlers = createMcpHandlers({ client });
 
     const result = await handlers.health_status();
 
     assert.equal(calls.healthStatus, 1);
-    assert.deepEqual(result, { ok: true, result: healthPayload });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.freshness.screen.newestAgeMs, 1500);
+    assert.deepEqual(result.result.freshness.screen.timestampSources, { updatedAt: 2 });
   });
 
   it('query_screen_odds_best_comps returns derived sharp-book metadata for MLB props', async () => {
