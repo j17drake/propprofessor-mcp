@@ -85,6 +85,8 @@ If you want to use a different location, set `AUTH_FILE`.
 
 More detail: [AUTH.md](./AUTH.md)
 
+If you do not already have an `auth.json`, see the export guide in [AUTH.md](./AUTH.md#how-to-export-authjson).
+
 ## Verify It Works
 
 Run:
@@ -228,6 +230,7 @@ If you use ChatGPT:
 
 - this repo is not currently a direct local `stdio` ChatGPT setup
 - the recommended future direction is exposing it as a remote MCP server
+- until then, Claude Desktop, Cursor, and Cline are the easiest ways to use it
 
 ## Advanced Settings
 

@@ -46,6 +46,36 @@ The important part is that it includes PropProfessor cookies.
 2. Export the browser session or storage state.
 3. Run `pp-query install-auth --source /path/to/exported-auth.json`.
 
+## How To Export `auth.json`
+
+Any method is fine as long as it produces a JSON file that contains your logged-in PropProfessor browser cookies.
+
+Common options:
+
+1. Browser automation tools that can save storage state
+2. A browser extension that can export cookies or full session state as JSON
+3. Your existing personal PropProfessor automation or scraping setup, if you already have one
+
+What to look for in the exported file:
+
+- it should be JSON
+- it should contain a `cookies` array
+- it should include cookies for `propprofessor.com` or its subdomains
+
+After exporting, install it with:
+
+```bash
+pp-query install-auth --source /path/to/exported-auth.json
+```
+
+Then verify it with:
+
+```bash
+pp-query doctor
+```
+
+If `doctor` says `No PropProfessor cookies found`, the export did not include the right cookies and you should export again from a logged-in browser session.
+
 ## Easiest Way To Check Your Setup
 
 Run:

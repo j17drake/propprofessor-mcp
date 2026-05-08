@@ -171,6 +171,17 @@ What this means:
 - there is no recommended local `pp-mcp` ChatGPT setup for this repo today
 - if ChatGPT support matters, the recommended future direction is exposing this server as a remote MCP endpoint
 
+Practical recommendation:
+
+- use Claude Desktop, Cursor, or Cline today if you want the fastest path
+- treat ChatGPT support as a future remote-deployment step, not a local setup step
+
+What a future ChatGPT-friendly path would look like:
+
+1. run this MCP server behind a remote transport that ChatGPT can reach
+2. secure it appropriately because it would no longer be local-only
+3. connect ChatGPT to that remote MCP endpoint instead of trying to launch `pp-mcp` locally
+
 If you mainly use ChatGPT today, this repo will be easier to use through Claude Desktop, Cursor, or Cline until a remote MCP path is added.
 
 ## Generic Local MCP
