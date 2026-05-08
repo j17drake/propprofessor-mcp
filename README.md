@@ -1,13 +1,27 @@
 # PropProfessor MCP
 
-Use PropProfessor from any MCP client.
+Use PropProfessor from AI clients that support MCP.
 
 This project gives you:
 
 - `pp-mcp`, an MCP server for AI agents
 - `pp-query`, a local CLI for setup checks and direct testing
 
-If you are new here, the fastest path is:
+Works best with local MCP clients like Claude Desktop, Cursor, and Cline.
+
+If you use ChatGPT, see the ChatGPT note below first. ChatGPT currently does not use this project the same way local `stdio` MCP clients do.
+
+## Choose Your Client
+
+| Client | Status | Best path |
+| --- | --- | --- |
+| Claude Desktop | Best support | Use the local `pp-mcp` server directly |
+| Cursor | Best support | Use `.cursor/mcp.json` with `pp-mcp` or `node` |
+| Cline | Supported | Use `cline_mcp_settings.json` with `pp-mcp` or `node` |
+| ChatGPT | Alternative setup | Not a direct local `stdio` MCP path for this repo today |
+| Generic local MCP client | Supported | Use the generic `pp-mcp` config in `CONFIG.md` |
+
+## Quick Start
 
 1. Install the project
 2. Save your PropProfessor browser session to `~/.propprofessor/auth.json`
@@ -86,40 +100,51 @@ You can also run:
 pp-query health
 ```
 
+## Client Setup
+
+### Claude Desktop
+
+Claude Desktop is one of the best ways to use this project.
+
+Use the Claude Desktop setup in [CONFIG.md](./CONFIG.md#claude-desktop), then try:
+
+`Check whether the PropProfessor MCP connection is healthy.`
+
+### Cursor
+
+Cursor supports local `stdio` MCP servers directly.
+
+Use the Cursor setup in [CONFIG.md](./CONFIG.md#cursor), then try:
+
+`Check whether the PropProfessor MCP connection is healthy.`
+
+### Cline
+
+Cline supports local MCP servers through its MCP settings file.
+
+Use the Cline setup in [CONFIG.md](./CONFIG.md#cline), then try:
+
+`Check whether the PropProfessor MCP connection is healthy.`
+
+### ChatGPT
+
+ChatGPT supports MCP in a different way from local `stdio` MCP clients.
+
+This repo is currently designed for local `stdio` MCP clients such as Claude Desktop, Cursor, and Cline. ChatGPT's MCP support is oriented around remote MCP servers and ChatGPT apps, not launching this local `pp-mcp` process directly.
+
+If ChatGPT support is important to you, the recommended future direction is exposing this server as a remote MCP endpoint.
+
+See [CONFIG.md](./CONFIG.md#chatgpt) for the short explanation.
+
+### Generic Local MCP Client
+
+If your client can launch a local `stdio` MCP server, use the generic setup in [CONFIG.md](./CONFIG.md#generic-local-mcp).
+
 ## Add It To Your MCP Client
 
-Basic config:
+If your client supports local `stdio` MCP servers, use the client-specific setup in [CONFIG.md](./CONFIG.md).
 
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "pp-mcp",
-      "args": [],
-      "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
-      }
-    }
-  }
-}
-```
-
-If your client wants a direct path instead of a linked binary:
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "node",
-      "args": [
-        "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"
-      ]
-    }
-  }
-}
-```
-
-More examples: [CONFIG.md](./CONFIG.md)
+If your client is not listed, start with the generic local MCP config.
 
 ## Example Prompts
 
@@ -187,11 +212,16 @@ If `pp-query doctor` finds auth but the endpoint check fails:
 - your session may be stale
 - log in again and export a fresh session file
 
-If your MCP client cannot start the server:
+If Claude Desktop, Cursor, or Cline cannot start the server:
 
 - run `pp-query doctor`
 - make sure `pp-mcp` is on your PATH
 - if needed, use the direct `node /path/to/.../propprofessor-mcp-server.js` setup
+
+If you use ChatGPT:
+
+- this repo is not currently a direct local `stdio` ChatGPT setup
+- the recommended future direction is exposing it as a remote MCP server
 
 ## Advanced Settings
 
