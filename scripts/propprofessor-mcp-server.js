@@ -425,6 +425,28 @@ function buildPositiveEvTarget(play = {}) {
   };
 }
 
+function createOddsHistoryMemoizedQuery(client) {
+  const cache = new Map();
+  return async function queryHistoryMemoized(params = {}) {
+    const sportsbooks = Array.isArray(params.sportsbooks)
+      ? params.sportsbooks.map(value => String(value || '').trim()).filter(Boolean)
+      : [];
+    const cacheKey = JSON.stringify({
+      gameId: params.gameId ?? null,
+      selectionId: params.selectionId ?? null,
+      sportsbooks,
+      startTimestamp: params.startTimestamp ?? null
+    });
+    if (!cache.has(cacheKey)) {
+      cache.set(cacheKey, Promise.resolve().then(() => client.queryOddsHistory({
+        ...params,
+        sportsbooks
+      })));
+    }
+    return cache.get(cacheKey);
+  };
+}
+
 async function validatePositiveEvCandidates({ client, candidates = [], args = {} } = {}) {
   const rows = Array.isArray(candidates) ? candidates.filter(play => play && typeof play === 'object') : [];
   const requestedBooks = normalizeBookList(args.books);
@@ -432,6 +454,7 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
   const debug = getDebugFlag(args.debug, true);
   const lookbackHoursUsed = getLookbackHours(args);
   const maxAgeMs = getMaxAgeMs(args);
+  const queryHistoryMemoized = createOddsHistoryMemoizedQuery(client);
   let failedValidationCount = 0;
   let historyFailureCount = 0;
   const validationWarnings = [];
@@ -459,7 +482,7 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
         preferredBook: focusBook || null,
         sharpBooks,
         historySportsbooks: sharpBooks,
-        queryHistoryFn: params => client.queryOddsHistory(params)
+        queryHistoryFn: queryHistoryMemoized
       });
     } catch (error) {
       validationFailed = true;

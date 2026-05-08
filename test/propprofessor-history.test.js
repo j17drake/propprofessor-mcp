@@ -7,6 +7,33 @@ const { findBestHistoryRow, normalizeHistoryPayload, resolveHistoryForEntity, ge
 const { getSharpBookComparisonSet } = require('../lib/propprofessor-sharp-books');
 
 describe('propprofessor history matching', () => {
+  it('reports gameId metadata when selection ids differ but game ids match', async () => {
+    const result = await resolveHistoryForEntity({
+      client: {},
+      target: {
+        book: 'NoVigApp',
+        pick: 'Boston Celtics',
+        game: 'Boston Celtics vs Miami Heat',
+        odds: '-142',
+        gameId: 'game-1',
+        selectionId: 'Moneyline:Boston_Celtics'
+      },
+      rows: [{
+        book: 'NoVigApp',
+        pick: 'Boston Celtics',
+        game: 'Boston Celtics vs Miami Heat',
+        odds: '-142',
+        gameId: 'game-1',
+        selectionId: 'Moneyline:Miami_Heat'
+      }],
+      queryHistoryFn: async () => [{ odds: -150, start_ts: 1 }, { odds: -142, start_ts: 2 }]
+    });
+
+    assert.equal(result.lineHistoryAvailable, true);
+    assert.equal(result.historyMatchedBy, 'gameId');
+    assert.equal(result.historyMatchKey, 'gameId');
+  });
+
   it('does not resolve odds history from a weak book-only row match', async () => {
     let queried = false;
     const result = await resolveHistoryForEntity({
@@ -33,6 +60,35 @@ describe('propprofessor history matching', () => {
     assert.equal(result.lineHistoryAvailable, true);
     assert.equal(result.matchStrength.strong, true);
     assert.equal(calls[0].gameId, 'game-1');
+  });
+
+  it('does not resolve fallback history when only book, pick, and odds match', async () => {
+    let queried = false;
+    const result = await resolveHistoryForEntity({
+      client: {},
+      target: {
+        book: 'NoVigApp',
+        pick: 'Baltimore Orioles',
+        game: 'Baltimore Orioles vs Boston Red Sox',
+        odds: '-130'
+      },
+      rows: [{
+        book: 'NoVigApp',
+        pick: 'Baltimore Orioles',
+        game: 'Baltimore Orioles vs New York Yankees',
+        odds: '-130',
+        gameId: 'game-wrong',
+        selectionId: 'selection-wrong'
+      }],
+      queryHistoryFn: async () => {
+        queried = true;
+        return [{ odds: -135, start_ts: 1 }, { odds: -130, start_ts: 2 }];
+      }
+    });
+
+    assert.equal(queried, false);
+    assert.equal(result.lineHistoryAvailable, false);
+    assert.equal(result.matchStrength.strong, false);
   });
 
   it('queries backend odds history using the configured default lookback window', async () => {
@@ -94,6 +150,21 @@ describe('propprofessor history matching', () => {
     assert.equal(result[0].book, 'Rebet');
     assert.equal(result[0].odds, -118);
     assert.equal(result[2].book, 'FanDuel');
+  });
+
+  it('sorts normalized odds history chronologically across payload shapes', () => {
+    const result = normalizeHistoryPayload({
+      NoVigApp: [
+        { odds: -110, start_ts: 30 },
+        { odds: -120, start_ts: 10 }
+      ],
+      FanDuel: [
+        { odds: -118, start_ts: 20 }
+      ]
+    });
+
+    assert.deepEqual(result.map(point => point.odds), [-120, -118, -110]);
+    assert.deepEqual(result.map(point => point.book), ['NoVigApp', 'FanDuel', 'NoVigApp']);
   });
 
   it('passes preferred and sharp sportsbooks into odds-history hydration requests', async () => {

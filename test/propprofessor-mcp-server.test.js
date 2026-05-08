@@ -789,6 +789,29 @@ describe('validated candidate concurrency helpers', () => {
     assert.match(result.warnings[0], /1 candidate validation lookup/);
   });
 
+  it('validated candidates reuse identical odds-history lookups within a run', async () => {
+    let historyCalls = 0;
+    const handlers = createMcpHandlers({
+      client: {
+        querySportsbook: async () => ([
+          { id: 'row-1', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A', odds: -110 },
+          { id: 'row-2', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A', odds: -110 }
+        ]),
+        queryOddsHistory: async () => {
+          historyCalls += 1;
+          return {
+            Fliff: [{ odds: -110, start_ts: 1 }, { odds: -120, start_ts: 2 }]
+          };
+        }
+      }
+    });
+
+    const result = await handlers.query_validated_positive_ev_candidates({ sportsbooks: ['Fliff'], leagues: ['NBA'], debug: false });
+
+    assert.equal(result.ok, true);
+    assert.equal(historyCalls, 1);
+  });
+
   it('bin entrypoints include node shebangs', () => {
     const serverEntry = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js'), 'utf8');
     const queryEntry = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'query-propprofessor.js'), 'utf8');
