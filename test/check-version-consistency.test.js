@@ -17,7 +17,7 @@ function makeRepoFixture({ version = '1.0.4', changelog = '# Changelog\n\n## 1.0
     dir,
     env: {
       ...process.env,
-      ...(githubRef ? { GITHUB_REF: githubRef } : {}),
+      GITHUB_REF: githubRef || '',
     },
   };
 }
