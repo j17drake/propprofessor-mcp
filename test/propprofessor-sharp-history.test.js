@@ -19,8 +19,14 @@ describe('propprofessor sharp history helpers', () => {
       { book: 'Fliff', odds: null, time: 4 }
     ]);
 
-    assert.deepEqual(grouped.Fliff.map(point => point.odds), [130, 120]);
-    assert.deepEqual(grouped.NoVigApp.map(point => point.odds), [118]);
+    assert.deepEqual(
+      grouped.Fliff.map((point) => point.odds),
+      [130, 120]
+    );
+    assert.deepEqual(
+      grouped.NoVigApp.map((point) => point.odds),
+      [118]
+    );
   });
 
   it('filters out odds outliers and duplicate consecutive same-book points', () => {
@@ -33,11 +39,14 @@ describe('propprofessor sharp history helpers', () => {
       { book: 'Circa', odds: 145, time: 6 }
     ]);
 
-    assert.deepEqual(filtered.keptPoints.map(point => [point.book, point.odds]), [
-      ['Pinnacle', -120],
-      ['Pinnacle', -112],
-      ['Circa', 145]
-    ]);
+    assert.deepEqual(
+      filtered.keptPoints.map((point) => [point.book, point.odds]),
+      [
+        ['Pinnacle', -120],
+        ['Pinnacle', -112],
+        ['Circa', 145]
+      ]
+    );
     assert.equal(filtered.droppedCount, 3);
     assert.equal(filtered.dropReasons.outlier_odds, 2);
     assert.equal(filtered.dropReasons.duplicate_consecutive, 1);
@@ -45,11 +54,14 @@ describe('propprofessor sharp history helpers', () => {
 
   it('builds a recent window from same-book time series', () => {
     const nowMs = Date.UTC(2026, 4, 6, 12, 0, 0);
-    const windows = buildMovementWindows([
-      { book: 'Pinnacle', odds: 125, time: nowMs - 8 * 60 * 60 * 1000 },
-      { book: 'Pinnacle', odds: 140, time: nowMs - 4 * 60 * 60 * 1000 },
-      { book: 'Pinnacle', odds: 132, time: nowMs - 60 * 60 * 1000 }
-    ], { nowMs, recentWindowHours: 6 });
+    const windows = buildMovementWindows(
+      [
+        { book: 'Pinnacle', odds: 125, time: nowMs - 8 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: 140, time: nowMs - 4 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: 132, time: nowMs - 60 * 60 * 1000 }
+      ],
+      { nowMs, recentWindowHours: 6 }
+    );
 
     assert.equal(windows.fullWindow.direction, 'adverse');
     assert.equal(windows.recentWindow.direction, 'supportive');

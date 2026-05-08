@@ -10,11 +10,14 @@ async function main() {
   const market = process.env.PP_SMOKE_MARKET || 'Moneyline';
   const books = String(process.env.PP_SMOKE_BOOKS || 'NoVigApp')
     .split(',')
-    .map(value => value.trim())
+    .map((value) => value.trim())
     .filter(Boolean);
   const limit = Number(process.env.PP_SMOKE_LIMIT || 3);
   const lookbackHours = Number(process.env.PP_SMOKE_LOOKBACK_HOURS || 6);
-  const debug = String(process.env.PP_SMOKE_DEBUG || 'false').trim().toLowerCase() === 'true';
+  const debug =
+    String(process.env.PP_SMOKE_DEBUG || 'false')
+      .trim()
+      .toLowerCase() === 'true';
 
   const payload = await client.queryScreenOddsBestComps({
     league,
@@ -36,17 +39,18 @@ async function main() {
     },
     league,
     focusBook: books[0] || null,
-    rankRows: (hydratedRows, { debug: rankedDebug } = {}) => rankLeagueScreenRows(hydratedRows, {
-      league,
-      market,
-      limit,
-      includeAll: true,
-      books,
-      debug: rankedDebug
-    })
+    rankRows: (hydratedRows, { debug: rankedDebug } = {}) =>
+      rankLeagueScreenRows(hydratedRows, {
+        league,
+        market,
+        limit,
+        includeAll: true,
+        books,
+        debug: rankedDebug
+      })
   });
 
-  const sample = (Array.isArray(result.result) ? result.result : []).slice(0, limit).map(row => ({
+  const sample = (Array.isArray(result.result) ? result.result : []).slice(0, limit).map((row) => ({
     participant: row.participant || row.selection || row.pick || null,
     book: row.book || null,
     odds: row.odds ?? row.currentOdds ?? null,
@@ -55,21 +59,27 @@ async function main() {
     movementDebugIncluded: Object.prototype.hasOwnProperty.call(row, 'movementDebug')
   }));
 
-  console.log(JSON.stringify({
-    ok: result.ok,
-    league,
-    market,
-    books,
-    lookbackHours,
-    debug,
-    freshness: result.freshness,
-    resultMeta: result.resultMeta,
-    sample
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: result.ok,
+        league,
+        market,
+        books,
+        lookbackHours,
+        debug,
+        freshness: result.freshness,
+        resultMeta: result.resultMeta,
+        sample
+      },
+      null,
+      2
+    )
+  );
 }
 
 if (require.main === module) {
-  main().catch(error => {
+  main().catch((error) => {
     console.error(error.stack || error.message || String(error));
     process.exitCode = 1;
   });

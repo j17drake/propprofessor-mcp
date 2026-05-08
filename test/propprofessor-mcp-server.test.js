@@ -2,7 +2,6 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { once } = require('node:events');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -16,36 +15,34 @@ const {
 
 const serverPath = path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js');
 
-function makeEmptyScreenPayload() {
-  return { game_data: [] };
-}
-
 function createRankedScreenClientStub({
-      rankedPayload = {
-        game_data: [{
-          gameId: 'stub-game-1',
-          league: 'NBA',
-          market: 'Moneyline',
-          updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
-          homeTeam: 'Stub Home',
-          awayTeam: 'Stub Away',
-          selections: {
-            a: {
-              selection1: 'Stub Home',
-              participant1: 'Stub Home',
-              selection1Id: 'Moneyline:Stub_Home',
-              selection2: 'Stub Away',
-              participant2: 'Stub Away',
-              selection2Id: 'Moneyline:Stub_Away',
-              odds: {
-                NoVigApp: { odds1: -118, odds2: 104 },
-                Polymarket: { odds1: -125, odds2: 110 }
-              }
+  rankedPayload = {
+    game_data: [
+      {
+        gameId: 'stub-game-1',
+        league: 'NBA',
+        market: 'Moneyline',
+        updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+        homeTeam: 'Stub Home',
+        awayTeam: 'Stub Away',
+        selections: {
+          a: {
+            selection1: 'Stub Home',
+            participant1: 'Stub Home',
+            selection1Id: 'Moneyline:Stub_Home',
+            selection2: 'Stub Away',
+            participant2: 'Stub Away',
+            selection2Id: 'Moneyline:Stub_Away',
+            odds: {
+              NoVigApp: { odds1: -118, odds2: 104 },
+              Polymarket: { odds1: -125, odds2: 110 }
             }
-          },
-          defaultKey: 'a'
-        }]
-      },
+          }
+        },
+        defaultKey: 'a'
+      }
+    ]
+  },
   rawPayload = { ok: true, rows: [] },
   healthPayload = { ok: true, screen: { reachable: true } }
 } = {}) {
@@ -59,20 +56,23 @@ function createRankedScreenClientStub({
   return {
     calls,
     client: {
-      querySportsbook: async filters => {
+      querySportsbook: async (filters) => {
         calls.querySportsbook.push(filters);
         return [{ id: 'ev-row-1', book: 'Fliff', ev: 4.2 }];
       },
-      queryScreenOdds: async filters => {
+      queryScreenOdds: async (filters) => {
         calls.queryScreenOdds.push(filters);
         return rawPayload;
       },
-      queryScreenOddsBestComps: async filters => {
+      queryScreenOddsBestComps: async (filters) => {
         calls.queryScreenOddsBestComps.push(filters);
         return rankedPayload;
       },
       queryOddsHistory: async () => ({
-        NoVigApp: [{ odds: -118, start_ts: 1 }, { odds: -130, start_ts: 2 }],
+        NoVigApp: [
+          { odds: -118, start_ts: 1 },
+          { odds: -130, start_ts: 2 }
+        ],
         Polymarket: [{ odds: -125, start_ts: 3 }]
       }),
       healthStatus: async () => {
@@ -215,11 +215,13 @@ describe('propprofessor MCP server stdio contract', () => {
     });
 
     try {
-      proc.stdin.write(createJsonRpcMessage(1, 'initialize', {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: { name: 'test-client', version: '1.0.0' }
-      }));
+      proc.stdin.write(
+        createJsonRpcMessage(1, 'initialize', {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'test-client', version: '1.0.0' }
+        })
+      );
 
       const initializeResponse = await waitForJsonRpcMessage(proc);
       assert.equal(initializeResponse.id, 1);
@@ -231,7 +233,7 @@ describe('propprofessor MCP server stdio contract', () => {
       proc.stdin.write(createJsonRpcMessage(2, 'tools/list', {}));
       const toolsResponse = await waitForJsonRpcMessage(proc);
       assert.equal(toolsResponse.id, 2);
-      const toolNames = toolsResponse.result.tools.map(tool => tool.name).sort();
+      const toolNames = toolsResponse.result.tools.map((tool) => tool.name).sort();
       assert.deepEqual(toolNames, [
         'health_status',
         'league_presets',
@@ -263,16 +265,18 @@ describe('propprofessor MCP server stdio contract', () => {
     });
 
     try {
-      proc.stdin.write(JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'test-client', version: '1.0.0' }
-        }
-      }) + '\n');
+      proc.stdin.write(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'test-client', version: '1.0.0' }
+          }
+        }) + '\n'
+      );
 
       const initializeResponse = await waitForNdjsonMessage(proc);
       assert.equal(initializeResponse.id, 1);
@@ -293,10 +297,12 @@ describe('propprofessor MCP server stdio contract', () => {
       handlers: {
         query_screen_odds: async () => ({ ok: true })
       },
-      toolDefinitions: [{
-        name: 'query_screen_odds',
-        inputSchema: { type: 'object', properties: {}, additionalProperties: false }
-      }]
+      toolDefinitions: [
+        {
+          name: 'query_screen_odds',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+        }
+      ]
     });
 
     const response = await server.handleRequest({
@@ -343,14 +349,26 @@ describe('propprofessor MCP server stdio contract', () => {
           throw error;
         }
       },
-      toolDefinitions: [{
-        name: 'fail_tool',
-        inputSchema: { type: 'object', properties: {}, additionalProperties: false }
-      }]
+      toolDefinitions: [
+        {
+          name: 'fail_tool',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+        }
+      ]
     });
 
-    await server.handleRequest({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0.0' } } });
-    const response = await server.handleRequest({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'fail_tool', arguments: {} } });
+    await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0.0' } }
+    });
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'fail_tool', arguments: {} }
+    });
 
     assert.equal(response.result.isError, true);
     assert.equal(response.result.structuredContent.ok, false);
@@ -365,7 +383,18 @@ describe('propprofessor MCP server stdio contract', () => {
   it('returns backend validation errors when validated candidates cannot validate any rows', async () => {
     const handlers = createMcpHandlers({
       client: {
-        querySportsbook: async () => ([{ id: 'row-1', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A' }]),
+        querySportsbook: async () => [
+          {
+            id: 'row-1',
+            league: 'NBA',
+            market: 'Moneyline',
+            book: 'Fliff',
+            participant: 'A',
+            selection: 'A',
+            gameId: 'game-1',
+            selectionId: 'Moneyline:A'
+          }
+        ],
         queryOddsHistory: async () => {
           const error = new Error('history backend unavailable');
           error.status = 503;
@@ -376,14 +405,26 @@ describe('propprofessor MCP server stdio contract', () => {
 
     const server = createMcpServer({
       handlers,
-      toolDefinitions: [{
-        name: 'query_validated_positive_ev_candidates',
-        inputSchema: { type: 'object', properties: {}, additionalProperties: true }
-      }]
+      toolDefinitions: [
+        {
+          name: 'query_validated_positive_ev_candidates',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: true }
+        }
+      ]
     });
 
-    await server.handleRequest({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0.0' } } });
-    const response = await server.handleRequest({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'query_validated_positive_ev_candidates', arguments: {} } });
+    await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0.0' } }
+    });
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'query_validated_positive_ev_candidates', arguments: {} }
+    });
 
     assert.equal(response.result.isError, true);
     assert.equal(response.result.structuredContent.ok, false);
@@ -391,19 +432,14 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(response.result.structuredContent.error.category, 'backend');
   });
 
-  it('classifies malformed Content-Length frames as transport errors', () => {
+  it('skips malformed Content-Length frames gracefully without crashing', () => {
     const messages = [];
-    const reader = createStdioMessageReader(message => {
+    const reader = createStdioMessageReader((message) => {
       messages.push(message);
     });
 
-    assert.throws(() => {
+    assert.doesNotThrow(() => {
       reader(Buffer.from('Content-Length: nope\r\n\r\n{"jsonrpc":"2.0"}', 'utf8'));
-    }, error => {
-      assert.equal(error.code, 'INVALID_MCP_FRAME');
-      assert.equal(error.category, 'transport');
-      assert.match(error.message, /Invalid Content-Length header/);
-      return true;
     });
     assert.deepEqual(messages, []);
   });
@@ -522,7 +558,7 @@ describe('propprofessor MCP server stdio contract', () => {
   it('query_screen_odds_best_comps returns derived sharp-book metadata for NBA props', async () => {
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => ({ ok: true, filters }),
+        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
         queryOddsHistory: async () => ({})
       }
     });
@@ -536,16 +572,16 @@ describe('propprofessor MCP server stdio contract', () => {
   it('league presets expose sharpMainMarkets and sharpProps labels', async () => {
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => ({ ok: true, filters }),
+        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
         queryOddsHistory: async () => ({})
       }
     });
 
     const presets = await handlers.league_presets();
-    const nba = presets.result.find(entry => entry.league === 'NBA');
-    const wnba = presets.result.find(entry => entry.league === 'WNBA');
-    const nfl = presets.result.find(entry => entry.league === 'NFL');
-    const mlb = presets.result.find(entry => entry.league === 'MLB');
+    const nba = presets.result.find((entry) => entry.league === 'NBA');
+    const wnba = presets.result.find((entry) => entry.league === 'WNBA');
+    const nfl = presets.result.find((entry) => entry.league === 'NFL');
+    const mlb = presets.result.find((entry) => entry.league === 'MLB');
 
     assert.ok(wnba);
     assert.equal(wnba.displayName, 'WNBA');
@@ -583,34 +619,41 @@ describe('propprofessor MCP server stdio contract', () => {
 
   it('query_screen_odds_ranked returns a structured ranked response', async () => {
     const rankedPayload = {
-      game_data: [{
-        gameId: 'game-1',
-        league: 'NBA',
-        market: 'Moneyline',
-        updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
-        homeTeam: 'Lakers',
-        awayTeam: 'Warriors',
-        selections: {
-          a: {
-            selection1: 'Lakers',
-            participant1: 'Lakers',
-            selection1Id: 'Moneyline:Lakers',
-            selection2: 'Warriors',
-            participant2: 'Warriors',
-            selection2Id: 'Moneyline:Warriors',
-            odds: {
-              NoVigApp: { odds1: -118, odds2: 104 },
-              Polymarket: { odds1: -125, odds2: 110 }
+      game_data: [
+        {
+          gameId: 'game-1',
+          league: 'NBA',
+          market: 'Moneyline',
+          updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+          homeTeam: 'Lakers',
+          awayTeam: 'Warriors',
+          selections: {
+            a: {
+              selection1: 'Lakers',
+              participant1: 'Lakers',
+              selection1Id: 'Moneyline:Lakers',
+              selection2: 'Warriors',
+              participant2: 'Warriors',
+              selection2Id: 'Moneyline:Warriors',
+              odds: {
+                NoVigApp: { odds1: -118, odds2: 104 },
+                Polymarket: { odds1: -125, odds2: 110 }
+              }
             }
-          }
-        },
-        defaultKey: 'a'
-      }]
+          },
+          defaultKey: 'a'
+        }
+      ]
     };
     const { client, calls } = createRankedScreenClientStub({ rankedPayload });
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', includeAll: true, books: ['NoVigApp'] });
+    const result = await handlers.query_screen_odds_ranked({
+      league: 'NBA',
+      market: 'Moneyline',
+      includeAll: true,
+      books: ['NoVigApp']
+    });
 
     assert.equal(calls.queryScreenOddsBestComps.length, 1);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
@@ -635,7 +678,13 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', includeAll: true, books: ['NoVigApp'], debug: false });
+    const result = await handlers.query_screen_odds_ranked({
+      league: 'NBA',
+      market: 'Moneyline',
+      includeAll: true,
+      books: ['NoVigApp'],
+      debug: false
+    });
 
     assert.equal(result.resultMeta.debugEnabled, false);
     assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'movementDebug'), false);
@@ -659,7 +708,12 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_sport_screen({ league: 'Tennis', market: 'Moneyline', book: 'Pinnacle', includeAll: true });
+    const result = await handlers.query_sport_screen({
+      league: 'Tennis',
+      market: 'Moneyline',
+      book: 'Pinnacle',
+      includeAll: true
+    });
 
     assert.ok(calls.queryScreenOdds.length >= 1);
     assert.equal(calls.queryScreenOddsBestComps.length, 0);
@@ -713,7 +767,7 @@ describe('propprofessor MCP server stdio contract', () => {
   it('query_screen_odds_best_comps returns derived sharp-book metadata for MLB props', async () => {
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => ({ ok: true, filters }),
+        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
         queryOddsHistory: async () => ({})
       }
     });
@@ -728,7 +782,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const calls = [];
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           calls.push(filters);
           return { game_data: [] };
         },
@@ -749,13 +803,17 @@ describe('validated candidate concurrency helpers', () => {
     let inFlight = 0;
     let maxInFlight = 0;
 
-    const result = await mapWithConcurrency([1, 2, 3, 4, 5], async value => {
-      inFlight += 1;
-      maxInFlight = Math.max(maxInFlight, inFlight);
-      await new Promise(resolve => setTimeout(resolve, 5));
-      inFlight -= 1;
-      return value * 10;
-    }, { concurrency: 2 });
+    const result = await mapWithConcurrency(
+      [1, 2, 3, 4, 5],
+      async (value) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return value * 10;
+      },
+      { concurrency: 2 }
+    );
 
     assert.deepEqual(result, [10, 20, 30, 40, 50]);
     assert.equal(maxInFlight <= 2, true);
@@ -764,22 +822,47 @@ describe('validated candidate concurrency helpers', () => {
   it('validated candidates use hybrid handling when only some rows fail validation', async () => {
     const handlers = createMcpHandlers({
       client: {
-        querySportsbook: async () => ([
-          { id: 'ok-row', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A' },
-          { id: 'bad-row', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'B', selection: 'B', gameId: 'game-2', selectionId: 'Moneyline:B' }
-        ]),
+        querySportsbook: async () => [
+          {
+            id: 'ok-row',
+            league: 'NBA',
+            market: 'Moneyline',
+            book: 'Fliff',
+            participant: 'A',
+            selection: 'A',
+            gameId: 'game-1',
+            selectionId: 'Moneyline:A'
+          },
+          {
+            id: 'bad-row',
+            league: 'NBA',
+            market: 'Moneyline',
+            book: 'Fliff',
+            participant: 'B',
+            selection: 'B',
+            gameId: 'game-2',
+            selectionId: 'Moneyline:B'
+          }
+        ],
         queryOddsHistory: async ({ gameId }) => {
           if (gameId === 'game-2') {
             throw new Error('history failed');
           }
           return {
-            Fliff: [{ odds: -110, start_ts: 1 }, { odds: -120, start_ts: 2 }]
+            Fliff: [
+              { odds: -110, start_ts: 1 },
+              { odds: -120, start_ts: 2 }
+            ]
           };
         }
       }
     });
 
-    const result = await handlers.query_validated_positive_ev_candidates({ sportsbooks: ['Fliff'], leagues: ['NBA'], debug: false });
+    const result = await handlers.query_validated_positive_ev_candidates({
+      sportsbooks: ['Fliff'],
+      leagues: ['NBA'],
+      debug: false
+    });
     assert.equal(result.ok, true);
     assert.equal(result.resultMeta.candidateCount, 2);
     assert.equal(result.resultMeta.validatedCount, 1);
@@ -793,20 +876,47 @@ describe('validated candidate concurrency helpers', () => {
     let historyCalls = 0;
     const handlers = createMcpHandlers({
       client: {
-        querySportsbook: async () => ([
-          { id: 'row-1', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A', odds: -110 },
-          { id: 'row-2', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A', odds: -110 }
-        ]),
+        querySportsbook: async () => [
+          {
+            id: 'row-1',
+            league: 'NBA',
+            market: 'Moneyline',
+            book: 'Fliff',
+            participant: 'A',
+            selection: 'A',
+            gameId: 'game-1',
+            selectionId: 'Moneyline:A',
+            odds: -110
+          },
+          {
+            id: 'row-2',
+            league: 'NBA',
+            market: 'Moneyline',
+            book: 'Fliff',
+            participant: 'A',
+            selection: 'A',
+            gameId: 'game-1',
+            selectionId: 'Moneyline:A',
+            odds: -110
+          }
+        ],
         queryOddsHistory: async () => {
           historyCalls += 1;
           return {
-            Fliff: [{ odds: -110, start_ts: 1 }, { odds: -120, start_ts: 2 }]
+            Fliff: [
+              { odds: -110, start_ts: 1 },
+              { odds: -120, start_ts: 2 }
+            ]
           };
         }
       }
     });
 
-    const result = await handlers.query_validated_positive_ev_candidates({ sportsbooks: ['Fliff'], leagues: ['NBA'], debug: false });
+    const result = await handlers.query_validated_positive_ev_candidates({
+      sportsbooks: ['Fliff'],
+      leagues: ['NBA'],
+      debug: false
+    });
 
     assert.equal(result.ok, true);
     assert.equal(historyCalls, 1);

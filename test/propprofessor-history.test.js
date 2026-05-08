@@ -3,7 +3,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { findBestHistoryRow, normalizeHistoryPayload, resolveHistoryForEntity, getOddsHistoryStartTimestamp } = require('../lib/propprofessor-history');
+const {
+  normalizeHistoryPayload,
+  resolveHistoryForEntity,
+  getOddsHistoryStartTimestamp
+} = require('../lib/propprofessor-history');
 const { getSharpBookComparisonSet } = require('../lib/propprofessor-sharp-books');
 
 describe('propprofessor history matching', () => {
@@ -18,15 +22,20 @@ describe('propprofessor history matching', () => {
         gameId: 'game-1',
         selectionId: 'Moneyline:Boston_Celtics'
       },
-      rows: [{
-        book: 'NoVigApp',
-        pick: 'Boston Celtics',
-        game: 'Boston Celtics vs Miami Heat',
-        odds: '-142',
-        gameId: 'game-1',
-        selectionId: 'Moneyline:Miami_Heat'
-      }],
-      queryHistoryFn: async () => [{ odds: -150, start_ts: 1 }, { odds: -142, start_ts: 2 }]
+      rows: [
+        {
+          book: 'NoVigApp',
+          pick: 'Boston Celtics',
+          game: 'Boston Celtics vs Miami Heat',
+          odds: '-142',
+          gameId: 'game-1',
+          selectionId: 'Moneyline:Miami_Heat'
+        }
+      ],
+      queryHistoryFn: async () => [
+        { odds: -150, start_ts: 1 },
+        { odds: -142, start_ts: 2 }
+      ]
     });
 
     assert.equal(result.lineHistoryAvailable, true);
@@ -39,8 +48,20 @@ describe('propprofessor history matching', () => {
     const result = await resolveHistoryForEntity({
       client: {},
       target: { book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Orioles vs Red Sox', odds: '-130' },
-      rows: [{ book: 'NoVigApp', pick: 'Portland Trail Blazers +5.5', game: 'Trail Blazers vs Warriors', odds: '+102', gameId: 'wrong-game', selectionId: 'wrong-selection' }],
-      queryHistoryFn: async () => { queried = true; return [{ odds: -110 }, { odds: -130 }]; }
+      rows: [
+        {
+          book: 'NoVigApp',
+          pick: 'Portland Trail Blazers +5.5',
+          game: 'Trail Blazers vs Warriors',
+          odds: '+102',
+          gameId: 'wrong-game',
+          selectionId: 'wrong-selection'
+        }
+      ],
+      queryHistoryFn: async () => {
+        queried = true;
+        return [{ odds: -110 }, { odds: -130 }];
+      }
     });
 
     assert.equal(queried, false);
@@ -52,9 +73,26 @@ describe('propprofessor history matching', () => {
     const calls = [];
     const result = await resolveHistoryForEntity({
       client: {},
-      target: { book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Baltimore Orioles vs Boston Red Sox', odds: '-130' },
-      rows: [{ book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Baltimore Orioles vs Boston Red Sox', odds: '-120', gameId: 'game-1', selectionId: 'selection-1' }],
-      queryHistoryFn: async params => { calls.push(params); return [{ odds: -120 }, { odds: -140 }]; }
+      target: {
+        book: 'NoVigApp',
+        pick: 'Baltimore Orioles',
+        game: 'Baltimore Orioles vs Boston Red Sox',
+        odds: '-130'
+      },
+      rows: [
+        {
+          book: 'NoVigApp',
+          pick: 'Baltimore Orioles',
+          game: 'Baltimore Orioles vs Boston Red Sox',
+          odds: '-120',
+          gameId: 'game-1',
+          selectionId: 'selection-1'
+        }
+      ],
+      queryHistoryFn: async (params) => {
+        calls.push(params);
+        return [{ odds: -120 }, { odds: -140 }];
+      }
     });
 
     assert.equal(result.lineHistoryAvailable, true);
@@ -72,17 +110,22 @@ describe('propprofessor history matching', () => {
         game: 'Baltimore Orioles vs Boston Red Sox',
         odds: '-130'
       },
-      rows: [{
-        book: 'NoVigApp',
-        pick: 'Baltimore Orioles',
-        game: 'Baltimore Orioles vs New York Yankees',
-        odds: '-130',
-        gameId: 'game-wrong',
-        selectionId: 'selection-wrong'
-      }],
+      rows: [
+        {
+          book: 'NoVigApp',
+          pick: 'Baltimore Orioles',
+          game: 'Baltimore Orioles vs New York Yankees',
+          odds: '-130',
+          gameId: 'game-wrong',
+          selectionId: 'selection-wrong'
+        }
+      ],
       queryHistoryFn: async () => {
         queried = true;
-        return [{ odds: -135, start_ts: 1 }, { odds: -130, start_ts: 2 }];
+        return [
+          { odds: -135, start_ts: 1 },
+          { odds: -130, start_ts: 2 }
+        ];
       }
     });
 
@@ -97,9 +140,26 @@ describe('propprofessor history matching', () => {
     const result = await resolveHistoryForEntity({
       client: {},
       nowMs: fixedNowMs,
-      target: { book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Baltimore Orioles vs Boston Red Sox', odds: '-130' },
-      rows: [{ book: 'NoVigApp', pick: 'Baltimore Orioles', game: 'Baltimore Orioles vs Boston Red Sox', odds: '-130', gameId: 'game-1', selectionId: 'selection-1' }],
-      queryHistoryFn: async params => { calls.push(params); return [{ odds: -120 }, { odds: -140 }]; }
+      target: {
+        book: 'NoVigApp',
+        pick: 'Baltimore Orioles',
+        game: 'Baltimore Orioles vs Boston Red Sox',
+        odds: '-130'
+      },
+      rows: [
+        {
+          book: 'NoVigApp',
+          pick: 'Baltimore Orioles',
+          game: 'Baltimore Orioles vs Boston Red Sox',
+          odds: '-130',
+          gameId: 'game-1',
+          selectionId: 'selection-1'
+        }
+      ],
+      queryHistoryFn: async (params) => {
+        calls.push(params);
+        return [{ odds: -120 }, { odds: -140 }];
+      }
     });
 
     assert.equal(result.lineHistoryAvailable, true);
@@ -127,7 +187,10 @@ describe('propprofessor history matching', () => {
         selectionId: 'selection-99'
       },
       rows: [{ book: 'NoVigApp', pick: 'Boston Celtics', game: 'Boston Celtics vs Philadelphia 76ers', odds: '-105' }],
-      queryHistoryFn: async params => { calls.push(params); return [{ odds: -110 }, { odds: -105 }]; }
+      queryHistoryFn: async (params) => {
+        calls.push(params);
+        return [{ odds: -110 }, { odds: -105 }];
+      }
     });
 
     assert.equal(result.lineHistoryAvailable, true);
@@ -141,9 +204,7 @@ describe('propprofessor history matching', () => {
         { odds: -118, start_ts: 1, liquidity: 20 },
         { odds: -112, start_ts: 2, liquidity: 30 }
       ],
-      FanDuel: [
-        { odds: -110, start_ts: 3, liquidity: 0 }
-      ]
+      FanDuel: [{ odds: -110, start_ts: 3, liquidity: 0 }]
     });
 
     assert.equal(result.length, 3);
@@ -158,13 +219,17 @@ describe('propprofessor history matching', () => {
         { odds: -110, start_ts: 30 },
         { odds: -120, start_ts: 10 }
       ],
-      FanDuel: [
-        { odds: -118, start_ts: 20 }
-      ]
+      FanDuel: [{ odds: -118, start_ts: 20 }]
     });
 
-    assert.deepEqual(result.map(point => point.odds), [-120, -118, -110]);
-    assert.deepEqual(result.map(point => point.book), ['NoVigApp', 'FanDuel', 'NoVigApp']);
+    assert.deepEqual(
+      result.map((point) => point.odds),
+      [-120, -118, -110]
+    );
+    assert.deepEqual(
+      result.map((point) => point.book),
+      ['NoVigApp', 'FanDuel', 'NoVigApp']
+    );
   });
 
   it('passes preferred and sharp sportsbooks into odds-history hydration requests', async () => {
@@ -173,12 +238,26 @@ describe('propprofessor history matching', () => {
     const result = await resolveHistoryForEntity({
       client: {},
       target: { book: 'NoVigApp', pick: 'Boston Celtics', game: 'Boston Celtics vs Miami Heat', odds: '-142' },
-      rows: [{ book: 'NoVigApp', pick: 'Boston Celtics', game: 'Boston Celtics vs Miami Heat', odds: '-142', gameId: 'game-1', selectionId: 'Moneyline:Boston_Celtics' }],
+      rows: [
+        {
+          book: 'NoVigApp',
+          pick: 'Boston Celtics',
+          game: 'Boston Celtics vs Miami Heat',
+          odds: '-142',
+          gameId: 'game-1',
+          selectionId: 'Moneyline:Boston_Celtics'
+        }
+      ],
       preferredBook: 'NoVigApp',
       sharpBooks,
-      queryHistoryFn: async params => {
+      queryHistoryFn: async (params) => {
         calls.push(params);
-        return { NoVigApp: [{ odds: -150, start_ts: 1 }, { odds: -142, start_ts: 2 }] };
+        return {
+          NoVigApp: [
+            { odds: -150, start_ts: 1 },
+            { odds: -142, start_ts: 2 }
+          ]
+        };
       }
     });
 

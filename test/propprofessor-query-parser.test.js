@@ -6,7 +6,6 @@ const assert = require('node:assert/strict');
 const {
   inferDefaultLeague,
   inferDefaultMarket,
-  inferIntent,
   inferPreferredBook,
   parseNaturalLanguagePropQuery
 } = require('../lib/propprofessor-query-parser');
@@ -43,7 +42,6 @@ describe('propprofessor query parser', () => {
   });
 
   it('exposes the helper inferencers', () => {
-    assert.equal(inferIntent('best props today'), 'screen');
     assert.equal(inferPreferredBook('use Rebet'), 'Rebet');
     assert.equal(inferDefaultLeague('nba player points'), 'NBA');
     assert.equal(inferDefaultMarket('tennis spread', 'Tennis'), 'Spread');

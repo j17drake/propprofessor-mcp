@@ -38,7 +38,10 @@ function parseArgs(argv) {
       opts.limit = Number(next);
       i += 1;
     } else if (arg === '--books' || arg === '-b') {
-      opts.books = String(next).split(',').map(s => s.trim()).filter(Boolean);
+      opts.books = String(next)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       i += 1;
     } else if (arg === '--output' || arg === '-o') {
       opts.output = path.resolve(next);
@@ -82,7 +85,7 @@ function toRankedRows(payload, league, limit, options = {}) {
 }
 
 function toCandidateRows(rankedRows) {
-  return (Array.isArray(rankedRows) ? rankedRows : []).map(row => ({
+  return (Array.isArray(rankedRows) ? rankedRows : []).map((row) => ({
     sport: row.league || row.sport || '',
     league: row.league || row.sport || '',
     market: row.market || row.screenMarket || '',
@@ -128,6 +131,7 @@ async function main(argv = process.argv) {
   const league = String(opts.league || 'NBA');
   const market = String(opts.market || 'Moneyline');
 
+  let client;
   let payload;
   let rowsLoaded = 0;
 
@@ -136,10 +140,11 @@ async function main(argv = process.argv) {
     payload = localRows;
     rowsLoaded = localRows.length;
   } else {
-    const client = createPropProfessorClient();
-    const queryFn = typeof client.queryScreenOddsBestComps === 'function'
-      ? client.queryScreenOddsBestComps.bind(client)
-      : client.queryScreenOdds.bind(client);
+    client = createPropProfessorClient();
+    const queryFn =
+      typeof client.queryScreenOddsBestComps === 'function'
+        ? client.queryScreenOddsBestComps.bind(client)
+        : client.queryScreenOdds.bind(client);
     payload = await queryFn({
       league,
       market,
@@ -148,7 +153,7 @@ async function main(argv = process.argv) {
     });
   }
 
-  const client = createPropProfessorClient();
+  if (!client) client = createPropProfessorClient();
   const rows = extractScreenRows(payload);
   const lookbackHours = getOddsHistoryLookbackHours(opts.lookbackHours);
   const debug = getDebugFlag(opts.debug, true);
@@ -182,7 +187,7 @@ async function main(argv = process.argv) {
 }
 
 if (require.main === module) {
-  main().catch(err => {
+  main().catch((err) => {
     console.error(err.stack || err.message);
     process.exitCode = 1;
   });

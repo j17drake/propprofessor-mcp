@@ -11,11 +11,14 @@ const {
 } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
-const { rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, getLeagueRankingPreset, normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
 const {
-  buildRankedScreenResponse,
-  getDebugFlag
-} = require('../lib/propprofessor-mcp-ranked-screen');
+  rankTennisScreenRows,
+  rankLeagueScreenRows,
+  extractScreenRows,
+  getLeagueRankingPreset,
+  normalizeTennisMarketQuery
+} = require('../lib/propprofessor-screen-utils');
+const { buildRankedScreenResponse, getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
 
 const LEAGUE_ALIASES = {
   sport: null,
@@ -121,7 +124,8 @@ function buildDoctorReport(healthResult) {
   } else if (!auth.ok) {
     nextStep = `Save your PropProfessor browser session to ${auth.defaultUserAuthFile} or set AUTH_FILE, then rerun \`pp-query doctor\`.`;
   } else if (!endpointOk) {
-    nextStep = 'Your auth file was found, but the live health check failed. Refresh your browser session and rerun `pp-query doctor`.';
+    nextStep =
+      'Your auth file was found, but the live health check failed. Refresh your browser session and rerun `pp-query doctor`.';
   }
 
   return {
@@ -208,18 +212,21 @@ function emitJson(logger, payload) {
 }
 
 async function queryTennisPayloads(client, { market, books, is_live } = {}) {
-  const tennisQuery = typeof client.queryScreenOdds === 'function'
-    ? client.queryScreenOdds.bind(client)
-    : client.queryScreenOddsBestComps.bind(client);
+  const tennisQuery =
+    typeof client.queryScreenOdds === 'function'
+      ? client.queryScreenOdds.bind(client)
+      : client.queryScreenOddsBestComps.bind(client);
   const payloads = [];
 
   for (const tennisMarket of normalizeTennisMarketQuery(market || 'Moneyline')) {
-    payloads.push(await tennisQuery({
-      league: 'Tennis',
-      market: tennisMarket,
-      books,
-      is_live
-    }));
+    payloads.push(
+      await tennisQuery({
+        league: 'Tennis',
+        market: tennisMarket,
+        books,
+        is_live
+      })
+    );
   }
 
   return payloads;
@@ -257,7 +264,7 @@ function formatLocalStart(value, timeZone = getLocalTimezone()) {
 }
 
 function normalizeScreenRowTimes(rows, timeZone = getLocalTimezone()) {
-  return (Array.isArray(rows) ? rows : []).map(row => {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
     const startLabel = formatLocalStart(row?.start, timeZone);
     return {
       ...row,
@@ -305,7 +312,12 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   } else if (command === 'tennis') {
     payloads = await queryTennisPayloads(client, {
       market: opts.market || 'Moneyline',
-      books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      books: opts.books
+        ? String(opts.books)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
       is_live: Boolean(opts.live)
     });
     payload = payloads[0] || { game_data: [] };
@@ -313,12 +325,17 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     payload = await client.queryScreenOddsBestComps({
       league: screenCommand.league,
       market: opts.market || 'Moneyline',
-      books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      books: opts.books
+        ? String(opts.books)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
       is_live: Boolean(opts.live)
     });
   } else if (command === 'presets') {
     const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
-    const presets = leagues.map(league => getLeagueRankingPreset(league));
+    const presets = leagues.map((league) => getLeagueRankingPreset(league));
     emitJson(logger, { command, presets });
     return;
   } else if (command === 'health') {
@@ -326,7 +343,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     emitJson(logger, { command, ...result });
     return;
   } else if (command === 'doctor') {
-    let healthResult = null;
+    let healthResult;
     try {
       healthResult = await client.healthStatus();
     } catch (error) {
@@ -355,7 +372,12 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   const lookbackHours = getOddsHistoryLookbackHours(opts.lookbackHours);
   const debug = getDebugFlag(opts.debug, true);
   if (command === 'tennis') {
-    const tennisBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const tennisBooks = opts.books
+      ? String(opts.books)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
     const result = await buildRankedScreenResponse({
       client,
       payloads: Array.isArray(payloads) && payloads.length ? payloads : [payload],
@@ -370,13 +392,14 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       },
       league: 'Tennis',
       focusBook: tennisBooks[0] || 'Pinnacle',
-      rankRows: (hydratedRows, { debug: rankedDebug } = {}) => rankTennisScreenRows(hydratedRows, {
-        limit: opts.limit ? Number(opts.limit) : 12,
-        includeAll: true,
-        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
-        preferredBook: tennisBooks[0] || 'Pinnacle',
-        debug: rankedDebug
-      }),
+      rankRows: (hydratedRows, { debug: rankedDebug } = {}) =>
+        rankTennisScreenRows(hydratedRows, {
+          limit: opts.limit ? Number(opts.limit) : 12,
+          includeAll: true,
+          maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+          preferredBook: tennisBooks[0] || 'Pinnacle',
+          debug: rankedDebug
+        }),
       resultMeta: {
         command,
         notes: {
@@ -392,7 +415,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     result.sample = normalized;
     result.notes = {
       ...(result.notes || {}),
-      movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
+      movementAvailable: normalized.some((row) => row.lineHistoryUsable || row.clvProxyPct !== null),
       consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
       clvProxy: 'open odds vs current odds when history fields are present',
       timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
@@ -402,7 +425,12 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   }
 
   if (screenCommand.command === 'screen') {
-    const screenBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const screenBooks = opts.books
+      ? String(opts.books)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : ['NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
     const result = await buildRankedScreenResponse({
       client,
       payloads: [payload],
@@ -417,15 +445,16 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       },
       league: screenCommand.league,
       focusBook: screenBooks[0] || 'NoVigApp',
-      rankRows: (hydratedRows, { debug: rankedDebug } = {}) => rankLeagueScreenRows(hydratedRows, {
-        league: screenCommand.league,
-        market: opts.market || 'Moneyline',
-        limit: opts.limit ? Number(opts.limit) : 12,
-        includeAll: true,
-        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
-        books: screenBooks,
-        debug: rankedDebug
-      }),
+      rankRows: (hydratedRows, { debug: rankedDebug } = {}) =>
+        rankLeagueScreenRows(hydratedRows, {
+          league: screenCommand.league,
+          market: opts.market || 'Moneyline',
+          limit: opts.limit ? Number(opts.limit) : 12,
+          includeAll: true,
+          maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+          books: screenBooks,
+          debug: rankedDebug
+        }),
       resultMeta: {
         command,
         notes: {
@@ -441,7 +470,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     result.sample = normalized;
     result.notes = {
       ...(result.notes || {}),
-      movementAvailable: normalized.some(row => row.lineHistoryUsable || row.clvProxyPct !== null),
+      movementAvailable: normalized.some((row) => row.lineHistoryUsable || row.clvProxyPct !== null),
       consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
       clvProxy: 'open odds vs current odds when history fields are present',
       timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
@@ -450,7 +479,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     return;
   }
 
-  const filtered = rows.filter(row => {
+  const filtered = rows.filter((row) => {
     const text = JSON.stringify(row).toLowerCase();
     const playerOk = !opts.player || text.includes(String(opts.player).toLowerCase());
     const marketOk = !opts.market || text.includes(String(opts.market).toLowerCase());
@@ -462,7 +491,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
 }
 
 if (require.main === module) {
-  main().catch(err => {
+  main().catch((err) => {
     console.error(err.stack || err.message);
     process.exitCode = 1;
   });

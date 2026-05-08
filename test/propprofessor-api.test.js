@@ -67,10 +67,7 @@ describe('normalizeSelectionId', () => {
   });
 
   it('leaves already-normalized ids unchanged', () => {
-    assert.equal(
-      normalizeSelectionId('Point_Spread:San_Antonio_Spurs_-5.5'),
-      'Point_Spread:San_Antonio_Spurs_-5.5'
-    );
+    assert.equal(normalizeSelectionId('Point_Spread:San_Antonio_Spurs_-5.5'), 'Point_Spread:San_Antonio_Spurs_-5.5');
   });
 });
 
@@ -101,7 +98,7 @@ describe('fetchAccessToken', () => {
     const calls = [];
     const result = await fetchAccessToken({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         calls.push(options);
         return {
           body: JSON.stringify({
@@ -132,14 +129,14 @@ describe('fetchAccessToken', () => {
     });
 
     try {
-      await assert.rejects(
-        fetchAccessToken({ authFile: file }),
-        error => {
-          assert.match(error.message, /No PropProfessor cookies found/);
-          assert.match(error.message, new RegExp(path.escape ? path.escape(file) : file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-          return true;
-        }
-      );
+      await assert.rejects(fetchAccessToken({ authFile: file }), (error) => {
+        assert.match(error.message, /No PropProfessor cookies found/);
+        assert.match(
+          error.message,
+          new RegExp(path.escape ? path.escape(file) : file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        );
+        return true;
+      });
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -172,7 +169,7 @@ describe('createPropProfessorClient', () => {
     const fetchCalls = [];
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         tokenCalls.push(options);
         return {
           body: JSON.stringify({
@@ -235,7 +232,7 @@ describe('createPropProfessorClient', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ([{ id: 'row-1', updatedAt: new Date().toISOString() }])
+          json: async () => [{ id: 'row-1', updatedAt: new Date().toISOString() }]
         };
       }
     });
@@ -273,7 +270,7 @@ describe('createPropProfessorClient', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ([])
+          json: async () => []
         };
       }
     });
@@ -315,7 +312,7 @@ describe('createPropProfessorClient', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ([])
+          json: async () => []
         };
       }
     });
@@ -383,7 +380,12 @@ describe('createPropProfessorClient', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ({ FanDuel: [{ odds: -110, start_ts: 1 }, { odds: -120, start_ts: 2 }] })
+          json: async () => ({
+            FanDuel: [
+              { odds: -110, start_ts: 1 },
+              { odds: -120, start_ts: 2 }
+            ]
+          })
         };
       }
     });
@@ -444,7 +446,7 @@ describe('createPropProfessorClient', () => {
       assert.equal('fantasy' in health.errors, false);
       assert.equal('fantasy' in health.freshness, false);
       assert.equal(fetchCalls.length, 2);
-      assert.ok(fetchCalls.every(url => /\/screen/.test(url)));
+      assert.ok(fetchCalls.every((url) => /\/screen/.test(url)));
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -507,7 +509,7 @@ describe('createPropProfessorClient', () => {
     const tokenCalls = [];
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         tokenCalls.push(options);
         const token = tokenCalls.length === 1 ? 'jwt-1' : 'jwt-2';
         return {
@@ -580,38 +582,46 @@ describe('createPropProfessorClient', () => {
     const calls = [];
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           calls.push(filters);
           return {
-            game_data: [{
-              gameId: 'game-1',
-              league: 'NBA',
-              market: 'Point Spread',
-              homeTeam: 'Houston Rockets',
-              awayTeam: 'Los Angeles Lakers',
-              selections: {
-                '-2.5': {
-                  selection1: 'Houston Rockets -2.5',
-                  participant1: 'Houston Rockets',
-                  selection1Id: 'Point_Spread:Houston_Rockets_-2.5',
-                  line1: -2.5,
-                  selection2: 'Los Angeles Lakers +2.5',
-                  participant2: 'Los Angeles Lakers',
-                  selection2Id: 'Point_Spread:Los_Angeles_Lakers_+2.5',
-                  line2: 2.5,
-                  odds: {
-                    NoVigApp: { odds1: -128, odds2: 104 },
-                    Polymarket: { odds1: -126, odds2: 102 }
+            game_data: [
+              {
+                gameId: 'game-1',
+                league: 'NBA',
+                market: 'Point Spread',
+                homeTeam: 'Houston Rockets',
+                awayTeam: 'Los Angeles Lakers',
+                selections: {
+                  '-2.5': {
+                    selection1: 'Houston Rockets -2.5',
+                    participant1: 'Houston Rockets',
+                    selection1Id: 'Point_Spread:Houston_Rockets_-2.5',
+                    line1: -2.5,
+                    selection2: 'Los Angeles Lakers +2.5',
+                    participant2: 'Los Angeles Lakers',
+                    selection2Id: 'Point_Spread:Los_Angeles_Lakers_+2.5',
+                    line2: 2.5,
+                    odds: {
+                      NoVigApp: { odds1: -128, odds2: 104 },
+                      Polymarket: { odds1: -126, odds2: 102 }
+                    }
                   }
                 }
               }
-            }]
+            ]
           };
         },
         queryOddsHistory: async ({ gameId, selectionId }) => ({
           NoVigApp: String(selectionId).includes('Houston_Rockets')
-            ? [{ odds: -128, start_ts: 1 }, { odds: -140, start_ts: 2 }]
-            : [{ odds: 104, start_ts: 1 }, { odds: 116, start_ts: 2 }],
+            ? [
+                { odds: -128, start_ts: 1 },
+                { odds: -140, start_ts: 2 }
+              ]
+            : [
+                { odds: 104, start_ts: 1 },
+                { odds: 116, start_ts: 2 }
+              ],
           Polymarket: [{ odds: -126, start_ts: 3 }],
           meta: { gameId }
         })
@@ -640,40 +650,48 @@ describe('createPropProfessorClient', () => {
     const historyCalls = [];
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           screenCalls.push(filters);
           return {
-            game_data: [{
-              gameId: 'game-ranked-1',
-              league: 'NBA',
-              market: 'Moneyline',
-              updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
-              homeTeam: 'Boston Celtics',
-              awayTeam: 'Miami Heat',
-              selections: {
-                a: {
-                  selection1: 'Boston Celtics',
-                  participant1: 'Boston Celtics',
-                  selection1Id: 'Moneyline:Boston_Celtics',
-                  selection2: 'Miami Heat',
-                  participant2: 'Miami Heat',
-                  selection2Id: 'Moneyline:Miami_Heat',
-                  odds: {
-                    NoVigApp: { odds1: -142, odds2: 122 },
-                    Polymarket: { odds1: -150, odds2: 128 }
+            game_data: [
+              {
+                gameId: 'game-ranked-1',
+                league: 'NBA',
+                market: 'Moneyline',
+                updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+                homeTeam: 'Boston Celtics',
+                awayTeam: 'Miami Heat',
+                selections: {
+                  a: {
+                    selection1: 'Boston Celtics',
+                    participant1: 'Boston Celtics',
+                    selection1Id: 'Moneyline:Boston_Celtics',
+                    selection2: 'Miami Heat',
+                    participant2: 'Miami Heat',
+                    selection2Id: 'Moneyline:Miami_Heat',
+                    odds: {
+                      NoVigApp: { odds1: -142, odds2: 122 },
+                      Polymarket: { odds1: -150, odds2: 128 }
+                    }
                   }
-                }
-              },
-              defaultKey: 'a'
-            }]
+                },
+                defaultKey: 'a'
+              }
+            ]
           };
         },
         queryOddsHistory: async ({ gameId, selectionId, sportsbooks }) => {
           historyCalls.push({ gameId, selectionId, sportsbooks });
           return {
             NoVigApp: String(selectionId).includes('Boston_Celtics')
-              ? [{ odds: -142, start_ts: 1 }, { odds: -155, start_ts: 2 }]
-              : [{ odds: 122, start_ts: 1 }, { odds: 135, start_ts: 2 }],
+              ? [
+                  { odds: -142, start_ts: 1 },
+                  { odds: -155, start_ts: 2 }
+                ]
+              : [
+                  { odds: 122, start_ts: 1 },
+                  { odds: 135, start_ts: 2 }
+                ],
             Polymarket: [{ odds: -150, start_ts: 3 }],
             meta: { gameId }
           };
@@ -681,7 +699,12 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', books: ['NoVigApp'], lookbackHours: 6 });
+    const result = await handlers.query_screen_odds_ranked({
+      league: 'NBA',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      lookbackHours: 6
+    });
     assert.equal(result.ok, true);
     assert.equal(result.freshness.rowCount, 2);
     assert.equal(result.freshness.newestAgeMs !== null, true);
@@ -721,38 +744,48 @@ describe('createPropProfessorClient', () => {
     const handlers = createMcpHandlers({
       client: {
         queryScreenOddsBestComps: async () => ({
-          game_data: [{
-            gameId: 'game-ranked-2',
-            league: 'NBA',
-            market: 'Moneyline',
-            updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
-            homeTeam: 'Cleveland Cavaliers',
-            awayTeam: 'Detroit Pistons',
-            selections: {
-              a: {
-                selection1: 'Cleveland Cavaliers',
-                participant1: 'Cleveland Cavaliers',
-                selection1Id: 'Moneyline:Cleveland_Cavaliers',
-                selection2: 'Detroit Pistons',
-                participant2: 'Detroit Pistons',
-                selection2Id: 'Moneyline:Detroit_Pistons',
-                odds: {
-                  NoVigApp: { odds1: -130, odds2: 110 },
-                  Polymarket: { odds1: -138, odds2: 118 }
+          game_data: [
+            {
+              gameId: 'game-ranked-2',
+              league: 'NBA',
+              market: 'Moneyline',
+              updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
+              homeTeam: 'Cleveland Cavaliers',
+              awayTeam: 'Detroit Pistons',
+              selections: {
+                a: {
+                  selection1: 'Cleveland Cavaliers',
+                  participant1: 'Cleveland Cavaliers',
+                  selection1Id: 'Moneyline:Cleveland_Cavaliers',
+                  selection2: 'Detroit Pistons',
+                  participant2: 'Detroit Pistons',
+                  selection2Id: 'Moneyline:Detroit_Pistons',
+                  odds: {
+                    NoVigApp: { odds1: -130, odds2: 110 },
+                    Polymarket: { odds1: -138, odds2: 118 }
+                  }
                 }
-              }
-            },
-            defaultKey: 'a'
-          }]
+              },
+              defaultKey: 'a'
+            }
+          ]
         }),
         queryOddsHistory: async ({ gameId }) => ({
-          NoVigApp: [{ odds: -125, start_ts: 1 }, { odds: -130, start_ts: 2 }],
+          NoVigApp: [
+            { odds: -125, start_ts: 1 },
+            { odds: -130, start_ts: 2 }
+          ],
           meta: { gameId }
         })
       }
     });
 
-    const result = await handlers.query_screen_odds_ranked({ league: 'NBA', market: 'Moneyline', books: ['NoVigApp'], debug: false });
+    const result = await handlers.query_screen_odds_ranked({
+      league: 'NBA',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      debug: false
+    });
 
     assert.equal(result.resultMeta.debugEnabled, false);
     assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'movementDebug'), false);
@@ -766,38 +799,43 @@ describe('createPropProfessorClient', () => {
     const historyCalls = [];
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOddsBestComps: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           screenCalls.push(filters);
           return {
-            game_data: [{
-              gameId: 'game-sport-1',
-              league: 'NBA',
-              market: 'Moneyline',
-              updatedAt: new Date(Date.now() - 45 * 1000).toISOString(),
-              homeTeam: 'Knicks',
-              awayTeam: 'Pacers',
-              selections: {
-                a: {
-                  selection1: 'Knicks',
-                  participant1: 'Knicks',
-                  selection1Id: 'Moneyline:Knicks',
-                  selection2: 'Pacers',
-                  participant2: 'Pacers',
-                  selection2Id: 'Moneyline:Pacers',
-                  odds: {
-                    NoVigApp: { odds1: -118, odds2: 104 },
-                    Polymarket: { odds1: -125, odds2: 110 }
+            game_data: [
+              {
+                gameId: 'game-sport-1',
+                league: 'NBA',
+                market: 'Moneyline',
+                updatedAt: new Date(Date.now() - 45 * 1000).toISOString(),
+                homeTeam: 'Knicks',
+                awayTeam: 'Pacers',
+                selections: {
+                  a: {
+                    selection1: 'Knicks',
+                    participant1: 'Knicks',
+                    selection1Id: 'Moneyline:Knicks',
+                    selection2: 'Pacers',
+                    participant2: 'Pacers',
+                    selection2Id: 'Moneyline:Pacers',
+                    odds: {
+                      NoVigApp: { odds1: -118, odds2: 104 },
+                      Polymarket: { odds1: -125, odds2: 110 }
+                    }
                   }
-                }
-              },
-              defaultKey: 'a'
-            }]
+                },
+                defaultKey: 'a'
+              }
+            ]
           };
         },
         queryOddsHistory: async ({ gameId, selectionId }) => {
           historyCalls.push({ gameId, selectionId });
           return {
-            NoVigApp: [{ odds: -130, start_ts: 1 }, { odds: String(selectionId).includes('Knicks') ? -118 : 104, start_ts: 2 }],
+            NoVigApp: [
+              { odds: -130, start_ts: 1 },
+              { odds: String(selectionId).includes('Knicks') ? -118 : 104, start_ts: 2 }
+            ],
             Polymarket: [{ odds: -125, start_ts: 3 }],
             meta: { gameId }
           };
@@ -805,7 +843,12 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_sport_screen({ league: 'nba', market: 'Moneyline', books: ['NoVigApp'], lookbackHours: 8 });
+    const result = await handlers.query_sport_screen({
+      league: 'nba',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      lookbackHours: 8
+    });
     assert.equal(result.ok, true);
     assert.equal(result.league, 'NBA');
     assert.equal(result.freshness.rowCount, 2);
@@ -825,44 +868,52 @@ describe('createPropProfessorClient', () => {
     const historyCalls = [];
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOdds: async filters => {
+        queryScreenOdds: async (filters) => {
           screenCalls.push(filters);
           return {
-            game_data: [{
-              gameId: 'tennis-game-1',
-              league: 'Tennis',
-              market: 'Moneyline',
-              updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
-              homeTeam: 'Player A',
-              awayTeam: 'Player B',
-              selections: {
-                a: {
-                  selection1: 'Player A',
-                  participant1: 'Player A',
-                  selection1Id: 'Moneyline:Player_A',
-                  selection2: 'Player B',
-                  participant2: 'Player B',
-                  selection2Id: 'Moneyline:Player_B',
-                  odds: {
-                    Fliff: { odds1: 120, odds2: -130 },
-                    NoVigApp: { odds1: 118, odds2: -128 },
-                    Polymarket: { odds1: 110, odds2: -120 },
-                    Kalshi: { odds1: 108, odds2: -122 },
-                    BetOnline: { odds1: 115, odds2: -125 },
-                    Circa: { odds1: 112, odds2: -123 }
+            game_data: [
+              {
+                gameId: 'tennis-game-1',
+                league: 'Tennis',
+                market: 'Moneyline',
+                updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
+                homeTeam: 'Player A',
+                awayTeam: 'Player B',
+                selections: {
+                  a: {
+                    selection1: 'Player A',
+                    participant1: 'Player A',
+                    selection1Id: 'Moneyline:Player_A',
+                    selection2: 'Player B',
+                    participant2: 'Player B',
+                    selection2Id: 'Moneyline:Player_B',
+                    odds: {
+                      Fliff: { odds1: 120, odds2: -130 },
+                      NoVigApp: { odds1: 118, odds2: -128 },
+                      Polymarket: { odds1: 110, odds2: -120 },
+                      Kalshi: { odds1: 108, odds2: -122 },
+                      BetOnline: { odds1: 115, odds2: -125 },
+                      Circa: { odds1: 112, odds2: -123 }
+                    }
                   }
-                }
-              },
-              defaultKey: 'a'
-            }]
+                },
+                defaultKey: 'a'
+              }
+            ]
           };
         },
         queryOddsHistory: async ({ gameId, selectionId }) => {
           historyCalls.push({ gameId, selectionId });
           return {
             Fliff: String(selectionId).includes('Player_A')
-              ? [{ odds: 130, start_ts: 1 }, { odds: 120, start_ts: 2 }]
-              : [{ odds: -118, start_ts: 1 }, { odds: -130, start_ts: 2 }],
+              ? [
+                  { odds: 130, start_ts: 1 },
+                  { odds: 120, start_ts: 2 }
+                ]
+              : [
+                  { odds: -118, start_ts: 1 },
+                  { odds: -130, start_ts: 2 }
+                ],
             NoVigApp: [{ odds: 118, start_ts: 3 }],
             Polymarket: [{ odds: 110, start_ts: 4 }],
             meta: { gameId }
@@ -871,8 +922,15 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_tennis_screen({ market: 'Moneyline', book: 'Fliff', limit: 5, lookbackHours: 4 });
-    const tennisRow = result.result.find(row => row.selectionId === 'Moneyline:Player_A' || row.normalizedSelectionId === 'Moneyline:Player_A');
+    const result = await handlers.query_tennis_screen({
+      market: 'Moneyline',
+      book: 'Fliff',
+      limit: 5,
+      lookbackHours: 4
+    });
+    const tennisRow = result.result.find(
+      (row) => row.selectionId === 'Moneyline:Player_A' || row.normalizedSelectionId === 'Moneyline:Player_A'
+    );
     assert.ok(tennisRow);
     assert.equal(tennisRow.book, 'Fliff');
     assert.equal(tennisRow.lineHistoryAvailable, true);
@@ -938,10 +996,13 @@ describe('createPropProfessorClient', () => {
     const tokenCalls = [];
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         tokenCalls.push(options);
         return {
-          body: JSON.stringify({ token: tokenCalls.length === 1 ? 'jwt-1' : 'jwt-2', exp: Math.floor(Date.now() / 1000) + 600 }),
+          body: JSON.stringify({
+            token: tokenCalls.length === 1 ? 'jwt-1' : 'jwt-2',
+            exp: Math.floor(Date.now() / 1000) + 600
+          }),
           statusCode: 200
         };
       },
@@ -973,7 +1034,10 @@ describe('createPropProfessorClient', () => {
     let fetchAttempts = 0;
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
       fetchImpl: async () => {
         fetchAttempts += 1;
         if (fetchAttempts < 3) {
@@ -1002,7 +1066,10 @@ describe('createPropProfessorClient', () => {
     let fetchAttempts = 0;
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
       fetchImpl: async () => {
         fetchAttempts += 1;
         const error = new Error('request aborted');
@@ -1014,13 +1081,16 @@ describe('createPropProfessorClient', () => {
     });
 
     try {
-      await assert.rejects(() => client.queryScreenOdds({}), error => {
-        assert.equal(error.category, 'transport');
-        assert.equal(error.code, 'PROPPROFESSOR_TIMEOUT_ERROR');
-        assert.equal(error.retryable, true);
-        assert.match(error.message, /timed out/i);
-        return true;
-      });
+      await assert.rejects(
+        () => client.queryScreenOdds({}),
+        (error) => {
+          assert.equal(error.category, 'transport');
+          assert.equal(error.code, 'PROPPROFESSOR_TIMEOUT_ERROR');
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /timed out/i);
+          return true;
+        }
+      );
       assert.equal(fetchAttempts, 2);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -1034,20 +1104,26 @@ describe('createPropProfessorClient', () => {
     });
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
       fetchImpl: async () => ({ ok: false, status: 401, text: async () => 'unauthorized' }),
       retryDelaysMs: [0]
     });
 
     try {
-      await assert.rejects(() => client.queryScreenOdds({}), error => {
-        assert.equal(error.category, 'auth');
-        assert.equal(error.code, 'PROPPROFESSOR_AUTH_ERROR');
-        assert.equal(error.status, 401);
-        assert.equal(error.retryable, true);
-        assert.match(error.message, /401/);
-        return true;
-      });
+      await assert.rejects(
+        () => client.queryScreenOdds({}),
+        (error) => {
+          assert.equal(error.category, 'auth');
+          assert.equal(error.code, 'PROPPROFESSOR_AUTH_ERROR');
+          assert.equal(error.status, 401);
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /401/);
+          return true;
+        }
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -1060,20 +1136,30 @@ describe('createPropProfessorClient', () => {
     });
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
-      fetchImpl: async () => ({ ok: false, status: 429, text: async () => '<html><title>Just a moment...</title></html>' }),
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({
+        ok: false,
+        status: 429,
+        text: async () => '<html><title>Just a moment...</title></html>'
+      }),
       retryDelaysMs: [0]
     });
 
     try {
-      await assert.rejects(() => client.queryScreenOdds({}), error => {
-        assert.equal(error.category, 'transport');
-        assert.equal(error.code, 'PROPPROFESSOR_TRANSPORT_ERROR');
-        assert.equal(error.status, 429);
-        assert.equal(error.retryable, true);
-        assert.match(error.message, /checkpoint|429|Just a moment/i);
-        return true;
-      });
+      await assert.rejects(
+        () => client.queryScreenOdds({}),
+        (error) => {
+          assert.equal(error.category, 'transport');
+          assert.equal(error.code, 'PROPPROFESSOR_TRANSPORT_ERROR');
+          assert.equal(error.status, 429);
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /checkpoint|429|Just a moment/i);
+          return true;
+        }
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -1086,20 +1172,26 @@ describe('createPropProfessorClient', () => {
     });
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
       fetchImpl: async () => ({ ok: false, status: 503, text: async () => 'service unavailable' }),
       retryDelaysMs: [0]
     });
 
     try {
-      await assert.rejects(() => client.getHiddenBets(), error => {
-        assert.equal(error.category, 'backend');
-        assert.equal(error.code, 'PROPPROFESSOR_BACKEND_ERROR');
-        assert.equal(error.status, 503);
-        assert.equal(error.retryable, true);
-        assert.match(error.message, /503|service unavailable/i);
-        return true;
-      });
+      await assert.rejects(
+        () => client.getHiddenBets(),
+        (error) => {
+          assert.equal(error.category, 'backend');
+          assert.equal(error.code, 'PROPPROFESSOR_BACKEND_ERROR');
+          assert.equal(error.status, 503);
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /503|service unavailable/i);
+          return true;
+        }
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

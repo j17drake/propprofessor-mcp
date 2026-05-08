@@ -11,7 +11,6 @@ const {
   isTennisRow,
   normalizeDirection,
   normalizeMarketName,
-  normalizeTennisMarketQuery,
   parseBetPrompt,
   rankScreenRows,
   rankTennisScreenRows,
@@ -71,12 +70,15 @@ describe('analyzePlayerPropBet', () => {
   ];
 
   it('returns a yes verdict for a supported over play', () => {
-    const result = analyzePlayerPropBet({
-      player: 'James Harden',
-      side: 'over',
-      line: 18.5,
-      market: 'Points'
-    }, rows);
+    const result = analyzePlayerPropBet(
+      {
+        player: 'James Harden',
+        side: 'over',
+        line: 18.5,
+        market: 'Points'
+      },
+      rows
+    );
 
     assert.equal(result.verdict, 'yes');
     assert.equal(result.bestMatch.book, 'FanDuel');
@@ -84,12 +86,15 @@ describe('analyzePlayerPropBet', () => {
   });
 
   it('returns pass when no row matches the requested market', () => {
-    const result = analyzePlayerPropBet({
-      player: 'James Harden',
-      side: 'over',
-      line: 22.5,
-      market: 'Rebounds'
-    }, rows);
+    const result = analyzePlayerPropBet(
+      {
+        player: 'James Harden',
+        side: 'over',
+        line: 22.5,
+        market: 'Rebounds'
+      },
+      rows
+    );
 
     assert.equal(result.verdict, 'pass');
     assert.equal(result.bestMatch, null);
@@ -107,50 +112,70 @@ describe('extractScreenRows', () => {
       games: []
     };
 
-    assert.deepEqual(extractScreenRows(payload).map(row => row.id), ['row-1', 'row-2']);
+    assert.deepEqual(
+      extractScreenRows(payload).map((row) => row.id),
+      ['row-1', 'row-2']
+    );
   });
 
   it('falls back to legacy data/results arrays', () => {
-    assert.deepEqual(extractScreenRows({ data: [{ id: 'a' }] }).map(row => row.id), ['a']);
-    assert.deepEqual(extractScreenRows({ results: [{ id: 'b' }] }).map(row => row.id), ['b']);
-    assert.deepEqual(extractScreenRows([{ id: 'c' }]).map(row => row.id), ['c']);
+    assert.deepEqual(
+      extractScreenRows({ data: [{ id: 'a' }] }).map((row) => row.id),
+      ['a']
+    );
+    assert.deepEqual(
+      extractScreenRows({ results: [{ id: 'b' }] }).map((row) => row.id),
+      ['b']
+    );
+    assert.deepEqual(
+      extractScreenRows([{ id: 'c' }]).map((row) => row.id),
+      ['c']
+    );
   });
 
   it('expands nested odds screen selections into per-book rows', () => {
     const payload = {
-      game_data: [{
-        gameId: 'game-1',
-        league: 'NBA',
-        market: 'Point Spread',
-        homeTeam: 'Houston Rockets',
-        awayTeam: 'Los Angeles Lakers',
-        selections: {
-          '-2.5': {
-            selection1: 'Houston Rockets -2.5',
-            participant1: 'Houston Rockets',
-            selection1Id: 'Point_Spread:Houston_Rockets_-2.5',
-            line1: -2.5,
-            selection2: 'Los Angeles Lakers +2.5',
-            participant2: 'Los Angeles Lakers',
-            selection2Id: 'Point_Spread:Los_Angeles_Lakers_+2.5',
-            line2: 2.5,
-            odds: {
-              OnyxOdds: { odds1: -132, odds2: 110 },
-              NoVigApp: { odds1: -128, odds2: 104 }
+      game_data: [
+        {
+          gameId: 'game-1',
+          league: 'NBA',
+          market: 'Point Spread',
+          homeTeam: 'Houston Rockets',
+          awayTeam: 'Los Angeles Lakers',
+          selections: {
+            '-2.5': {
+              selection1: 'Houston Rockets -2.5',
+              participant1: 'Houston Rockets',
+              selection1Id: 'Point_Spread:Houston_Rockets_-2.5',
+              line1: -2.5,
+              selection2: 'Los Angeles Lakers +2.5',
+              participant2: 'Los Angeles Lakers',
+              selection2Id: 'Point_Spread:Los_Angeles_Lakers_+2.5',
+              line2: 2.5,
+              odds: {
+                OnyxOdds: { odds1: -132, odds2: 110 },
+                NoVigApp: { odds1: -128, odds2: 104 }
+              }
             }
           }
         }
-      }]
+      ]
     };
 
     const rows = extractScreenRows(payload, [{ book: 'OnyxOdds' }]);
     assert.equal(rows.length, 2);
-    assert.deepEqual(rows.map(row => row.selectionId), [
-      'Point_Spread:Houston_Rockets_-2.5',
-      'Point_Spread:Los_Angeles_Lakers_+2.5'
-    ]);
-    assert.deepEqual(rows.map(row => row.book), ['OnyxOdds', 'OnyxOdds']);
-    assert.deepEqual(rows.map(row => row.odds), [-132, 110]);
+    assert.deepEqual(
+      rows.map((row) => row.selectionId),
+      ['Point_Spread:Houston_Rockets_-2.5', 'Point_Spread:Los_Angeles_Lakers_+2.5']
+    );
+    assert.deepEqual(
+      rows.map((row) => row.book),
+      ['OnyxOdds', 'OnyxOdds']
+    );
+    assert.deepEqual(
+      rows.map((row) => row.odds),
+      [-132, 110]
+    );
   });
 });
 
@@ -253,11 +278,20 @@ describe('tennis screen ranking helpers', () => {
     const ranked = rankTennisScreenRows(extracted, { limit: 10, preferredBook: 'NoVigApp', includeAll: true });
 
     assert.equal(ranked.length, 2);
-    assert.deepEqual(ranked.map(row => row.book), ['NoVigApp', 'NoVigApp']);
-    assert.deepEqual(ranked.map(row => row.participant).sort(), ['Cobolli', 'Medvedev']);
-    assert.deepEqual(ranked.map(row => row.selectionId).sort(), ['Moneyline:Cobolli', 'Moneyline:Medvedev']);
-    assert.equal(ranked.every(row => row.hasConsensus), true);
-    assert.equal(ranked.every(row => row.consensusBookCount === 4), true);
+    assert.deepEqual(
+      ranked.map((row) => row.book),
+      ['NoVigApp', 'NoVigApp']
+    );
+    assert.deepEqual(ranked.map((row) => row.participant).sort(), ['Cobolli', 'Medvedev']);
+    assert.deepEqual(ranked.map((row) => row.selectionId).sort(), ['Moneyline:Cobolli', 'Moneyline:Medvedev']);
+    assert.equal(
+      ranked.every((row) => row.hasConsensus),
+      true
+    );
+    assert.equal(
+      ranked.every((row) => row.consensusBookCount === 4),
+      true
+    );
   });
 
   it('ranks general screen rows with consensus and movement metadata', () => {
@@ -296,14 +330,17 @@ describe('tennis screen ranking helpers', () => {
   });
 
   it('filters out weak rows when includeAll is false', () => {
-    const ranked = rankScreenRows([
-      {
-        league: 'NBA',
-        market: 'Moneyline',
-        book: 'NoVigApp',
-        odds: -110
-      }
-    ], { limit: 5, includeAll: false });
+    const ranked = rankScreenRows(
+      [
+        {
+          league: 'NBA',
+          market: 'Moneyline',
+          book: 'NoVigApp',
+          odds: -110
+        }
+      ],
+      { limit: 5, includeAll: false }
+    );
 
     assert.equal(ranked.length, 0);
   });
@@ -370,16 +407,19 @@ describe('tennis screen ranking helpers', () => {
   });
 
   it('rankLeagueScreenRows carries the league preset into ranked results', () => {
-    const ranked = rankLeagueScreenRows([
-      {
-        league: 'NBA',
-        market: 'Moneyline',
-        book: 'NoVigApp',
-        value: 3,
-        odds: -105,
-        lineHistory: [-115, -105]
-      }
-    ], { league: 'NBA', includeAll: true });
+    const ranked = rankLeagueScreenRows(
+      [
+        {
+          league: 'NBA',
+          market: 'Moneyline',
+          book: 'NoVigApp',
+          value: 3,
+          odds: -105,
+          lineHistory: [-115, -105]
+        }
+      ],
+      { league: 'NBA', includeAll: true }
+    );
 
     assert.equal(ranked[0].leaguePreset, 'NBA');
     assert.equal(ranked[0].screenMarket, 'moneyline');
@@ -434,22 +474,31 @@ describe('tennis screen ranking helpers', () => {
       rankLeagueScreenRows([rows[4]], { league: 'SOCCER', includeAll: true })[0]
     ];
 
-    assert.deepEqual(ranked.map(row => row.leaguePreset), ['NBA', 'MLB', 'NFL', 'NHL', 'Soccer']);
-    assert.equal(ranked.every(row => row.scoreBreakdown.total >= 0), true);
+    assert.deepEqual(
+      ranked.map((row) => row.leaguePreset),
+      ['NBA', 'MLB', 'NFL', 'NHL', 'Soccer']
+    );
+    assert.equal(
+      ranked.every((row) => row.scoreBreakdown.total >= 0),
+      true
+    );
   });
 
   it('flags rows with stale timestamps when a max age is provided', () => {
     const now = new Date('2026-04-24T13:00:00.000Z').getTime();
-    const ranked = rankScreenRows([
-      {
-        league: 'NBA',
-        book: 'NoVigApp',
-        market: 'Moneyline',
-        value: 2,
-        odds: 110,
-        updatedAt: new Date(now - 10 * 60 * 1000).toISOString()
-      }
-    ], { includeAll: true, maxAgeMs: 5 * 60 * 1000 });
+    const ranked = rankScreenRows(
+      [
+        {
+          league: 'NBA',
+          book: 'NoVigApp',
+          market: 'Moneyline',
+          value: 2,
+          odds: 110,
+          updatedAt: new Date(now - 10 * 60 * 1000).toISOString()
+        }
+      ],
+      { includeAll: true, maxAgeMs: 5 * 60 * 1000 }
+    );
 
     assert.equal(ranked[0].stale, true);
     assert.equal(ranked[0].freshnessMs > 0, true);
@@ -459,11 +508,15 @@ describe('tennis screen ranking helpers', () => {
 
   it('summarizeFreshness reports timestamp sources and falls back to response age for undated rows', () => {
     const now = new Date('2026-04-24T13:00:00.000Z').getTime();
-    const withTimestamps = summarizeFreshness([
-      { updatedAt: new Date(now - 10 * 1000).toISOString() },
-      { payload: { updatedAt: new Date(now - 30 * 1000).toISOString() } },
-      { meta: { timestamp: new Date(now - 20 * 1000).toISOString() } }
-    ], now, { maxAgeMs: 15 * 1000 });
+    const withTimestamps = summarizeFreshness(
+      [
+        { updatedAt: new Date(now - 10 * 1000).toISOString() },
+        { payload: { updatedAt: new Date(now - 30 * 1000).toISOString() } },
+        { meta: { timestamp: new Date(now - 20 * 1000).toISOString() } }
+      ],
+      now,
+      { maxAgeMs: 15 * 1000 }
+    );
 
     assert.equal(withTimestamps.rowCount, 3);
     assert.equal(withTimestamps.newestAgeMs, 10000);
@@ -487,25 +540,31 @@ describe('tennis screen ranking helpers', () => {
 
   it('exposes richer movement debug metadata on ranked rows', () => {
     const nowMs = Date.now();
-    const ranked = rankScreenRows([
-      {
-        league: 'NBA',
-        market: 'Moneyline',
-        book: 'NoVigApp',
-        value: 2.4,
-        odds: -112,
-        lineHistory: [
-          { book: 'NoVigApp', odds: -104, time: nowMs - 5 * 60 * 60 * 1000 },
-          { book: 'NoVigApp', odds: -104, time: nowMs - 4 * 60 * 60 * 1000 },
-          { book: 'NoVigApp', odds: -112, time: nowMs - 60 * 60 * 1000 },
-          { book: 'Polymarket', odds: -9999, time: nowMs - 30 * 60 * 1000 }
-        ],
-        historySportsbooksRequested: ['NoVigApp', 'Polymarket']
-      }
-    ], { limit: 5, includeAll: true });
+    const ranked = rankScreenRows(
+      [
+        {
+          league: 'NBA',
+          market: 'Moneyline',
+          book: 'NoVigApp',
+          value: 2.4,
+          odds: -112,
+          lineHistory: [
+            { book: 'NoVigApp', odds: -104, time: nowMs - 5 * 60 * 60 * 1000 },
+            { book: 'NoVigApp', odds: -104, time: nowMs - 4 * 60 * 60 * 1000 },
+            { book: 'NoVigApp', odds: -112, time: nowMs - 60 * 60 * 1000 },
+            { book: 'Polymarket', odds: -9999, time: nowMs - 30 * 60 * 1000 }
+          ],
+          historySportsbooksRequested: ['NoVigApp', 'Polymarket']
+        }
+      ],
+      { limit: 5, includeAll: true }
+    );
 
     assert.equal(ranked.length, 1);
-    assert.deepEqual(ranked[0].droppedHistoryReasons ?? ranked[0].movementDebug?.droppedHistoryReasons, { duplicate_consecutive: 1, outlier_odds: 1 });
+    assert.deepEqual(ranked[0].droppedHistoryReasons ?? ranked[0].movementDebug?.droppedHistoryReasons, {
+      duplicate_consecutive: 1,
+      outlier_odds: 1
+    });
     assert.equal(Array.isArray(ranked[0].filteredLineHistory), true);
     assert.equal(Array.isArray(ranked[0].droppedHistoryPoints), true);
     assert.equal(typeof ranked[0].openToCurrentClvPct, 'number');
@@ -520,26 +579,29 @@ describe('tennis screen ranking helpers', () => {
   });
 
   it('can suppress verbose debug payloads while keeping provenance metadata', () => {
-    const ranked = rankScreenRows([
-      {
-        league: 'NBA',
-        market: 'Moneyline',
-        book: 'NoVigApp',
-        participant: 'Boston Celtics',
-        selection: 'Boston Celtics',
-        pick: 'Boston Celtics',
-        odds: -118,
-        currentOdds: -118,
-        consensusEdge: 2.4,
-        hasConsensus: true,
-        consensusBookCount: 2,
-        lineHistory: [
-          { book: 'NoVigApp', odds: -125, time: Date.now() - 60_000 },
-          { book: 'NoVigApp', odds: -118, time: Date.now() }
-        ],
-        historySportsbooksRequested: ['NoVigApp']
-      }
-    ], { limit: 5, includeAll: true, debug: false });
+    const ranked = rankScreenRows(
+      [
+        {
+          league: 'NBA',
+          market: 'Moneyline',
+          book: 'NoVigApp',
+          participant: 'Boston Celtics',
+          selection: 'Boston Celtics',
+          pick: 'Boston Celtics',
+          odds: -118,
+          currentOdds: -118,
+          consensusEdge: 2.4,
+          hasConsensus: true,
+          consensusBookCount: 2,
+          lineHistory: [
+            { book: 'NoVigApp', odds: -125, time: Date.now() - 60_000 },
+            { book: 'NoVigApp', odds: -118, time: Date.now() }
+          ],
+          historySportsbooksRequested: ['NoVigApp']
+        }
+      ],
+      { limit: 5, includeAll: true, debug: false }
+    );
 
     assert.equal(ranked.length, 1);
     assert.equal(Object.prototype.hasOwnProperty.call(ranked[0], 'movementDebug'), false);

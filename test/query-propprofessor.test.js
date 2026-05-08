@@ -6,7 +6,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { buildDoctorReport, buildHelpText, buildInstallAuthReport, getCommandInventory, main, parseArgs, resolveScreenCommand } = require('../scripts/query-propprofessor');
+const {
+  buildDoctorReport,
+  buildHelpText,
+  buildInstallAuthReport,
+  getCommandInventory,
+  main,
+  parseArgs,
+  resolveScreenCommand
+} = require('../scripts/query-propprofessor');
 
 describe('query-propprofessor CLI parsing', () => {
   it('accepts lookback-hours aliases', () => {
@@ -29,11 +37,17 @@ describe('query-propprofessor CLI parsing', () => {
 
   it('accepts positive EV discovery flags', () => {
     const parsed = parseArgs([
-      'node', 'query', 'sportsbook',
-      '--league', 'NBA',
-      '--books', 'Fliff,NoVigApp',
-      '--market', 'Player Props',
-      '--line', '-3'
+      'node',
+      'query',
+      'sportsbook',
+      '--league',
+      'NBA',
+      '--books',
+      'Fliff,NoVigApp',
+      '--market',
+      'Player Props',
+      '--line',
+      '-3'
     ]);
 
     assert.equal(parsed.command, 'sportsbook');
@@ -51,7 +65,7 @@ describe('query-propprofessor CLI parsing', () => {
   });
 
   it('exposes the documented command inventory', () => {
-    const inventory = getCommandInventory().map(entry => entry.command);
+    const inventory = getCommandInventory().map((entry) => entry.command);
     assert.deepEqual(inventory, [
       'opinion',
       'sportsbook',
@@ -109,7 +123,7 @@ describe('query-propprofessor CLI command execution', () => {
     const payload = JSON.parse(lines[0]);
     assert.equal(payload.command, 'presets');
     assert.ok(Array.isArray(payload.presets));
-    assert.ok(payload.presets.some(entry => entry.league === 'WNBA'));
+    assert.ok(payload.presets.some((entry) => entry.league === 'WNBA'));
   });
 
   it('renders the command list locally', async () => {
@@ -124,7 +138,7 @@ describe('query-propprofessor CLI command execution', () => {
     const payload = JSON.parse(lines[0]);
     assert.equal(payload.command, 'list');
     assert.ok(Array.isArray(payload.commands));
-    assert.ok(payload.commands.some(entry => entry.command === 'sport'));
+    assert.ok(payload.commands.some((entry) => entry.command === 'sport'));
   });
 
   it('routes the sport alias through screen ranking with the requested league', async () => {
@@ -134,7 +148,7 @@ describe('query-propprofessor CLI command execution', () => {
     await main({
       argv: ['node', 'query', 'sport', '--league', 'WNBA', '--market', 'Moneyline'],
       client: {
-        queryScreenOddsBestComps: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           calls.push(filters);
           return { game_data: [] };
         }
@@ -155,7 +169,7 @@ describe('query-propprofessor CLI command execution', () => {
     await main({
       argv: ['node', 'query', 'nba', '--market', 'Moneyline'],
       client: {
-        queryScreenOddsBestComps: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           calls.push(filters);
           return { game_data: [] };
         }
@@ -185,7 +199,7 @@ describe('query-propprofessor CLI command execution', () => {
       await main({
         argv: ['node', 'query', command, '--market', 'Moneyline'],
         client: {
-          queryScreenOddsBestComps: async filters => {
+          queryScreenOddsBestComps: async (filters) => {
             calls.push(filters);
             return { game_data: [] };
           }
@@ -239,7 +253,11 @@ describe('query-propprofessor CLI command execution', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-cli-install-auth-'));
     const sourceFile = path.join(tempDir, 'source-auth.json');
     const destinationFile = path.join(tempDir, '.propprofessor', 'auth.json');
-    fs.writeFileSync(sourceFile, JSON.stringify({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }] }), 'utf8');
+    fs.writeFileSync(
+      sourceFile,
+      JSON.stringify({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }] }),
+      'utf8'
+    );
 
     try {
       await main({
@@ -262,7 +280,7 @@ describe('query-propprofessor CLI command execution', () => {
     await main({
       argv: ['node', 'query', 'sportsbook'],
       client: {
-        querySportsbook: async () => ([{ player: 'A' }])
+        querySportsbook: async () => [{ player: 'A' }]
       },
       logger: sportsbook.logger
     });
@@ -274,7 +292,7 @@ describe('query-propprofessor CLI command execution', () => {
     await main({
       argv: ['node', 'query', 'smart'],
       client: {
-        querySmartMoney: async () => ([{ player: 'B' }])
+        querySmartMoney: async () => [{ player: 'B' }]
       },
       logger: smart.logger
     });
@@ -290,7 +308,7 @@ describe('query-propprofessor CLI command execution', () => {
     await main({
       argv: ['node', 'query', 'tennis', '--market', 'Spread'],
       client: {
-        queryScreenOdds: async filters => {
+        queryScreenOdds: async (filters) => {
           calls.push(filters);
           return { game_data: [] };
         }
@@ -300,7 +318,10 @@ describe('query-propprofessor CLI command execution', () => {
 
     const payload = JSON.parse(lines[0]);
     assert.equal(calls.length, 3);
-    assert.deepEqual(calls.map(call => call.market), ['Game Handicap', 'Set Handicap', 'Point Spread']);
+    assert.deepEqual(
+      calls.map((call) => call.market),
+      ['Game Handicap', 'Set Handicap', 'Point Spread']
+    );
     assert.equal(payload.league, 'Tennis');
   });
 

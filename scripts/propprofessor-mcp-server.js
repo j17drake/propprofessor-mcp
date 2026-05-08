@@ -2,7 +2,12 @@
 'use strict';
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
-const { normalizeTennisMarketQuery, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows } = require('../lib/propprofessor-screen-utils');
+const {
+  normalizeTennisMarketQuery,
+  rankTennisScreenRows,
+  rankLeagueScreenRows,
+  extractScreenRows
+} = require('../lib/propprofessor-screen-utils');
 const {
   buildRankedScreenResponse: buildRankedScreenResponseShared,
   getIncludeAll,
@@ -11,8 +16,7 @@ const {
   getLookbackHours,
   getMaxAgeMs,
   normalizeBookList,
-  getDebugFlag,
-  DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS
+  getDebugFlag
 } = require('../lib/propprofessor-mcp-ranked-screen');
 const { getSharpBookComparisonSet, getSharpBookContext } = require('../lib/propprofessor-sharp-books');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
@@ -23,6 +27,7 @@ const {
   encodeMessage,
   createStdioMessageReader
 } = require('../lib/propprofessor-mcp-stdio');
+const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -49,343 +54,13 @@ async function mapWithConcurrency(items, worker, { concurrency = VALIDATED_EV_CO
   return results;
 }
 
-function buildToolDefinitions() {
-  return [
-    {
-      name: 'query_positive_ev_candidates',
-      description: 'Query the sportsbook +EV endpoint and return candidate plays for enabled books. Best used as a fast discovery layer before validating finalists with /screen and odds-history movement.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          sportsbooks: { type: 'array', items: { type: 'string' }, description: 'Optional target books such as Fliff, NoVigApp, FanDuel, or DraftKings' },
-          leagues: { type: 'array', items: { type: 'string' }, description: 'Optional league filters such as NBA, MLB, NHL, NFL, Tennis, or Soccer' },
-          marketTypes: { type: 'array', items: { type: 'string' }, description: 'Optional market-type filters such as Main Lines or Player Props' },
-          periodTypes: { type: 'array', items: { type: 'string' }, description: 'Optional period-type filters such as Full Game or Single Period' },
-          minValue: { type: 'number', description: 'Minimum EV/value threshold. Optional here because James may already set it on the frontend Positive EV screen.' },
-          maxValue: { type: 'number', description: 'Maximum EV/value threshold' },
-          minOdds: { type: 'number', description: 'Minimum American odds' },
-          maxOdds: { type: 'number', description: 'Maximum American odds' },
-          minHoursAway: { type: 'number', description: 'Minimum hours until start' },
-          maxHoursAway: { type: 'number', description: 'Maximum hours until start' },
-          minLiquidity: { type: 'number', description: 'Minimum liquidity filter' },
-          maxLiquidity: { type: 'number', description: 'Maximum liquidity filter' },
-          isLive: { type: 'boolean', description: 'Whether to query live +EV rows' },
-          showBreakOnly: { type: 'boolean' },
-          showTimeoutOnly: { type: 'boolean' },
-          showPeriodEndOnly: { type: 'boolean' },
-          timeAvailable: { type: 'number' },
-          userState: { type: 'string', description: 'User state code, default tx' },
-          hideNCAAPlayerProps: { type: 'boolean' },
-          weightSettings: { type: 'object', description: 'Optional backend weight-settings override object' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_validated_positive_ev_candidates',
-      description: 'Query sportsbook +EV candidates, then rank them with the same sharp-movement and odds-history logic used for /screen. This is the fast positive-EV finder plus validation pass.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          sportsbooks: { type: 'array', items: { type: 'string' }, description: 'Optional target books such as Fliff or NoVigApp' },
-          leagues: { type: 'array', items: { type: 'string' }, description: 'Optional league filters' },
-          marketTypes: { type: 'array', items: { type: 'string' }, description: 'Optional market-type filters such as Main Lines or Player Props' },
-          periodTypes: { type: 'array', items: { type: 'string' }, description: 'Optional period-type filters such as Full Game or Single Period' },
-          minValue: { type: 'number', description: 'Optional minimum EV/value threshold. Leave unset if the frontend Positive EV screen already enforces it.' },
-          maxValue: { type: 'number' },
-          minOdds: { type: 'number' },
-          maxOdds: { type: 'number' },
-          minHoursAway: { type: 'number' },
-          maxHoursAway: { type: 'number' },
-          minLiquidity: { type: 'number' },
-          maxLiquidity: { type: 'number' },
-          isLive: { type: 'boolean' },
-          showBreakOnly: { type: 'boolean' },
-          showTimeoutOnly: { type: 'boolean' },
-          showPeriodEndOnly: { type: 'boolean' },
-          timeAvailable: { type: 'number' },
-          userState: { type: 'string' },
-          hideNCAAPlayerProps: { type: 'boolean' },
-          weightSettings: { type: 'object' },
-          league: { type: 'string', description: 'Optional ranking league override when validating a single-sport candidate set' },
-          market: { type: 'string', description: 'Optional ranking market override when validating a single-market candidate set' },
-          books: { type: 'array', items: { type: 'string' }, description: 'Optional sharp-book override for validation and odds-history queries' },
-          limit: { type: 'number', description: 'Max number of validated rows to return' },
-          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
-          maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
-          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
-          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_screen_odds',
-      description: 'Query the live Odds Screen payload from /screen with the current league, market, game, and participant filters.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string', description: 'Odds screen market, for example Moneyline or Player Points' },
-          league: { type: 'string', description: 'League such as NBA' },
-          games: { type: 'array', items: { type: 'string' }, description: 'Optional game ids from the screen dropdown' },
-          participants: { type: 'array', items: { type: 'string' }, description: 'Optional participant filters' },
-          books: { type: 'array', items: { type: 'string' }, description: 'Optional display books filter' },
-          is_live: { type: 'boolean', description: 'Whether to query live odds' }
-        },
-        additionalProperties: false
-      }
-    },
-
-    {
-      name: 'query_screen_odds_best_comps',
-      description: 'Query /screen using a sharper default comparison set. Defaults to Pinnacle, Polymarket, Kalshi, BetOnline, and Circa cross-sport, switches NBA and NFL to the Dec 2024 Pikkit hierarchy, and switches MLB to the PromoGuy/Pikkit MLB hierarchy.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          league: { type: 'string' },
-          games: { type: 'array', items: { type: 'string' } },
-          participants: { type: 'array', items: { type: 'string' } },
-          books: { type: 'array', items: { type: 'string' } },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_screen_odds_ranked',
-      description: 'Query /screen and return hydrated ranked rows with consensus, movement, and freshness metadata for any market.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string', description: 'Odds screen market, for example Moneyline or Player Points' },
-          league: { type: 'string', description: 'League such as NBA' },
-          games: { type: 'array', items: { type: 'string' }, description: 'Optional game ids or identifiers to filter the query' },
-          participants: { type: 'array', items: { type: 'string' }, description: 'Optional participant filters' },
-          limit: { type: 'number', description: 'Max number of ranked rows to return' },
-          books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
-          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
-          maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
-          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
-          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' },
-          is_live: { type: 'boolean', description: 'Whether to query live odds' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_sport_screen',
-      description: 'Query /screen for any supported league and return league-specific ranked rows.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          league: { type: 'string', description: 'Supported league such as NBA, WNBA, MLB, NFL, NHL, soccer, NCAAB, NCAAF, or Tennis' },
-          market: { type: 'string', description: 'Optional market filter, default Moneyline' },
-          limit: { type: 'number', description: 'Max number of ranked rows to return' },
-          books: { type: 'array', items: { type: 'string' }, description: 'Optional comparison books override' },
-          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
-          maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
-          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
-          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' },
-          is_live: { type: 'boolean', description: 'Whether to query live odds' }
-        },
-        required: ['league'],
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_nba_screen',
-      description: 'Query /screen for NBA and return ranked rows with NBA presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_wnba_screen',
-      description: 'Query /screen for WNBA and return ranked rows with WNBA presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_mlb_screen',
-      description: 'Query /screen for MLB and return ranked rows with MLB presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_nfl_screen',
-      description: 'Query /screen for NFL and return ranked rows with NFL presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_nhl_screen',
-      description: 'Query /screen for NHL and return ranked rows with NHL presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_soccer_screen',
-      description: 'Query /screen for soccer and return ranked rows with soccer presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_ncaab_screen',
-      description: 'Query /screen for NCAAB and return ranked rows with NCAAB presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_ncaaf_screen',
-      description: 'Query /screen for NCAAF and return ranked rows with NCAAF presets.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string' },
-          limit: { type: 'number' },
-          books: { type: 'array', items: { type: 'string' } },
-          includeAll: { type: 'boolean' },
-          maxAgeMs: { type: 'number' },
-          lookbackHours: { type: 'number' },
-          debug: { type: 'boolean' },
-          is_live: { type: 'boolean' }
-        },
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'query_tennis_screen',
-      description: 'Query /screen for tennis and return the top ranked tennis plays.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          market: { type: 'string', description: 'Optional market filter, default Moneyline. Use Moneyline, Spread, or Total.' },
-          limit: { type: 'number', description: 'Max number of ranked plays to return' },
-          book: { type: 'string', description: 'Preferred book to rank, default Pinnacle. Set to Fliff for Fliff-only results.' },
-          books: { type: 'array', items: { type: 'string' }, description: 'Optional book filters for the backend query' },
-          maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
-          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
-          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' },
-          is_live: { type: 'boolean', description: 'Whether to query live tennis odds' }
-        },
-        additionalProperties: false
-      }
-    },
-
-    {
-      name: 'league_presets',
-      description: 'Return the current sport-specific ranking presets used by screen ranking.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false
-      }
-    },
-    {
-      name: 'health_status',
-      description: 'Check auth freshness and confirm the PropProfessor screen endpoint responds.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false
-      }
-    }
-  ];
-}
-
 // league preset inspector
 function buildLeaguePresetSummary() {
   const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
-  return leagues.map(league => {
+  return leagues.map((league) => {
     const preset = getLeagueRankingPreset(league);
     const isSharpLeague = ['NBA', 'NFL', 'MLB'].includes(league);
-    const sharpMainMarkets = isSharpLeague
-      ? getSharpBookComparisonSet({ league, market: 'Moneyline' })
-      : undefined;
+    const sharpMainMarkets = isSharpLeague ? getSharpBookComparisonSet({ league, market: 'Moneyline' }) : undefined;
     const sharpProps = isSharpLeague
       ? getSharpBookComparisonSet({ league, market: league === 'MLB' ? 'Player Strikeouts' : 'Player Points' })
       : undefined;
@@ -429,7 +104,7 @@ function createOddsHistoryMemoizedQuery(client) {
   const cache = new Map();
   return async function queryHistoryMemoized(params = {}) {
     const sportsbooks = Array.isArray(params.sportsbooks)
-      ? params.sportsbooks.map(value => String(value || '').trim()).filter(Boolean)
+      ? params.sportsbooks.map((value) => String(value || '').trim()).filter(Boolean)
       : [];
     const cacheKey = JSON.stringify({
       gameId: params.gameId ?? null,
@@ -438,17 +113,22 @@ function createOddsHistoryMemoizedQuery(client) {
       startTimestamp: params.startTimestamp ?? null
     });
     if (!cache.has(cacheKey)) {
-      cache.set(cacheKey, Promise.resolve().then(() => client.queryOddsHistory({
-        ...params,
-        sportsbooks
-      })));
+      cache.set(
+        cacheKey,
+        Promise.resolve().then(() =>
+          client.queryOddsHistory({
+            ...params,
+            sportsbooks
+          })
+        )
+      );
     }
     return cache.get(cacheKey);
   };
 }
 
 async function validatePositiveEvCandidates({ client, candidates = [], args = {} } = {}) {
-  const rows = Array.isArray(candidates) ? candidates.filter(play => play && typeof play === 'object') : [];
+  const rows = Array.isArray(candidates) ? candidates.filter((play) => play && typeof play === 'object') : [];
   const requestedBooks = normalizeBookList(args.books);
   const limit = getLimit(args);
   const debug = getDebugFlag(args.debug, true);
@@ -459,7 +139,7 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
   let historyFailureCount = 0;
   const validationWarnings = [];
 
-  const enriched = await mapWithConcurrency(rows, async play => {
+  const enriched = await mapWithConcurrency(rows, async (play) => {
     const league = String(play.league || args.league || '').trim() || 'NBA';
     const market = String(play.market || args.market || '').trim() || 'Moneyline';
     const focusBook = String(play.book || '').trim();
@@ -511,26 +191,34 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
       lineHistoryAvailable: Boolean(history.lineHistoryAvailable),
       lineHistorySource: history.lineHistorySource || null,
       lineHistoryLookbackHours: lookbackHoursUsed,
-      historySportsbooksRequested: Array.isArray(history.historySportsbooksRequested) ? history.historySportsbooksRequested : sharpBooks,
+      historySportsbooksRequested: Array.isArray(history.historySportsbooksRequested)
+        ? history.historySportsbooksRequested
+        : sharpBooks,
       normalizedSelectionId: history.normalizedSelectionId || target.selectionId || null,
       historyGameId: history.historyGameId || target.gameId || null,
       historyMatchedBy: history.historyMatchedBy || null,
       historyMatchKey: history.historyMatchKey || null,
       validationFailed,
-      validationErrorMessage: validationFailed ? String(validationError?.message || validationError || 'Validation failed') : null
+      validationErrorMessage: validationFailed
+        ? String(validationError?.message || validationError || 'Validation failed')
+        : null
     };
   });
 
-  const validatedRows = enriched.filter(row => !row.validationFailed);
+  const validatedRows = enriched.filter((row) => !row.validationFailed);
   const partiallyValidated = failedValidationCount > 0 && validatedRows.length > 0;
   const noRowsValidated = rows.length > 0 && validatedRows.length === 0;
 
   if (partiallyValidated) {
-    validationWarnings.push(`${failedValidationCount} candidate validation lookup(s) failed; returning ${validatedRows.length} validated row(s).`);
+    validationWarnings.push(
+      `${failedValidationCount} candidate validation lookup(s) failed; returning ${validatedRows.length} validated row(s).`
+    );
   }
 
   if (noRowsValidated) {
-    const error = new Error(`Positive EV validation failed for all ${rows.length} candidate(s); no validated results returned`);
+    const error = new Error(
+      `Positive EV validation failed for all ${rows.length} candidate(s); no validated results returned`
+    );
     error.code = 'VALIDATION_INCOMPLETE';
     error.category = 'backend';
     error.status = 503;
@@ -559,7 +247,11 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
     ok: true,
     result: ranked,
     count: ranked.length,
-    freshness: require('../lib/propprofessor-screen-utils').summarizeFreshness(extractScreenRows(validatedRows), Date.now(), { maxAgeMs }),
+    freshness: require('../lib/propprofessor-screen-utils').summarizeFreshness(
+      extractScreenRows(validatedRows),
+      Date.now(),
+      { maxAgeMs }
+    ),
     warnings: validationWarnings,
     resultMeta: {
       lookbackHoursUsed,
@@ -575,17 +267,6 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
 }
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
-  const leagueAliases = {
-    query_nba_screen: 'NBA',
-    query_wnba_screen: 'WNBA',
-    query_mlb_screen: 'MLB',
-    query_nfl_screen: 'NFL',
-    query_nhl_screen: 'NHL',
-    query_soccer_screen: 'Soccer',
-    query_ncaab_screen: 'NCAAB',
-    query_ncaaf_screen: 'NCAAF'
-  };
-
   async function runLeagueScreen(args = {}, league) {
     const requestedBooks = normalizeBookList(args.books);
     const market = args.market || 'Moneyline';
@@ -605,15 +286,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       args,
       league,
       focusBook,
-      rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
-        league,
-        market,
-        limit: getLimit(args),
-        books: requestedBooks.length ? requestedBooks : undefined,
-        includeAll: getIncludeAll(args),
-        maxAgeMs: getMaxAgeMs(args),
-        debug
-      })
+      rankRows: (hydratedRows, { debug } = {}) =>
+        rankLeagueScreenRows(hydratedRows, {
+          league,
+          market,
+          limit: getLimit(args),
+          books: requestedBooks.length ? requestedBooks : undefined,
+          includeAll: getIncludeAll(args),
+          maxAgeMs: getMaxAgeMs(args),
+          debug
+        })
     });
   }
 
@@ -658,7 +340,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         count: rows.length,
         result: rows,
         notes: {
-          workflow: 'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
+          workflow:
+            'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
           minValueBehavior: args.minValue === undefined ? 'unset_here_use_frontend_filter' : 'explicit_request_override'
         }
       };
@@ -725,15 +408,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         args,
         league,
         focusBook,
-        rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
-          league,
-          market,
-          limit: getLimit(args),
-          books: requestedBooks.length ? requestedBooks : undefined,
-          includeAll: getIncludeAll(args),
-          maxAgeMs: getMaxAgeMs(args),
-          debug
-        })
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankLeagueScreenRows(hydratedRows, {
+            league,
+            market,
+            limit: getLimit(args),
+            books: requestedBooks.length ? requestedBooks : undefined,
+            includeAll: getIncludeAll(args),
+            maxAgeMs: getMaxAgeMs(args),
+            debug
+          })
       });
     },
     async query_sport_screen(args = {}) {
@@ -767,23 +451,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const preferredBook = String(args.book || 'Pinnacle').trim() || 'Pinnacle';
       const requestedBooks = normalizeBookList(args.books);
       const marketQuery = normalizeTennisMarketQuery(args.market || 'Moneyline');
-      const queryFn = typeof client.queryScreenOdds === 'function'
-        ? client.queryScreenOdds.bind(client)
-        : client.queryScreenOddsBestComps.bind(client);
+      const queryFn =
+        typeof client.queryScreenOdds === 'function'
+          ? client.queryScreenOdds.bind(client)
+          : client.queryScreenOddsBestComps.bind(client);
       const payloads = [];
 
       for (const market of marketQuery) {
         const payload = await queryFn({
           market,
           league: 'Tennis',
-          books: requestedBooks.length ? requestedBooks : Array.from(new Set([
-            preferredBook,
-            'NoVigApp',
-            'Polymarket',
-            'Kalshi',
-            'BetOnline',
-            'Circa'
-          ])),
+          books: requestedBooks.length
+            ? requestedBooks
+            : Array.from(new Set([preferredBook, 'NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'])),
           is_live: Boolean(args.is_live)
         });
         payloads.push(payload);
@@ -795,13 +475,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         args,
         league: 'Tennis',
         focusBook: preferredBook,
-        rankRows: (hydratedRows, { debug } = {}) => rankTennisScreenRows(hydratedRows, {
-          limit: getLimit(args),
-          preferredBook,
-          includeAll: getIncludeAll(args),
-          maxAgeMs: getMaxAgeMs(args),
-          debug
-        })
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankTennisScreenRows(hydratedRows, {
+            limit: getLimit(args),
+            preferredBook,
+            includeAll: getIncludeAll(args),
+            maxAgeMs: getMaxAgeMs(args),
+            debug
+          })
       });
     },
 
@@ -818,7 +499,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 }
 
 function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = buildToolDefinitions() } = {}) {
-  const toolMap = new Map(toolDefinitions.map(tool => [tool.name, tool]));
+  const toolMap = new Map(toolDefinitions.map((tool) => [tool.name, tool]));
   let initialized = false;
 
   async function handleRequest(message) {
@@ -835,6 +516,14 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
 
     if (method === 'notifications/initialized') {
       return null;
+    }
+
+    if (method === 'notifications/cancelled') {
+      return null;
+    }
+
+    if (method === 'ping') {
+      return createJsonRpcSuccess(id, {});
     }
 
     if (!initialized) {
@@ -889,17 +578,17 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
 
 async function serveStdio(options = {}) {
   const server = createMcpServer(options);
-  const reader = createStdioMessageReader(async message => {
+  const reader = createStdioMessageReader(async (message) => {
     const response = await server.handleRequest(message);
     if (response && message && Object.prototype.hasOwnProperty.call(message, 'id')) {
       process.stdout.write(encodeMessage(response));
     }
   });
 
-  process.stdin.on('data', chunk => {
+  process.stdin.on('data', (chunk) => {
     Promise.resolve()
       .then(() => reader(chunk))
-      .catch(error => {
+      .catch((error) => {
         process.stderr.write((error.stack || error.message || String(error)) + '\n');
       });
   });
@@ -912,7 +601,7 @@ async function serveStdio(options = {}) {
 }
 
 if (require.main === module) {
-  serveStdio().catch(err => {
+  serveStdio().catch((err) => {
     process.stderr.write((err.stack || err.message) + '\n');
     process.exitCode = 1;
   });

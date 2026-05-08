@@ -55,7 +55,11 @@ describe('propprofessor API auth file resolution', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-auth-install-'));
     const sourceFile = path.join(tempDir, 'source-auth.json');
     const destinationFile = path.join(tempDir, '.propprofessor', 'auth.json');
-    fs.writeFileSync(sourceFile, JSON.stringify({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }] }), 'utf8');
+    fs.writeFileSync(
+      sourceFile,
+      JSON.stringify({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }] }),
+      'utf8'
+    );
 
     try {
       const result = installAuthFile({ sourceFile, destinationFile });
