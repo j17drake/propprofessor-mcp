@@ -5,6 +5,15 @@
   "type": "commonjs",
   "private": false,
   "main": "scripts/propprofessor-mcp-server.js",
+  "exports": {
+    ".": "./scripts/propprofessor-mcp-server.js",
+    "./api": "./lib/propprofessor-api.js",
+    "./analysis": "./lib/propprofessor-analysis.js",
+    "./mcp-stdio": "./lib/propprofessor-mcp-stdio.js",
+    "./ranked-screen": "./lib/propprofessor-mcp-ranked-screen.js",
+    "./screen-utils": "./lib/propprofessor-screen-utils.js",
+    "./sharp-books": "./lib/propprofessor-sharp-books.js"
+  },
   "bin": {
     "pp-mcp": "scripts/propprofessor-mcp-server.js",
     "pp-query": "scripts/query-propprofessor.js"
@@ -47,10 +56,19 @@
     "export-screen": "node scripts/export-ranked-screen.js",
     "smoke:live": "node scripts/smoke-live.js",
     "check:version": "node scripts/check-version-consistency.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "got-scraping": "^4.2.1",
     "superjson": "^2.2.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0",
+    "prettier": "^3.8.3"
   }
 }

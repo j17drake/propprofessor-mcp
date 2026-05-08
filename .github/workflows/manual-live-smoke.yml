@@ -24,6 +24,7 @@ jobs:
           PROPPROFESSOR_AUTH_JSON: ${{ secrets.PROPPROFESSOR_AUTH_JSON }}
         run: |
           test -n "$PROPPROFESSOR_AUTH_JSON"
+          echo "::add-mask::$PROPPROFESSOR_AUTH_JSON"
           printf '%s' "$PROPPROFESSOR_AUTH_JSON" > auth.json
 
       - name: Run live smoke

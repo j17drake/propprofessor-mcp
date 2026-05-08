@@ -13,13 +13,13 @@ If you use ChatGPT, see the ChatGPT note below first. ChatGPT currently does not
 
 ## Choose Your Client
 
-| Client | Status | Best path |
-| --- | --- | --- |
-| Claude Desktop | Best support | Use the local `pp-mcp` server directly |
-| Cursor | Best support | Use `.cursor/mcp.json` with `pp-mcp` or `node` |
-| Cline | Supported | Use `cline_mcp_settings.json` with `pp-mcp` or `node` |
-| ChatGPT | Alternative setup | Not a direct local `stdio` MCP path for this repo today |
-| Generic local MCP client | Supported | Use the generic `pp-mcp` config in `CONFIG.md` |
+| Client                   | Status            | Best path                                               |
+| ------------------------ | ----------------- | ------------------------------------------------------- |
+| Claude Desktop           | Best support      | Use the local `pp-mcp` server directly                  |
+| Cursor                   | Best support      | Use `.cursor/mcp.json` with `pp-mcp` or `node`          |
+| Cline                    | Supported         | Use `cline_mcp_settings.json` with `pp-mcp` or `node`   |
+| ChatGPT                  | Alternative setup | Not a direct local `stdio` MCP path for this repo today |
+| Generic local MCP client | Supported         | Use the generic `pp-mcp` config in `CONFIG.md`          |
 
 ## Quick Start
 

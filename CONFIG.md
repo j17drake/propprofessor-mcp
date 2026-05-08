@@ -41,9 +41,7 @@ If `pp-mcp` is not available on your PATH, use:
   "mcpServers": {
     "propprofessor": {
       "command": "node",
-      "args": [
-        "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"
-      ],
+      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
         "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
       }
@@ -89,9 +87,7 @@ Direct path fallback:
   "mcpServers": {
     "propprofessor": {
       "command": "node",
-      "args": [
-        "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"
-      ],
+      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
         "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
       }
@@ -138,9 +134,7 @@ Direct path fallback:
   "mcpServers": {
     "propprofessor": {
       "command": "node",
-      "args": [
-        "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"
-      ],
+      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
         "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
       },
@@ -209,9 +203,7 @@ Direct path fallback:
   "mcpServers": {
     "propprofessor": {
       "command": "node",
-      "args": [
-        "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"
-      ],
+      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
         "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
       }
