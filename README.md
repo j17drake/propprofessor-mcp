@@ -81,6 +81,33 @@ pp-mcp
 pp-query health
 ```
 
+## Manual live smoke workflow
+
+This repo includes a manual GitHub Actions workflow for a live smoke check.
+
+Before running it, add this repository secret:
+
+- `PROPPROFESSOR_AUTH_JSON`, the full contents of a working `auth.json`
+
+Then run the `manual-live-smoke` workflow from the Actions tab.
+It installs dependencies, writes `auth.json` from the secret, and runs:
+
+```bash
+npm run smoke:live
+```
+
+## Release checklist
+
+Before creating a new GitHub release:
+
+1. Update the version in `package.json`
+2. Add the matching heading in `CHANGELOG.md`
+3. Run `npm test`
+4. Run `npm run check:version`
+5. Run `npm run smoke:live`
+6. Create and push the git tag
+7. Publish the GitHub release from that tag
+
 ## pp-query command inventory
 
 The local `pp-query` CLI intentionally keeps a broader maintenance surface than the MCP server. Use the MCP server for screen-first ranked queries, and use `pp-query` when you want local-only helpers for sportsbook, smart money, or fantasy inspection.
