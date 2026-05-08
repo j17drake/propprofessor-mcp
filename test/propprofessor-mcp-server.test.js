@@ -9,7 +9,8 @@ const packageJson = require('../package.json');
 const {
   createMcpHandlers,
   createMcpServer,
-  createStdioMessageReader
+  createStdioMessageReader,
+  mapWithConcurrency
 } = require('../scripts/propprofessor-mcp-server');
 
 const serverPath = path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js');
@@ -48,6 +49,7 @@ function createRankedScreenClientStub({
   healthPayload = { ok: true, screen: { reachable: true } }
 } = {}) {
   const calls = {
+    querySportsbook: [],
     queryScreenOdds: [],
     queryScreenOddsBestComps: [],
     healthStatus: 0
@@ -56,6 +58,10 @@ function createRankedScreenClientStub({
   return {
     calls,
     client: {
+      querySportsbook: async filters => {
+        calls.querySportsbook.push(filters);
+        return [{ id: 'ev-row-1', book: 'Fliff', ev: 4.2 }];
+      },
       queryScreenOdds: async filters => {
         calls.queryScreenOdds.push(filters);
         return rawPayload;
@@ -198,7 +204,7 @@ function waitForNdjsonMessage(proc, timeoutMs = 5000) {
 
 describe('propprofessor MCP server stdio contract', () => {
   // Direct smoke coverage checklist for public MCP tools:
-  // covered: query_screen_odds, query_screen_odds_best_comps, query_screen_odds_ranked,
+  // covered: query_positive_ev_candidates, query_validated_positive_ev_candidates, query_screen_odds, query_screen_odds_best_comps, query_screen_odds_ranked,
   // query_sport_screen, query_nba_screen, query_wnba_screen, query_mlb_screen,
   // query_nfl_screen, query_nhl_screen, query_soccer_screen, query_ncaab_screen,
   // query_ncaaf_screen, query_tennis_screen, league_presets, health_status.
@@ -234,12 +240,14 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_ncaaf_screen',
         'query_nfl_screen',
         'query_nhl_screen',
+        'query_positive_ev_candidates',
         'query_screen_odds',
         'query_screen_odds_best_comps',
         'query_screen_odds_ranked',
         'query_soccer_screen',
         'query_sport_screen',
         'query_tennis_screen',
+        'query_validated_positive_ev_candidates',
         'query_wnba_screen'
       ]);
     } finally {
@@ -393,6 +401,92 @@ describe('propprofessor MCP server stdio contract', () => {
       is_live: false
     });
     assert.deepEqual(result, { ok: true, result: payload });
+  });
+
+  it('query_positive_ev_candidates returns sportsbook discovery rows and forwards filters', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_positive_ev_candidates({
+      sportsbooks: ['Fliff', 'NoVigApp'],
+      leagues: ['NBA', 'MLB'],
+      marketTypes: ['Main Lines', 'Player Props'],
+      periodTypes: ['Full Game'],
+      minValue: -3,
+      maxValue: 20,
+      minOdds: -120,
+      maxOdds: 200,
+      minHoursAway: 0,
+      maxHoursAway: 24,
+      minLiquidity: 10,
+      maxLiquidity: 1000,
+      isLive: false,
+      userState: 'tx'
+    });
+
+    assert.equal(calls.querySportsbook.length, 1);
+    assert.deepEqual(calls.querySportsbook[0], {
+      isLive: false,
+      showBreakOnly: undefined,
+      showTimeoutOnly: undefined,
+      showPeriodEndOnly: undefined,
+      timeAvailable: undefined,
+      userState: 'tx',
+      hideNCAAPlayerProps: undefined,
+      sportsbooks: ['Fliff', 'NoVigApp'],
+      leagues: ['NBA', 'MLB'],
+      minOdds: -120,
+      maxOdds: 200,
+      minValue: -3,
+      maxValue: 20,
+      marketTypes: ['Main Lines', 'Player Props'],
+      periodTypes: ['Full Game'],
+      minHoursAway: 0,
+      maxHoursAway: 24,
+      minLiquidity: 10,
+      maxLiquidity: 1000,
+      weightSettings: undefined
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.count, 1);
+    assert.equal(result.result[0].book, 'Fliff');
+    assert.match(result.notes.workflow, /fast discovery candidates/i);
+  });
+
+  it('query_positive_ev_candidates leaves minValue unset when omitted so frontend filtering can drive it', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_positive_ev_candidates({
+      sportsbooks: ['Fliff'],
+      leagues: ['NBA']
+    });
+
+    assert.equal(calls.querySportsbook.length, 1);
+    assert.equal(calls.querySportsbook[0].minValue, undefined);
+    assert.equal(result.notes.minValueBehavior, 'unset_here_use_frontend_filter');
+  });
+
+  it('query_validated_positive_ev_candidates ranks sportsbook candidates with movement metadata', async () => {
+    const { client } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_validated_positive_ev_candidates({
+      sportsbooks: ['Fliff'],
+      leagues: ['NBA'],
+      limit: 5,
+      debug: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.resultMeta.source, 'positive_ev_candidates');
+    assert.equal(result.resultMeta.candidateCount, 1);
+    assert.equal(result.resultMeta.debugEnabled, false);
+    assert.ok(Array.isArray(result.result));
+    assert.equal(result.result.length, 1);
+    assert.equal(result.result[0].book, 'Fliff');
+    assert.ok(Object.prototype.hasOwnProperty.call(result.result[0], 'movementLabel'));
+    assert.ok(Object.prototype.hasOwnProperty.call(result.result[0], 'rankingProvenance'));
   });
 
   it('query_screen_odds_best_comps returns derived sharp-book metadata for NBA props', async () => {
@@ -617,5 +711,23 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls[0].league, 'Soccer');
     assert.equal(calls[0].market, 'Moneyline');
     assert.equal(result.ok, true);
+  });
+});
+
+describe('validated candidate concurrency helpers', () => {
+  it('mapWithConcurrency preserves input order while limiting in-flight workers', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    const result = await mapWithConcurrency([1, 2, 3, 4, 5], async value => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return value * 10;
+    }, { concurrency: 2 });
+
+    assert.deepEqual(result, [10, 20, 30, 40, 50]);
+    assert.equal(maxInFlight <= 2, true);
   });
 });

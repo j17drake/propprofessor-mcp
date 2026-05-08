@@ -1,18 +1,20 @@
 'use strict';
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
-const { normalizeTennisMarketQuery, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows } = require('../lib/propprofessor-screen-utils');
+const { normalizeTennisMarketQuery, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows } = require('../lib/propprofessor-screen-utils');
 const {
   buildRankedScreenResponse: buildRankedScreenResponseShared,
   getIncludeAll,
   getLeagueRankingPreset,
   getLimit,
+  getLookbackHours,
   getMaxAgeMs,
   normalizeBookList,
   getDebugFlag,
   DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS
 } = require('../lib/propprofessor-mcp-ranked-screen');
 const { getSharpBookComparisonSet, getSharpBookContext } = require('../lib/propprofessor-sharp-books');
+const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
 const {
   categorizeError,
   createJsonRpcSuccess,
@@ -24,9 +26,98 @@ const {
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
 const PROTOCOL_VERSION = '2024-11-05';
+const VALIDATED_EV_CONCURRENCY = 6;
+
+async function mapWithConcurrency(items, worker, { concurrency = VALIDATED_EV_CONCURRENCY } = {}) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return [];
+
+  const limit = Math.max(1, Math.floor(Number(concurrency) || 1));
+  const results = new Array(list.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < list.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await worker(list[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, () => runWorker()));
+  return results;
+}
 
 function buildToolDefinitions() {
   return [
+    {
+      name: 'query_positive_ev_candidates',
+      description: 'Query the sportsbook +EV endpoint and return candidate plays for enabled books. Best used as a fast discovery layer before validating finalists with /screen and odds-history movement.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sportsbooks: { type: 'array', items: { type: 'string' }, description: 'Optional target books such as Fliff, NoVigApp, FanDuel, or DraftKings' },
+          leagues: { type: 'array', items: { type: 'string' }, description: 'Optional league filters such as NBA, MLB, NHL, NFL, Tennis, or Soccer' },
+          marketTypes: { type: 'array', items: { type: 'string' }, description: 'Optional market-type filters such as Main Lines or Player Props' },
+          periodTypes: { type: 'array', items: { type: 'string' }, description: 'Optional period-type filters such as Full Game or Single Period' },
+          minValue: { type: 'number', description: 'Minimum EV/value threshold. Optional here because James may already set it on the frontend Positive EV screen.' },
+          maxValue: { type: 'number', description: 'Maximum EV/value threshold' },
+          minOdds: { type: 'number', description: 'Minimum American odds' },
+          maxOdds: { type: 'number', description: 'Maximum American odds' },
+          minHoursAway: { type: 'number', description: 'Minimum hours until start' },
+          maxHoursAway: { type: 'number', description: 'Maximum hours until start' },
+          minLiquidity: { type: 'number', description: 'Minimum liquidity filter' },
+          maxLiquidity: { type: 'number', description: 'Maximum liquidity filter' },
+          isLive: { type: 'boolean', description: 'Whether to query live +EV rows' },
+          showBreakOnly: { type: 'boolean' },
+          showTimeoutOnly: { type: 'boolean' },
+          showPeriodEndOnly: { type: 'boolean' },
+          timeAvailable: { type: 'number' },
+          userState: { type: 'string', description: 'User state code, default tx' },
+          hideNCAAPlayerProps: { type: 'boolean' },
+          weightSettings: { type: 'object', description: 'Optional backend weight-settings override object' }
+        },
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'query_validated_positive_ev_candidates',
+      description: 'Query sportsbook +EV candidates, then rank them with the same sharp-movement and odds-history logic used for /screen. This is the fast positive-EV finder plus validation pass.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sportsbooks: { type: 'array', items: { type: 'string' }, description: 'Optional target books such as Fliff or NoVigApp' },
+          leagues: { type: 'array', items: { type: 'string' }, description: 'Optional league filters' },
+          marketTypes: { type: 'array', items: { type: 'string' }, description: 'Optional market-type filters such as Main Lines or Player Props' },
+          periodTypes: { type: 'array', items: { type: 'string' }, description: 'Optional period-type filters such as Full Game or Single Period' },
+          minValue: { type: 'number', description: 'Optional minimum EV/value threshold. Leave unset if the frontend Positive EV screen already enforces it.' },
+          maxValue: { type: 'number' },
+          minOdds: { type: 'number' },
+          maxOdds: { type: 'number' },
+          minHoursAway: { type: 'number' },
+          maxHoursAway: { type: 'number' },
+          minLiquidity: { type: 'number' },
+          maxLiquidity: { type: 'number' },
+          isLive: { type: 'boolean' },
+          showBreakOnly: { type: 'boolean' },
+          showTimeoutOnly: { type: 'boolean' },
+          showPeriodEndOnly: { type: 'boolean' },
+          timeAvailable: { type: 'number' },
+          userState: { type: 'string' },
+          hideNCAAPlayerProps: { type: 'boolean' },
+          weightSettings: { type: 'object' },
+          league: { type: 'string', description: 'Optional ranking league override when validating a single-sport candidate set' },
+          market: { type: 'string', description: 'Optional ranking market override when validating a single-market candidate set' },
+          books: { type: 'array', items: { type: 'string' }, description: 'Optional sharp-book override for validation and odds-history queries' },
+          limit: { type: 'number', description: 'Max number of validated rows to return' },
+          includeAll: { type: 'boolean', description: 'Include rows even when consensus or movement data is missing' },
+          maxAgeMs: { type: 'number', description: 'Treat rows older than this many milliseconds as stale' },
+          lookbackHours: { type: 'number', description: `Odds-history lookback window in hours, default ${DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS}` },
+          debug: { type: 'boolean', description: 'Include verbose movement debug payloads such as filtered line history and dropped-point reasons, default true' }
+        },
+        additionalProperties: false
+      }
+    },
     {
       name: 'query_screen_odds',
       description: 'Query the live Odds Screen payload from /screen with the current league, market, game, and participant filters.',
@@ -313,6 +404,106 @@ function buildLeaguePresetSummary() {
   });
 }
 
+function buildPositiveEvTarget(play = {}) {
+  const homeTeam = String(play.homeTeam || '').trim();
+  const awayTeam = String(play.awayTeam || '').trim();
+  const participant = String(play.participant || play.selection || '').trim();
+  const selection = String(play.selection || participant).trim();
+  const game = homeTeam && awayTeam ? `${awayTeam} vs ${homeTeam}` : String(play.game || play.matchup || '').trim();
+  return {
+    book: String(play.book || play.sportsbook || '').trim(),
+    playType: String(play.market || play.marketType || '').trim(),
+    pick: selection,
+    selection,
+    participant,
+    game,
+    odds: play.odds,
+    league: String(play.league || '').trim(),
+    gameId: play.gameId ?? play.game_id ?? null,
+    selectionId: play.selectionId ?? play.selection_id ?? null
+  };
+}
+
+async function validatePositiveEvCandidates({ client, candidates = [], args = {} } = {}) {
+  const rows = Array.isArray(candidates) ? candidates.filter(play => play && typeof play === 'object') : [];
+  const requestedBooks = normalizeBookList(args.books);
+  const limit = getLimit(args);
+  const debug = getDebugFlag(args.debug, true);
+  const lookbackHoursUsed = getLookbackHours(args);
+  const maxAgeMs = getMaxAgeMs(args);
+
+  const enriched = await mapWithConcurrency(rows, async play => {
+    const league = String(play.league || args.league || '').trim() || 'NBA';
+    const market = String(play.market || args.market || '').trim() || 'Moneyline';
+    const focusBook = String(play.book || '').trim();
+    const sharpBooks = getSharpBookComparisonSet({
+      league,
+      market,
+      requestedBooks: requestedBooks.length ? requestedBooks : undefined
+    });
+    const target = buildPositiveEvTarget(play);
+
+    const history = await resolveHistoryForEntity({
+      client,
+      target,
+      rows,
+      lookbackHours: lookbackHoursUsed,
+      preferredBook: focusBook || null,
+      sharpBooks,
+      historySportsbooks: sharpBooks,
+      queryHistoryFn: params => client.queryOddsHistory(params)
+    }).catch(() => ({
+      lineHistory: [],
+      lineHistoryAvailable: false,
+      lineHistorySource: null,
+      historySportsbooksRequested: sharpBooks
+    }));
+
+    return {
+      ...play,
+      league,
+      market,
+      book: focusBook || play.book || play.sportsbook || '',
+      participant: play.participant || target.participant,
+      selection: play.selection || target.selection,
+      pick: play.pick || target.pick,
+      game: play.game || play.matchup || target.game,
+      odds: play.odds,
+      lineHistory: Array.isArray(history.lineHistory) ? history.lineHistory : [],
+      lineHistoryAvailable: Boolean(history.lineHistoryAvailable),
+      lineHistorySource: history.lineHistorySource || null,
+      lineHistoryLookbackHours: lookbackHoursUsed,
+      historySportsbooksRequested: Array.isArray(history.historySportsbooksRequested) ? history.historySportsbooksRequested : sharpBooks,
+      normalizedSelectionId: history.normalizedSelectionId || target.selectionId || null,
+      historyGameId: history.historyGameId || target.gameId || null,
+      historyMatchedBy: history.historyMatchedBy || null,
+      historyMatchKey: history.historyMatchKey || null
+    };
+  });
+
+  const ranked = rankLeagueScreenRows(enriched, {
+    league: args.league || enriched[0]?.league || 'NBA',
+    market: args.market || enriched[0]?.market || 'Moneyline',
+    limit,
+    includeAll: getIncludeAll(args),
+    maxAgeMs,
+    books: requestedBooks.length ? requestedBooks : undefined,
+    debug
+  });
+
+  return {
+    ok: true,
+    result: ranked,
+    count: ranked.length,
+    freshness: require('../lib/propprofessor-screen-utils').summarizeFreshness(extractScreenRows(enriched), Date.now(), { maxAgeMs }),
+    resultMeta: {
+      lookbackHoursUsed,
+      debugEnabled: debug,
+      source: 'positive_ev_candidates',
+      candidateCount: rows.length
+    }
+  };
+}
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   const leagueAliases = {
@@ -369,6 +560,50 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
 
   const handlers = {
+    async query_positive_ev_candidates(args = {}) {
+      const payload = await client.querySportsbook({
+        isLive: args.isLive,
+        showBreakOnly: args.showBreakOnly,
+        showTimeoutOnly: args.showTimeoutOnly,
+        showPeriodEndOnly: args.showPeriodEndOnly,
+        timeAvailable: args.timeAvailable,
+        userState: args.userState,
+        hideNCAAPlayerProps: args.hideNCAAPlayerProps,
+        sportsbooks: Array.isArray(args.sportsbooks) ? args.sportsbooks : undefined,
+        leagues: Array.isArray(args.leagues) ? args.leagues : undefined,
+        minOdds: args.minOdds,
+        maxOdds: args.maxOdds,
+        minValue: args.minValue,
+        maxValue: args.maxValue,
+        marketTypes: Array.isArray(args.marketTypes) ? args.marketTypes : undefined,
+        periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : undefined,
+        minHoursAway: args.minHoursAway,
+        maxHoursAway: args.maxHoursAway,
+        minLiquidity: args.minLiquidity,
+        maxLiquidity: args.maxLiquidity,
+        weightSettings: args.weightSettings && typeof args.weightSettings === 'object' ? args.weightSettings : undefined
+      });
+      const rows = Array.isArray(payload) ? payload : [];
+      return {
+        ok: true,
+        count: rows.length,
+        result: rows,
+        notes: {
+          workflow: 'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
+          minValueBehavior: args.minValue === undefined ? 'unset_here_use_frontend_filter' : 'explicit_request_override'
+        }
+      };
+    },
+
+    async query_validated_positive_ev_candidates(args = {}) {
+      const discovery = await handlers.query_positive_ev_candidates(args);
+      return validatePositiveEvCandidates({
+        client,
+        candidates: discovery.result,
+        args
+      });
+    },
+
     async query_screen_odds(args = {}) {
       const payload = await client.queryScreenOdds({
         market: args.market || 'Moneyline',
@@ -620,5 +855,6 @@ module.exports = {
   createMcpServer,
   createStdioMessageReader,
   encodeMessage,
+  mapWithConcurrency,
   serveStdio
 };

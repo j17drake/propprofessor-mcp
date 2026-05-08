@@ -36,9 +36,9 @@ describe('propprofessor query parser', () => {
     assert.equal(parsed.market, 'Pitcher Strikeouts');
   });
 
-  it('routes fantasy prompts to fantasy intent', () => {
+  it('keeps fantasy phrasing on the screen intent now that fantasy is not a public CLI command', () => {
     const parsed = parseNaturalLanguagePropQuery('is Underdog fantasy good today');
-    assert.equal(parsed.intent, 'fantasy');
+    assert.equal(parsed.intent, 'screen');
     assert.equal(parsed.book, 'Underdog');
   });
 

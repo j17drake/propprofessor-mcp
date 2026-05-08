@@ -26,7 +26,7 @@ npm install
 You also need a saved PropProfessor browser session at `auth.json` in the repo root.
 That file is ignored by git, so copy it from your existing setup or save a fresh browser session into this repo.
 
-This repo now exposes a strict screen-first MCP surface. Fantasy, sportsbook +EV, smart money, and hidden-bet mutation flows stay available only in the local query client or underlying library helpers, not the MCP contract.
+This repo now exposes a mostly screen-first MCP surface, with intentionally restored sportsbook discovery helpers. The `query_positive_ev_candidates` MCP tool is available as a fast +EV finder, and `query_validated_positive_ev_candidates` adds the built-in odds-history and sharp-movement validation pass. Smart money inspection stays available in the local query client, while hidden-bet mutation flows remain underlying library helpers rather than public CLI commands.
 
 ## Run locally
 
@@ -116,12 +116,11 @@ Before creating a new GitHub release:
 
 ## pp-query command inventory
 
-The local `pp-query` CLI intentionally keeps a broader maintenance surface than the MCP server. Use the MCP server for screen-first ranked queries, and use `pp-query` when you want local-only helpers for sportsbook, smart money, or fantasy inspection.
+The local `pp-query` CLI intentionally keeps a broader maintenance surface than the MCP server. Use the MCP server for screen-first ranked queries, and use `pp-query` when you want local-only helpers for sportsbook and smart money inspection or local ranked screen workflows.
 
 - `opinion`, analyze a single prop from the sportsbook screen
 - `sportsbook`, fetch sportsbook +EV rows
 - `smart`, fetch smart money rows
-- `fantasy`, fetch fantasy rows
 - `tennis`, query and rank tennis screen rows
 - `screen`, query any sport screen with `--league`
 - `sport`, alias for `screen`, use `--league` to pick the sport
@@ -160,8 +159,10 @@ If you prefer a direct repo path instead of a global link, use the local file pa
 
 ## Available MCP tools
 
-The MCP server is strict screen-only. These are the full tool names it now exposes:
+The MCP server stays screen-first, with restored sportsbook discovery helpers for +EV candidate generation and validation. These are the full tool names it now exposes:
 
+- `query_positive_ev_candidates`
+- `query_validated_positive_ev_candidates`
 - `query_screen_odds`
 - `query_screen_odds_best_comps`
 - `query_screen_odds_ranked`
