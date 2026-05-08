@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6
+
+- Fixed `superjson` loading in the CommonJS API client by using a cached dynamic import, restoring Node 18 compatibility for TRPC hide-row serialization
+- Added CI and local verification coverage across Node 18 and Node 20, including lint and Prettier checks
+- Kept the release version ahead of the already-published `v1.0.5` tag so the next GitHub release can be tagged cleanly as `v1.0.6`
+
 ## 1.0.5
 
 - Restored `query_positive_ev_candidates` as an MCP sportsbook discovery helper so Hermes can scan broad +EV candidates before validating finalists with `/screen`
