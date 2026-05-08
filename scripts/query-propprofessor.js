@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 
-const { createPropProfessorClient } = require('../lib/propprofessor-api');
+const os = require('node:os');
+
+const { createPropProfessorClient, inspectAuthSetup } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
 const { rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, getLeagueRankingPreset, normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
@@ -40,8 +42,84 @@ function getCommandInventory() {
     { command: 'ncaaf', description: 'NCAAF screen shorthand' },
     { command: 'presets', description: 'Show active league ranking presets' },
     { command: 'list', description: 'Show the command inventory' },
-    { command: 'health', description: 'Check auth and endpoint health' }
+    { command: 'health', description: 'Check auth and endpoint health' },
+    { command: 'doctor', description: 'Run first-time setup checks and explain next steps' }
   ];
+}
+
+function buildHelpText() {
+  return [
+    'PropProfessor query CLI',
+    '',
+    'Start here:',
+    '  pp-query doctor',
+    '  pp-query health',
+    '',
+    'Common commands:',
+    '  pp-query doctor',
+    '  pp-query health',
+    '  pp-query screen --league NBA --market Moneyline',
+    '  pp-query nba --market Moneyline',
+    '  pp-query tennis --market Moneyline --limit 10',
+    '',
+    'Useful flags:',
+    '  --league NBA',
+    '  --market Moneyline',
+    '  --books NoVigApp,Polymarket',
+    '  --lookback-hours 6',
+    '  --limit 10',
+    '',
+    'Auth file lookup order:',
+    '  1. AUTH_FILE',
+    `  2. ${os.homedir()}/.propprofessor/auth.json`,
+    '  3. ./auth.json in this repo',
+    '',
+    'If you are new here, save your PropProfessor browser session at:',
+    `  ${os.homedir()}/.propprofessor/auth.json`
+  ].join('\n');
+}
+
+function getNodeVersionStatus() {
+  const major = Number(String(process.versions?.node || '').split('.')[0] || 0);
+  return {
+    ok: major >= 18,
+    current: process.versions?.node || 'unknown',
+    required: '18+'
+  };
+}
+
+function buildDoctorReport(healthResult) {
+  const node = getNodeVersionStatus();
+  const auth = inspectAuthSetup();
+  const endpointOk = Boolean(healthResult?.ok);
+
+  let nextStep = 'Ready to add this server to your MCP client.';
+  if (!node.ok) {
+    nextStep = 'Install Node.js 18 or newer, then rerun `pp-query doctor`.';
+  } else if (!auth.ok) {
+    nextStep = `Save your PropProfessor browser session to ${auth.defaultUserAuthFile} or set AUTH_FILE, then rerun \`pp-query doctor\`.`;
+  } else if (!endpointOk) {
+    nextStep = 'Your auth file was found, but the live health check failed. Refresh your browser session and rerun `pp-query doctor`.';
+  }
+
+  return {
+    command: 'doctor',
+    ok: node.ok && auth.ok && endpointOk,
+    checks: {
+      node,
+      auth,
+      endpoint: {
+        ok: endpointOk,
+        details: healthResult || null
+      }
+    },
+    summary: {
+      node: node.ok ? 'ok' : 'error',
+      auth: auth.ok ? 'ok' : 'error',
+      endpoint: endpointOk ? 'ok' : 'error'
+    },
+    nextStep
+  };
 }
 
 function parseArgs(argv) {
@@ -167,7 +245,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   const screenCommand = resolveScreenCommand(command, opts);
 
   if (command === 'help') {
-    logger.log('Usage: node scripts/query-propprofessor.js opinion --player "James Harden" --market "Points" --line 18.5 --side over');
+    logger.log(buildHelpText());
     process.exitCode = 0;
     return;
   }
@@ -218,6 +296,18 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   } else if (command === 'health') {
     const result = await client.healthStatus();
     emitJson(logger, { command, ...result });
+    return;
+  } else if (command === 'doctor') {
+    let healthResult = null;
+    try {
+      healthResult = await client.healthStatus();
+    } catch (error) {
+      healthResult = {
+        ok: false,
+        error: String(error?.message || error)
+      };
+    }
+    emitJson(logger, buildDoctorReport(healthResult));
     return;
   } else {
     throw new Error(`Unknown command: ${command}`);
@@ -341,6 +431,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildDoctorReport,
+  buildHelpText,
   getCommandInventory,
   parseArgs,
   resolveScreenCommand,

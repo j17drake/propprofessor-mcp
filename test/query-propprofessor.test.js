@@ -3,7 +3,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { getCommandInventory, main, parseArgs, resolveScreenCommand } = require('../scripts/query-propprofessor');
+const { buildDoctorReport, buildHelpText, getCommandInventory, main, parseArgs, resolveScreenCommand } = require('../scripts/query-propprofessor');
 
 describe('query-propprofessor CLI parsing', () => {
   it('accepts lookback-hours aliases', () => {
@@ -66,8 +66,16 @@ describe('query-propprofessor CLI parsing', () => {
       'ncaaf',
       'presets',
       'list',
-      'health'
+      'health',
+      'doctor'
     ]);
+  });
+
+  it('prints beginner-friendly help text', () => {
+    const help = buildHelpText();
+    assert.match(help, /Start here:/);
+    assert.match(help, /pp-query doctor/);
+    assert.match(help, /Auth file lookup order:/);
   });
 });
 
@@ -204,6 +212,23 @@ describe('query-propprofessor CLI command execution', () => {
     assert.deepEqual(payload.endpoints, { screen: 'ok' });
   });
 
+  it('smoke-runs the doctor command and reports success when health passes', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'doctor'],
+      client: {
+        healthStatus: async () => ({ ok: true, endpoints: { screen: 'ok' } })
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'doctor');
+    assert.equal(typeof payload.checks.auth.selectedAuthFile, 'string');
+    assert.equal(payload.summary.endpoint, 'ok');
+  });
+
   it('smoke-runs the documented sportsbook and smart commands', async () => {
     const sportsbook = createLogger();
     await main({
@@ -249,5 +274,12 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(calls.length, 3);
     assert.deepEqual(calls.map(call => call.market), ['Game Handicap', 'Set Handicap', 'Point Spread']);
     assert.equal(payload.league, 'Tennis');
+  });
+
+  it('builds a doctor report with a clear next step when endpoint health fails', () => {
+    const report = buildDoctorReport({ ok: false, error: 'boom' });
+    assert.equal(report.command, 'doctor');
+    assert.equal(report.summary.endpoint, 'error');
+    assert.equal(typeof report.nextStep, 'string');
   });
 });

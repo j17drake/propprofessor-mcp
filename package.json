@@ -1,7 +1,7 @@
 {
   "name": "propprofessor-mcp",
   "version": "1.0.5",
-  "description": "Screen-first PropProfessor MCP server plus a broader local query CLI",
+  "description": "Beginner-friendly PropProfessor MCP server and setup CLI for any MCP client",
   "type": "commonjs",
   "private": false,
   "main": "scripts/propprofessor-mcp-server.js",
@@ -15,6 +15,7 @@
     "README.md",
     "AUTH.md",
     "CONFIG.md",
+    "MAINTAINERS.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
@@ -28,10 +29,12 @@
   "homepage": "https://github.com/j17drake/propprofessor-mcp#readme",
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
     "propprofessor",
     "sports-betting",
-    "cli"
+    "cli",
+    "ai-agent"
   ],
   "author": "James Drake",
   "license": "MIT",

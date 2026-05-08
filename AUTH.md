@@ -1,25 +1,74 @@
 # PropProfessor MCP Auth Guide
 
-This repo uses a saved PropProfessor browser session to fetch short-lived access tokens.
+This project uses a saved logged-in PropProfessor browser session to fetch short-lived access tokens.
 
-## Required file
+## Recommended Location
 
-- `auth.json`, saved in the repo root
+Put your auth file here:
 
-The file is ignored by git. Copy it from your existing PropProfessor setup or save a fresh session after logging in.
+```bash
+~/.propprofessor/auth.json
+```
 
-## How the token flow works
+That is the default user-level location.
 
-1. The client reads PropProfessor cookies from `auth.json`
-2. It sends those cookies to PropProfessor's access-token endpoint
-3. It uses the returned bearer token for `/screen`, `/fantasy`, and related requests
+## Auth Lookup Order
 
-## If you need a fresh session
+The project checks auth in this order:
 
-Use your normal browser login flow for PropProfessor, then save the browser storage state into this repo as `auth.json`.
+1. `AUTH_FILE`
+2. `~/.propprofessor/auth.json`
+3. `auth.json` in the repo root
+
+For most users, the best choice is `~/.propprofessor/auth.json`.
+
+## What Should Be In `auth.json`
+
+It should be a saved browser session from a logged-in PropProfessor session.
+
+The important part is that it includes PropProfessor cookies.
+
+## How The Auth Flow Works
+
+1. The client reads PropProfessor cookies from your saved session file.
+2. It sends those cookies to PropProfessor's access-token endpoint.
+3. It uses the returned bearer token for live requests.
+
+## If You Need A Fresh Session
+
+1. Log in to PropProfessor in your browser.
+2. Export the browser session or storage state.
+3. Save it as `~/.propprofessor/auth.json`.
+
+## Easiest Way To Check Your Setup
+
+Run:
+
+```bash
+pp-query doctor
+```
+
+That will tell you:
+
+- whether an auth file was found
+- which path was selected
+- whether the file appears usable
+- whether PropProfessor responds
 
 ## Troubleshooting
 
-- If you see `No PropProfessor cookies found in auth.json`, the session file is missing or stale
-- If requests start failing with auth errors, refresh `auth.json` from a logged-in browser session
-- If you are testing locally, keep `auth.json` next to `package.json`
+If you see `No PropProfessor cookies found`:
+
+- the file exists, but it does not contain PropProfessor cookies
+- export a fresh logged-in browser session
+
+If auth was found but live requests fail:
+
+- the session may be stale
+- log in again and export a fresh file
+
+If you want to keep auth somewhere else:
+
+```bash
+AUTH_FILE=/path/to/auth.json pp-query doctor
+```
