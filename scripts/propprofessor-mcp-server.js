@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 'use strict';
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
@@ -431,6 +432,9 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
   const debug = getDebugFlag(args.debug, true);
   const lookbackHoursUsed = getLookbackHours(args);
   const maxAgeMs = getMaxAgeMs(args);
+  let failedValidationCount = 0;
+  let historyFailureCount = 0;
+  const validationWarnings = [];
 
   const enriched = await mapWithConcurrency(rows, async play => {
     const league = String(play.league || args.league || '').trim() || 'NBA';
@@ -443,21 +447,32 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
     });
     const target = buildPositiveEvTarget(play);
 
-    const history = await resolveHistoryForEntity({
-      client,
-      target,
-      rows,
-      lookbackHours: lookbackHoursUsed,
-      preferredBook: focusBook || null,
-      sharpBooks,
-      historySportsbooks: sharpBooks,
-      queryHistoryFn: params => client.queryOddsHistory(params)
-    }).catch(() => ({
-      lineHistory: [],
-      lineHistoryAvailable: false,
-      lineHistorySource: null,
-      historySportsbooksRequested: sharpBooks
-    }));
+    let history;
+    let validationFailed = false;
+    let validationError = null;
+    try {
+      history = await resolveHistoryForEntity({
+        client,
+        target,
+        rows,
+        lookbackHours: lookbackHoursUsed,
+        preferredBook: focusBook || null,
+        sharpBooks,
+        historySportsbooks: sharpBooks,
+        queryHistoryFn: params => client.queryOddsHistory(params)
+      });
+    } catch (error) {
+      validationFailed = true;
+      validationError = error;
+      failedValidationCount += 1;
+      historyFailureCount += 1;
+      history = {
+        lineHistory: [],
+        lineHistoryAvailable: false,
+        lineHistorySource: null,
+        historySportsbooksRequested: sharpBooks
+      };
+    }
 
     return {
       ...play,
@@ -477,13 +492,39 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
       normalizedSelectionId: history.normalizedSelectionId || target.selectionId || null,
       historyGameId: history.historyGameId || target.gameId || null,
       historyMatchedBy: history.historyMatchedBy || null,
-      historyMatchKey: history.historyMatchKey || null
+      historyMatchKey: history.historyMatchKey || null,
+      validationFailed,
+      validationErrorMessage: validationFailed ? String(validationError?.message || validationError || 'Validation failed') : null
     };
   });
 
-  const ranked = rankLeagueScreenRows(enriched, {
-    league: args.league || enriched[0]?.league || 'NBA',
-    market: args.market || enriched[0]?.market || 'Moneyline',
+  const validatedRows = enriched.filter(row => !row.validationFailed);
+  const partiallyValidated = failedValidationCount > 0 && validatedRows.length > 0;
+  const noRowsValidated = rows.length > 0 && validatedRows.length === 0;
+
+  if (partiallyValidated) {
+    validationWarnings.push(`${failedValidationCount} candidate validation lookup(s) failed; returning ${validatedRows.length} validated row(s).`);
+  }
+
+  if (noRowsValidated) {
+    const error = new Error(`Positive EV validation failed for all ${rows.length} candidate(s); no validated results returned`);
+    error.code = 'VALIDATION_INCOMPLETE';
+    error.category = 'backend';
+    error.status = 503;
+    error.retryable = true;
+    error.details = {
+      candidateCount: rows.length,
+      validatedCount: 0,
+      failedValidationCount,
+      historyFailureCount,
+      lookbackHoursUsed
+    };
+    throw error;
+  }
+
+  const ranked = rankLeagueScreenRows(validatedRows, {
+    league: args.league || validatedRows[0]?.league || 'NBA',
+    market: args.market || validatedRows[0]?.market || 'Moneyline',
     limit,
     includeAll: getIncludeAll(args),
     maxAgeMs,
@@ -495,12 +536,17 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
     ok: true,
     result: ranked,
     count: ranked.length,
-    freshness: require('../lib/propprofessor-screen-utils').summarizeFreshness(extractScreenRows(enriched), Date.now(), { maxAgeMs }),
+    freshness: require('../lib/propprofessor-screen-utils').summarizeFreshness(extractScreenRows(validatedRows), Date.now(), { maxAgeMs }),
+    warnings: validationWarnings,
     resultMeta: {
       lookbackHoursUsed,
       debugEnabled: debug,
       source: 'positive_ev_candidates',
-      candidateCount: rows.length
+      candidateCount: rows.length,
+      validatedCount: validatedRows.length,
+      failedValidationCount,
+      historyFailureCount,
+      partialValidation: partiallyValidated
     }
   };
 }

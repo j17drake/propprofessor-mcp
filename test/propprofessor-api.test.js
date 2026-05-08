@@ -9,7 +9,9 @@ const path = require('path');
 const {
   buildPropProfessorCookieHeader,
   createPropProfessorClient,
+  createTimeoutError,
   fetchAccessToken,
+  isAbortLikeError,
   normalizeSelectionId,
   readAuthState
 } = require('../lib/propprofessor-api');
@@ -69,6 +71,20 @@ describe('normalizeSelectionId', () => {
       normalizeSelectionId('Point_Spread:San_Antonio_Spurs_-5.5'),
       'Point_Spread:San_Antonio_Spurs_-5.5'
     );
+  });
+});
+
+describe('timeout helpers', () => {
+  it('recognizes abort-like errors and tags timeout failures', () => {
+    assert.equal(isAbortLikeError({ name: 'AbortError' }), true);
+    assert.equal(isAbortLikeError({ code: 'ABORT_ERR' }), true);
+    assert.equal(isAbortLikeError({ message: 'boom' }), false);
+
+    const error = createTimeoutError({ source: 'HTTP', timeoutMs: 3210, cause: new Error('aborted') });
+    assert.equal(error.code, 'PROPPROFESSOR_TIMEOUT_ERROR');
+    assert.equal(error.category, 'transport');
+    assert.equal(error.retryable, true);
+    assert.match(error.message, /3210ms/);
   });
 });
 
@@ -972,6 +988,40 @@ describe('createPropProfessorClient', () => {
       const result = await client.queryScreenOdds({});
       assert.deepEqual(result, { ok: true });
       assert.equal(fetchAttempts, 3);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('retries timeout failures and reports them as transport errors when retries are exhausted', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    let fetchAttempts = 0;
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      fetchImpl: async () => {
+        fetchAttempts += 1;
+        const error = new Error('request aborted');
+        error.name = 'AbortError';
+        throw error;
+      },
+      retryDelaysMs: [0],
+      requestTimeoutMs: 1
+    });
+
+    try {
+      await assert.rejects(() => client.queryScreenOdds({}), error => {
+        assert.equal(error.category, 'transport');
+        assert.equal(error.code, 'PROPPROFESSOR_TIMEOUT_ERROR');
+        assert.equal(error.retryable, true);
+        assert.match(error.message, /timed out/i);
+        return true;
+      });
+      assert.equal(fetchAttempts, 2);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

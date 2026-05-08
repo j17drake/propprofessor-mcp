@@ -4,6 +4,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 const packageJson = require('../package.json');
 const {
@@ -359,6 +360,35 @@ describe('propprofessor MCP server stdio contract', () => {
       category: 'auth',
       status: 401
     });
+  });
+
+  it('returns backend validation errors when validated candidates cannot validate any rows', async () => {
+    const handlers = createMcpHandlers({
+      client: {
+        querySportsbook: async () => ([{ id: 'row-1', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A' }]),
+        queryOddsHistory: async () => {
+          const error = new Error('history backend unavailable');
+          error.status = 503;
+          throw error;
+        }
+      }
+    });
+
+    const server = createMcpServer({
+      handlers,
+      toolDefinitions: [{
+        name: 'query_validated_positive_ev_candidates',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: true }
+      }]
+    });
+
+    await server.handleRequest({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'test', version: '1.0.0' } } });
+    const response = await server.handleRequest({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'query_validated_positive_ev_candidates', arguments: {} } });
+
+    assert.equal(response.result.isError, true);
+    assert.equal(response.result.structuredContent.ok, false);
+    assert.equal(response.result.structuredContent.error.code, 'VALIDATION_INCOMPLETE');
+    assert.equal(response.result.structuredContent.error.category, 'backend');
   });
 
   it('classifies malformed Content-Length frames as transport errors', () => {
@@ -729,5 +759,40 @@ describe('validated candidate concurrency helpers', () => {
 
     assert.deepEqual(result, [10, 20, 30, 40, 50]);
     assert.equal(maxInFlight <= 2, true);
+  });
+
+  it('validated candidates use hybrid handling when only some rows fail validation', async () => {
+    const handlers = createMcpHandlers({
+      client: {
+        querySportsbook: async () => ([
+          { id: 'ok-row', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'A', selection: 'A', gameId: 'game-1', selectionId: 'Moneyline:A' },
+          { id: 'bad-row', league: 'NBA', market: 'Moneyline', book: 'Fliff', participant: 'B', selection: 'B', gameId: 'game-2', selectionId: 'Moneyline:B' }
+        ]),
+        queryOddsHistory: async ({ gameId }) => {
+          if (gameId === 'game-2') {
+            throw new Error('history failed');
+          }
+          return {
+            Fliff: [{ odds: -110, start_ts: 1 }, { odds: -120, start_ts: 2 }]
+          };
+        }
+      }
+    });
+
+    const result = await handlers.query_validated_positive_ev_candidates({ sportsbooks: ['Fliff'], leagues: ['NBA'], debug: false });
+    assert.equal(result.ok, true);
+    assert.equal(result.resultMeta.candidateCount, 2);
+    assert.equal(result.resultMeta.validatedCount, 1);
+    assert.equal(result.resultMeta.failedValidationCount, 1);
+    assert.equal(result.resultMeta.partialValidation, true);
+    assert.ok(Array.isArray(result.warnings));
+    assert.match(result.warnings[0], /1 candidate validation lookup/);
+  });
+
+  it('bin entrypoints include node shebangs', () => {
+    const serverEntry = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js'), 'utf8');
+    const queryEntry = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'query-propprofessor.js'), 'utf8');
+    assert.match(serverEntry, /^#!\/usr\/bin\/env node/);
+    assert.match(queryEntry, /^#!\/usr\/bin\/env node/);
   });
 });

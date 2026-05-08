@@ -1,9 +1,10 @@
+#!/usr/bin/env node
 'use strict';
 
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
-const { rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, getLeagueRankingPreset } = require('../lib/propprofessor-screen-utils');
+const { rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, getLeagueRankingPreset, normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
 const {
   buildRankedScreenResponse,
   getDebugFlag
@@ -100,6 +101,24 @@ function emitJson(logger, payload) {
   logger.log(JSON.stringify(payload, null, 2));
 }
 
+async function queryTennisPayloads(client, { market, books, is_live } = {}) {
+  const tennisQuery = typeof client.queryScreenOdds === 'function'
+    ? client.queryScreenOdds.bind(client)
+    : client.queryScreenOddsBestComps.bind(client);
+  const payloads = [];
+
+  for (const tennisMarket of normalizeTennisMarketQuery(market || 'Moneyline')) {
+    payloads.push(await tennisQuery({
+      league: 'Tennis',
+      market: tennisMarket,
+      books,
+      is_live
+    }));
+  }
+
+  return payloads;
+}
+
 function resolveScreenCommand(command, opts = {}) {
   if (Object.prototype.hasOwnProperty.call(LEAGUE_ALIASES, command)) {
     return {
@@ -172,20 +191,18 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   }
 
   let payload;
+  let payloads = null;
   if (command === 'sportsbook') {
     payload = await client.querySportsbook();
   } else if (command === 'smart') {
     payload = await client.querySmartMoney();
   } else if (command === 'tennis') {
-    const tennisQuery = typeof client.queryScreenOdds === 'function'
-      ? client.queryScreenOdds.bind(client)
-      : client.queryScreenOddsBestComps.bind(client);
-    payload = await tennisQuery({
-      league: 'Tennis',
+    payloads = await queryTennisPayloads(client, {
       market: opts.market || 'Moneyline',
       books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
       is_live: Boolean(opts.live)
     });
+    payload = payloads[0] || { game_data: [] };
   } else if (screenCommand.command === 'screen') {
     payload = await client.queryScreenOddsBestComps({
       league: screenCommand.league,
@@ -211,13 +228,9 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   const debug = getDebugFlag(opts.debug, true);
   if (command === 'tennis') {
     const tennisBooks = opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
-    const queryFn = typeof client.queryScreenOdds === 'function'
-      ? client.queryScreenOdds.bind(client)
-      : client.queryScreenOddsBestComps.bind(client);
-    const payloads = [payload];
     const result = await buildRankedScreenResponse({
       client,
-      payloads,
+      payloads: Array.isArray(payloads) && payloads.length ? payloads : [payload],
       args: {
         books: tennisBooks,
         historySportsbooks: tennisBooks,

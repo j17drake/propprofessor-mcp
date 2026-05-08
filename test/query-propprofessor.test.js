@@ -229,4 +229,25 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(smartPayload.command, 'smart');
     assert.equal(smartPayload.count, 1);
   });
+
+  it('expands tennis market aliases the same way as MCP tennis queries', async () => {
+    const { logger, lines } = createLogger();
+    const calls = [];
+
+    await main({
+      argv: ['node', 'query', 'tennis', '--market', 'Spread'],
+      client: {
+        queryScreenOdds: async filters => {
+          calls.push(filters);
+          return { game_data: [] };
+        }
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(calls.length, 3);
+    assert.deepEqual(calls.map(call => call.market), ['Game Handicap', 'Set Handicap', 'Point Spread']);
+    assert.equal(payload.league, 'Tennis');
+  });
 });

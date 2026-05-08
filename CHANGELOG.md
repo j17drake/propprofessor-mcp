@@ -13,6 +13,11 @@
 - Shipped the sharp-history and ranked lookback work into the MCP ranked response path and export tooling
 - Made `health_status` freshness ages non-null for populated screen payloads, with timestamp-source reporting and explicit fallback metadata when rows are undated
 - Exposed richer ranked movement/debug metadata, including filtered history trails, dropped-point reasons, movement debug summaries, and lookback/result metadata
+- Added bounded request timeouts across HTTP and TRPC calls so MCP and CLI requests fail predictably instead of hanging indefinitely
+- Changed `query_validated_positive_ev_candidates` to use hybrid validation failure handling: partial validation returns warnings plus validation counts, while fully unvalidated requests fail explicitly
+- Aligned `pp-query tennis` market expansion with the MCP tennis flow for spread and total aliases
+- Hardened ranked preferred-book matching so regex-special characters in book names cannot crash ranking
+- Added executable shebangs to the published `pp-mcp` and `pp-query` bin entrypoints
 
 ## 1.0.4
 

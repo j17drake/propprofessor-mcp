@@ -26,7 +26,7 @@ npm install
 You also need a saved PropProfessor browser session at `auth.json` in the repo root.
 That file is ignored by git, so copy it from your existing setup or save a fresh browser session into this repo.
 
-This repo now exposes a mostly screen-first MCP surface, with intentionally restored sportsbook discovery helpers. The `query_positive_ev_candidates` MCP tool is available as a fast +EV finder, and `query_validated_positive_ev_candidates` adds the built-in odds-history and sharp-movement validation pass. Smart money inspection stays available in the local query client, while hidden-bet mutation flows remain underlying library helpers rather than public CLI commands.
+This repo now exposes a mostly screen-first MCP surface, with intentionally restored sportsbook discovery helpers. The `query_positive_ev_candidates` MCP tool is available as a fast +EV finder, and `query_validated_positive_ev_candidates` adds the built-in odds-history and sharp-movement validation pass. Validated +EV queries now use hybrid failure handling: partially validated candidate sets return ranked results plus warning metadata, while requests where no candidates could be validated fail explicitly instead of silently degrading. Smart money inspection stays available in the local query client, while hidden-bet mutation flows remain underlying library helpers rather than public CLI commands.
 
 ## Run locally
 
@@ -71,6 +71,12 @@ Optional environment variables:
 - `LOCAL_TIMEZONE`, display timezone for local CLI formatting, default `America/Chicago`
 - `PROPPROFESSOR_MCP_NDJSON`, set to `true` to use NDJSON framing instead of `Content-Length`
 - `PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS`, default ranked odds-history lookback window in hours, default `6`
+
+Runtime behavior:
+
+- PropProfessor HTTP and TRPC requests use bounded timeouts and retry retryable failures instead of hanging indefinitely
+- `query_validated_positive_ev_candidates` returns `warnings` and validation counts when only part of the candidate set can be validated
+- `query_validated_positive_ev_candidates` returns an error when zero candidates can be validated
 
 Per-request overrides:
 
@@ -178,6 +184,8 @@ The MCP server stays screen-first, with restored sportsbook discovery helpers fo
 - `query_tennis_screen`
 - `league_presets`
 - `health_status`
+
+`query_validated_positive_ev_candidates` response metadata now includes `validatedCount`, `failedValidationCount`, `historyFailureCount`, and `partialValidation` so callers can distinguish fully validated results from degraded-but-usable responses.
 
 ## Requirements
 
