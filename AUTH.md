@@ -4,7 +4,13 @@ This project uses a saved logged-in PropProfessor browser session to fetch short
 
 ## Recommended Location
 
-Put your auth file here:
+Easiest option:
+
+```bash
+pp-query install-auth --source /path/to/auth.json
+```
+
+That installs your saved browser session into:
 
 ```bash
 ~/.propprofessor/auth.json
@@ -38,7 +44,7 @@ The important part is that it includes PropProfessor cookies.
 
 1. Log in to PropProfessor in your browser.
 2. Export the browser session or storage state.
-3. Save it as `~/.propprofessor/auth.json`.
+3. Run `pp-query install-auth --source /path/to/exported-auth.json`.
 
 ## Easiest Way To Check Your Setup
 

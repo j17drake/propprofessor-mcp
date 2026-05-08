@@ -3,7 +3,12 @@
 
 const os = require('node:os');
 
-const { createPropProfessorClient, inspectAuthSetup } = require('../lib/propprofessor-api');
+const {
+  createPropProfessorClient,
+  DEFAULT_USER_AUTH_FILE,
+  installAuthFile,
+  inspectAuthSetup
+} = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
 const { rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, getLeagueRankingPreset, normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
@@ -43,7 +48,8 @@ function getCommandInventory() {
     { command: 'presets', description: 'Show active league ranking presets' },
     { command: 'list', description: 'Show the command inventory' },
     { command: 'health', description: 'Check auth and endpoint health' },
-    { command: 'doctor', description: 'Run first-time setup checks and explain next steps' }
+    { command: 'doctor', description: 'Run first-time setup checks and explain next steps' },
+    { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' }
   ];
 }
 
@@ -52,10 +58,12 @@ function buildHelpText() {
     'PropProfessor query CLI',
     '',
     'Start here:',
+    '  pp-query install-auth --source /path/to/auth.json',
     '  pp-query doctor',
     '  pp-query health',
     '',
     'Common commands:',
+    '  pp-query install-auth --source /path/to/auth.json',
     '  pp-query doctor',
     '  pp-query health',
     '  pp-query screen --league NBA --market Moneyline',
@@ -74,9 +82,23 @@ function buildHelpText() {
     `  2. ${os.homedir()}/.propprofessor/auth.json`,
     '  3. ./auth.json in this repo',
     '',
-    'If you are new here, save your PropProfessor browser session at:',
+    'If you are new here, install your browser session with:',
+    '  pp-query install-auth --source /path/to/auth.json',
+    '',
+    'Default auth location:',
     `  ${os.homedir()}/.propprofessor/auth.json`
   ].join('\n');
+}
+
+function buildInstallAuthReport(result) {
+  return {
+    command: 'install-auth',
+    ok: true,
+    sourceFile: result.sourceFile,
+    destinationFile: result.destinationFile,
+    usedExistingFile: Boolean(result.usedExistingFile),
+    nextStep: 'Run `pp-query doctor` to verify that the installed auth file works.'
+  };
 }
 
 function getNodeVersionStatus() {
@@ -156,6 +178,12 @@ function parseArgs(argv) {
       i += 1;
     } else if (arg === '--books' || arg === '-b') {
       opts.books = next;
+      i += 1;
+    } else if (arg === '--source') {
+      opts.source = next;
+      i += 1;
+    } else if (arg === '--dest' || arg === '--destination') {
+      opts.destination = next;
       i += 1;
     } else if (arg === '--live') {
       opts.live = true;
@@ -309,6 +337,16 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     }
     emitJson(logger, buildDoctorReport(healthResult));
     return;
+  } else if (command === 'install-auth') {
+    if (!opts.source) {
+      throw new Error(`install-auth requires --source. Example: pp-query install-auth --source /path/to/auth.json`);
+    }
+    const installResult = installAuthFile({
+      sourceFile: opts.source,
+      destinationFile: opts.destination || DEFAULT_USER_AUTH_FILE
+    });
+    emitJson(logger, buildInstallAuthReport(installResult));
+    return;
   } else {
     throw new Error(`Unknown command: ${command}`);
   }
@@ -433,6 +471,7 @@ if (require.main === module) {
 module.exports = {
   buildDoctorReport,
   buildHelpText,
+  buildInstallAuthReport,
   getCommandInventory,
   parseArgs,
   resolveScreenCommand,

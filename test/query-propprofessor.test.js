@@ -2,8 +2,11 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
-const { buildDoctorReport, buildHelpText, getCommandInventory, main, parseArgs, resolveScreenCommand } = require('../scripts/query-propprofessor');
+const { buildDoctorReport, buildHelpText, buildInstallAuthReport, getCommandInventory, main, parseArgs, resolveScreenCommand } = require('../scripts/query-propprofessor');
 
 describe('query-propprofessor CLI parsing', () => {
   it('accepts lookback-hours aliases', () => {
@@ -67,13 +70,15 @@ describe('query-propprofessor CLI parsing', () => {
       'presets',
       'list',
       'health',
-      'doctor'
+      'doctor',
+      'install-auth'
     ]);
   });
 
   it('prints beginner-friendly help text', () => {
     const help = buildHelpText();
     assert.match(help, /Start here:/);
+    assert.match(help, /install-auth/);
     assert.match(help, /pp-query doctor/);
     assert.match(help, /Auth file lookup order:/);
   });
@@ -229,6 +234,29 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(payload.summary.endpoint, 'ok');
   });
 
+  it('smoke-runs the install-auth command and copies a source file', async () => {
+    const { logger, lines } = createLogger();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-cli-install-auth-'));
+    const sourceFile = path.join(tempDir, 'source-auth.json');
+    const destinationFile = path.join(tempDir, '.propprofessor', 'auth.json');
+    fs.writeFileSync(sourceFile, JSON.stringify({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }] }), 'utf8');
+
+    try {
+      await main({
+        argv: ['node', 'query', 'install-auth', '--source', sourceFile, '--destination', destinationFile],
+        client: {},
+        logger
+      });
+
+      const payload = JSON.parse(lines[0]);
+      assert.equal(payload.command, 'install-auth');
+      assert.equal(payload.ok, true);
+      assert.equal(fs.existsSync(destinationFile), true);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('smoke-runs the documented sportsbook and smart commands', async () => {
     const sportsbook = createLogger();
     await main({
@@ -281,5 +309,16 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(report.command, 'doctor');
     assert.equal(report.summary.endpoint, 'error');
     assert.equal(typeof report.nextStep, 'string');
+  });
+
+  it('builds an install-auth report with a follow-up step', () => {
+    const report = buildInstallAuthReport({
+      sourceFile: '/tmp/source.json',
+      destinationFile: '/tmp/auth.json',
+      usedExistingFile: false
+    });
+    assert.equal(report.command, 'install-auth');
+    assert.equal(report.ok, true);
+    assert.match(report.nextStep, /pp-query doctor/);
   });
 });

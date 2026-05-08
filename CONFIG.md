@@ -8,6 +8,7 @@ Before configuring any client, run:
 cd /path/to/propprofessor-mcp
 npm install
 npm link
+pp-query install-auth --source /path/to/auth.json
 pp-query doctor
 ```
 

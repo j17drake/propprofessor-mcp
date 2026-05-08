@@ -24,7 +24,7 @@ If you use ChatGPT, see the ChatGPT note below first. ChatGPT currently does not
 ## Quick Start
 
 1. Install the project
-2. Save your PropProfessor browser session to `~/.propprofessor/auth.json`
+2. Run `pp-query install-auth --source /path/to/auth.json`
 3. Run `pp-query doctor`
 4. Add `pp-mcp` to your MCP client
 
@@ -61,7 +61,13 @@ After `npm link`, these commands are available on your PATH:
 
 ## Set Up Auth
 
-Save your PropProfessor browser session JSON at:
+Easiest option:
+
+```bash
+pp-query install-auth --source /path/to/auth.json
+```
+
+That copies your saved PropProfessor browser session into the default location:
 
 ```bash
 ~/.propprofessor/auth.json
