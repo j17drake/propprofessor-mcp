@@ -6,6 +6,12 @@ Screen-first PropProfessor MCP server, plus a broader local query CLI for mainte
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![node](https://img.shields.io/badge/node-%3E%3D18-339933)
 
+## Workflow badges
+
+[![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Manual live smoke](https://github.com/j17drake/propprofessor-mcp/actions/workflows/manual-live-smoke.yml/badge.svg)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/manual-live-smoke.yml)
+[![Release](https://github.com/j17drake/propprofessor-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/release.yml)
+
 ## Quick start
 
 - [Auth guide](./AUTH.md)
