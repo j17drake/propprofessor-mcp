@@ -19,6 +19,7 @@ const {
   normalizeTennisMarketQuery
 } = require('../lib/propprofessor-screen-utils');
 const { buildRankedScreenResponse, getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
+const { createMcpHandlers } = require('./propprofessor-mcp-server');
 
 const LEAGUE_ALIASES = {
   sport: null,
@@ -27,6 +28,8 @@ const LEAGUE_ALIASES = {
   mlb: 'MLB',
   nfl: 'NFL',
   nhl: 'NHL',
+  ufc: 'UFC',
+  mma: 'UFC',
   soccer: 'Soccer',
   ncaab: 'NCAAB',
   ncaaf: 'NCAAF'
@@ -46,6 +49,9 @@ function getCommandInventory() {
     { command: 'mlb', description: 'MLB screen shorthand' },
     { command: 'nfl', description: 'NFL screen shorthand' },
     { command: 'nhl', description: 'NHL screen shorthand' },
+    { command: 'ufc', description: 'UFC screen shorthand' },
+    { command: 'ufc-card', description: 'Query a UFC card shortlist' },
+    { command: 'mma', description: 'MMA alias for UFC screen shorthand' },
     { command: 'soccer', description: 'Soccer screen shorthand' },
     { command: 'ncaab', description: 'NCAAB screen shorthand' },
     { command: 'ncaaf', description: 'NCAAF screen shorthand' },
@@ -71,8 +77,10 @@ function buildHelpText() {
     '  pp-query doctor',
     '  pp-query health',
     '  pp-query screen --league NBA --market Moneyline',
-    '  pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis --market Moneyline',
+    '  pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis,WNBA,UFC --market Moneyline',
     '  pp-query nba --market Moneyline',
+    '  pp-query ufc --market Moneyline',
+    '  pp-query ufc-card --book NoVigApp --market Moneyline',
     '  pp-query tennis --market Moneyline --limit 10',
     '',
     'Useful flags:',
@@ -193,7 +201,19 @@ function parseArgs(argv) {
       opts.leagues = next;
       i += 1;
     } else if (arg === '--markets') {
+      opts.market = next;
       opts.markets = next;
+      i += 1;
+    } else if (arg === '--event-date' || arg === '--eventDate') {
+      opts.eventDate = next;
+      i += 1;
+    } else if (arg === '--card-window' || arg === '--cardWindow') {
+      opts.cardWindow = next;
+      i += 1;
+    } else if (arg === '--upcoming-only' || arg === '--upcomingOnly') {
+      opts.upcomingOnly = true;
+    } else if (arg === '--max-hours-away' || arg === '--maxHoursAway') {
+      opts.maxHoursAway = next;
       i += 1;
     } else if (arg === '--scan-limit' || arg === '--scanLimit') {
       opts.scanLimit = next;
@@ -306,6 +326,50 @@ function normalizeScreenRowTimes(rows, timeZone = getLocalTimezone()) {
   });
 }
 
+function getMultiValueOption(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  if (value === undefined || value === null || value === '') return [];
+  return String(value).split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function toBooleanOption(value) {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return false;
+  return !['false', '0', 'no', 'off'].includes(normalized);
+}
+
+function renderUfcCardOutput(result, logger = console) {
+  const officialPlays = Array.isArray(result?.officialPlays) ? result.officialPlays : [];
+  const bestLooks = Array.isArray(result?.bestLooks) ? result.bestLooks : [];
+  const passes = Array.isArray(result?.passes) ? result.passes : [];
+  const summaryText = result?.summaryText || result?.summary || `UFC card: ${officialPlays.length} official bet${officialPlays.length === 1 ? '' : 's'}, ${bestLooks.length} look${bestLooks.length === 1 ? '' : 's'}, ${passes.length} pass${passes.length === 1 ? '' : 'es'}.`;
+
+  const lines = [];
+  const addSection = (title, rows) => {
+    lines.push(title);
+    if (!rows.length) {
+      lines.push('  (none)');
+      return;
+    }
+    rows.slice(0, 10).forEach((row, index) => {
+      const label = row?.summary || row?.label || row?.name || row?.fighter || row?.participant || row?.selection || row?.market || row?.title || JSON.stringify(row);
+      lines.push(`  ${index + 1}. ${label}`);
+    });
+  };
+
+  addSection('Official UFC bets', officialPlays);
+  addSection('Best UFC looks', bestLooks);
+  addSection('Passes', passes);
+  lines.push('Summary');
+  lines.push(`  ${summaryText}`);
+
+  logger.log(lines.join('\n'));
+}
+
 async function main({ argv = process.argv, client = createPropProfessorClient(), logger = console } = {}) {
   const { command, opts } = parseArgs(argv);
   const screenCommand = resolveScreenCommand(command, opts);
@@ -338,6 +402,27 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   let payloads = null;
   if (command === 'sportsbook') {
     payload = await client.querySportsbook();
+  } else if (command === 'ufc-card') {
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.query_ufc_card({
+      book: opts.book || opts.targetBook,
+      targetBook: opts.targetBook || opts.book,
+      markets: getMultiValueOption(opts.markets || opts.market),
+      eventDate: opts.eventDate,
+      cardWindow: opts.cardWindow,
+      upcomingOnly: toBooleanOption(opts.upcomingOnly),
+      maxHoursAway: opts.maxHoursAway !== undefined ? Number(opts.maxHoursAway) : undefined,
+      limit: opts.limit !== undefined ? Number(opts.limit) : undefined,
+      scanLimit: opts.scanLimit !== undefined ? Number(opts.scanLimit) : undefined,
+      debug: toBooleanOption(opts.debug),
+      is_live: Boolean(opts.live)
+    });
+    if (opts.json) {
+      emitJson(logger, result);
+    } else {
+      renderUfcCardOutput(result, logger);
+    }
+    return;
   } else if (command === 'smart') {
     payload = await client.querySmartMoney();
   } else if (command === 'tennis') {
@@ -367,7 +452,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       is_live: Boolean(opts.live)
     });
   } else if (command === 'presets') {
-    const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
+    const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'UFC', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
     const presets = leagues.map((league) => getLeagueRankingPreset(league));
     emitJson(logger, { command, presets });
     return;
@@ -413,7 +498,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
           .filter(Boolean)
       : opts.league
         ? [opts.league]
-        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
+        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA', 'UFC'];
     const markets = opts.markets
       ? String(opts.markets)
           .split(',')

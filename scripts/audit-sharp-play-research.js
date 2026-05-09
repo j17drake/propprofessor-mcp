@@ -4,7 +4,42 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { cleanResearchSummary, isPidAlive } = require('../lib/propprofessor-sharp-plays-dashboard');
+function cleanResearchSummary(value) {
+  let text = String(value || '').replace(/\r/g, '').trim();
+  if (!text) return '';
+
+  const verdictMatches = Array.from(text.matchAll(/(^|\n)\s*Verdict:\s*/g));
+  if (verdictMatches.length) {
+    const last = verdictMatches[verdictMatches.length - 1];
+    text = text.slice(last.index + (last[1] || '').length).trimStart();
+  }
+
+  text = text
+    .replace(/^╭.*$/gm, '')
+    .replace(/^╰.*$/gm, '')
+    .replace(/^Resume this session with:[\s\S]*$/m, '')
+    .replace(/^Session:\s+.*$/gm, '')
+    .replace(/^Duration:\s+.*$/gm, '')
+    .replace(/^Messages:\s+.*$/gm, '')
+    .split('\n')
+    .map((line) => line.replace(/^\s*│\s?/, '').replace(/\s*│\s*$/, '').trimEnd())
+    .join('\n')
+    .trim();
+
+  if (verdictMatches.length && !text.startsWith('Verdict:')) text = `Verdict: ${text}`;
+  return text;
+}
+
+function isPidAlive(pid) {
+  const number = Number(pid);
+  if (!Number.isInteger(number) || number <= 0) return false;
+  try {
+    process.kill(number, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const DEFAULT_HERMES_HOME = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes');
 const DEFAULT_RESEARCH_DIR = process.env.PP_SHARP_PLAYS_RESEARCH_DIR || path.join(DEFAULT_HERMES_HOME, 'propprofessor', 'sharp-play-research');

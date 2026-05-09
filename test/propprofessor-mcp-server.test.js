@@ -12,6 +12,7 @@ const {
   createStdioMessageReader,
   mapWithConcurrency
 } = require('../scripts/propprofessor-mcp-server');
+const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 
 const serverPath = path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js');
 
@@ -210,7 +211,7 @@ describe('propprofessor MCP server stdio contract', () => {
   // Direct smoke coverage checklist for public MCP tools:
   // covered: query_positive_ev_candidates, query_validated_positive_ev_candidates, query_screen_odds, query_screen_odds_best_comps, query_screen_odds_ranked,
   // query_sharp_plays, query_sport_screen, query_nba_screen, query_wnba_screen, query_mlb_screen,
-  // query_nfl_screen, query_nhl_screen, query_soccer_screen, query_ncaab_screen,
+  // query_nfl_screen, query_nhl_screen, query_ufc_screen, query_soccer_screen, query_ncaab_screen,
   // query_ncaaf_screen, query_tennis_screen, league_presets, health_status.
   it('responds to initialize and lists the expected tools', async () => {
     const proc = spawn(process.execPath, [serverPath], {
@@ -254,8 +255,11 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_soccer_screen',
         'query_sport_screen',
         'query_tennis_screen',
+        'query_ufc_card',
+        'query_ufc_screen',
         'query_validated_positive_ev_candidates',
         'query_wnba_screen'
+
       ]);
     } finally {
       proc.kill('SIGTERM');
@@ -598,12 +602,137 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(mlb.sharpProps, ['Circa', 'FanDuel', 'PropBuilder', 'Pinnacle', 'DraftKings', 'Bet365']);
   });
 
+  it('query_ufc_card returns a first-class shortlist response and honors card filters', async () => {
+    const now = new Date('2026-05-09T12:00:00Z');
+    const futureEventDate = '2026-05-10';
+    const rankedPayload = {
+      game_data: [
+        {
+          gameId: 'ufc-game-1',
+          league: 'UFC',
+          market: 'Moneyline',
+          updatedAt: new Date(now.getTime() - 45 * 1000).toISOString(),
+          start: new Date('2026-05-10T03:00:00Z').toISOString(),
+          homeTeam: 'Fighter B',
+          awayTeam: 'Fighter A',
+          selections: {
+            a: {
+              selection1: 'Fighter A',
+              participant1: 'Fighter A',
+              selection1Id: 'Moneyline:Fighter_A',
+              selection2: 'Fighter B',
+              participant2: 'Fighter B',
+              selection2Id: 'Moneyline:Fighter_B',
+              odds: {
+                NoVigApp: { odds1: 120, odds2: -140 },
+                Polymarket: { odds1: 118, odds2: -138 }
+              }
+            }
+          },
+          defaultKey: 'a'
+        },
+        {
+          gameId: 'ufc-game-2',
+          league: 'UFC',
+          market: 'Moneyline',
+          updatedAt: new Date(now.getTime() - 45 * 1000).toISOString(),
+          start: new Date('2026-05-12T03:00:00Z').toISOString(),
+          homeTeam: 'Fighter D',
+          awayTeam: 'Fighter C',
+          selections: {
+            a: {
+              selection1: 'Fighter C',
+              participant1: 'Fighter C',
+              selection1Id: 'Moneyline:Fighter_C',
+              selection2: 'Fighter D',
+              participant2: 'Fighter D',
+              selection2Id: 'Moneyline:Fighter_D',
+              odds: {
+                NoVigApp: { odds1: 135, odds2: -155 },
+                Polymarket: { odds1: 130, odds2: -150 }
+              }
+            }
+          },
+          defaultKey: 'a'
+        }
+      ]
+    };
+    const { client, calls } = createRankedScreenClientStub({ rankedPayload });
+    const handlers = createMcpHandlers({ client });
+
+    assert.equal(typeof handlers.query_ufc_card, 'function');
+
+    const result = await handlers.query_ufc_card({
+      eventDate: futureEventDate,
+      cardWindow: 'today',
+      limit: 5,
+      scanLimit: 10,
+      includePasses: true,
+      debug: false,
+      is_live: false
+    });
+
+    assert.equal(calls.queryScreenOddsBestComps.length, 1);
+    assert.equal(calls.queryScreenOddsBestComps[0].league, 'UFC');
+    assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
+    assert.equal(result.ok, true);
+    assert.equal(result.league, 'UFC');
+    assert.equal(result.count, 2);
+    assert.ok(Array.isArray(result.officialPlays));
+    assert.ok(Array.isArray(result.bestLooks));
+    assert.ok(Array.isArray(result.passes));
+    assert.equal(result.summaryText.includes('UFC'), true);
+    assert.equal(result.resultMeta.source, 'ufc_card');
+    assert.equal(result.resultMeta.cardWindow, 'eventDate');
+    assert.equal(result.resultMeta.eventDate, futureEventDate);
+    assert.equal(result.resultMeta.shortlist.count, 2);
+    assert.ok(result.passes.every((row) => row.shortlistEventDate === futureEventDate));
+    assert.equal(result.passes[0].shortlistCardWindow, 'eventDate');
+  });
+
+  it('query_ufc_card forwards book/targetBook into ranked scanning and normalizes markets arrays', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const bookResult = await handlers.query_ufc_card({
+      book: 'NoVigApp',
+      markets: ['Moneyline', 'Total'],
+      limit: 1,
+      scanLimit: 4,
+      includePasses: false,
+      debug: false,
+      is_live: false
+    });
+
+    const targetBookResult = await handlers.query_ufc_card({
+      targetBook: 'DraftKings',
+      markets: ['Total', 'Moneyline'],
+      limit: 1,
+      scanLimit: 4,
+      includePasses: false,
+      debug: false,
+      is_live: false
+    });
+
+    assert.equal(calls.queryScreenOddsBestComps.length, 2);
+    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, ['NoVigApp']);
+    assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
+    assert.equal(bookResult.resultMeta.focusBook, 'NoVigApp');
+    assert.deepEqual(bookResult.resultMeta.historySportsbooksRequested, ['NoVigApp']);
+
+    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, ['DraftKings']);
+    assert.equal(calls.queryScreenOddsBestComps[1].market, 'Total');
+    assert.equal(targetBookResult.resultMeta.focusBook, 'DraftKings');
+    assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, ['DraftKings']);
+  });
+
   for (const { toolName, league } of [
     { toolName: 'query_nba_screen', league: 'NBA' },
     { toolName: 'query_wnba_screen', league: 'WNBA' },
     { toolName: 'query_mlb_screen', league: 'MLB' },
     { toolName: 'query_nfl_screen', league: 'NFL' },
     { toolName: 'query_nhl_screen', league: 'NHL' },
+    { toolName: 'query_ufc_screen', league: 'UFC' },
     { toolName: 'query_ncaab_screen', league: 'NCAAB' },
     { toolName: 'query_ncaaf_screen', league: 'NCAAF' }
   ]) {
@@ -729,6 +858,161 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.notEqual(result.result[0].movementSourceBook, 'NoVigApp');
   });
 
+  it('sharp plays service preserves the mcp result shape when reused directly', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+
+    async function queryLeagueScreen(rankedArgs = {}, league) {
+      const payload = await client.queryScreenOddsBestComps({
+        market: rankedArgs.market || 'Moneyline',
+        league,
+        games: Array.isArray(rankedArgs.games) ? rankedArgs.games : [],
+        participants: Array.isArray(rankedArgs.participants) ? rankedArgs.participants : [],
+        books: Array.isArray(rankedArgs.books) ? rankedArgs.books : [],
+        is_live: Boolean(rankedArgs.is_live)
+      });
+      return {
+        ok: true,
+        result: Array.isArray(payload?.game_data)
+          ? payload.game_data.map((row) => ({
+              ...row,
+              book: 'NoVigApp',
+              targetBook: 'NoVigApp',
+              executionBook: 'NoVigApp',
+              verdict: 'Bet candidate',
+              sharpPlaySupport: { movementIsSharpSourced: true, sourceIsTargetBook: false },
+              movementSourceBook: 'Pinnacle'
+            }))
+          : []
+      };
+    }
+
+    async function queryTennisScreen() {
+      return { ok: true, result: [] };
+    }
+
+    const result = await runSharpPlays(
+      {
+        book: 'NoVigApp',
+        leagues: ['NBA'],
+        markets: ['Moneyline'],
+        minConsensusBookCount: 1,
+        limit: 5,
+        lookbackHours: 6
+      },
+      { queryLeagueScreen, queryTennisScreen }
+    );
+
+    assert.equal(result.ok, true);
+    assert.ok(Array.isArray(result.result));
+    assert.ok(result.resultMeta && typeof result.resultMeta === 'object');
+    assert.equal(result.resultMeta.source, 'sharp_plays_addon');
+    assert.equal(result.resultMeta.targetBook, 'NoVigApp');
+    assert.deepEqual(result.resultMeta.targetBooks, ['NoVigApp']);
+    assert.equal(result.resultMeta.lookbackHoursUsed, 6);
+    assert.equal(result.resultMeta.scannedQueryCount, 1);
+    assert.equal(calls.queryScreenOddsBestComps.length, 1);
+  });
+
+  it('query_sharp_plays adds empty-state diagnostics when strict filtering removes all rows', async () => {
+    const handlers = createMcpHandlers({
+      client: {
+        querySportsbook: async () => [],
+        queryScreenOdds: async () => ({ ok: true, rows: [] }),
+        queryScreenOddsBestComps: async () => ({
+          game_data: [
+            {
+              gameId: 'empty-state-1',
+              league: 'NBA',
+              market: 'Moneyline',
+              updatedAt: new Date().toISOString(),
+              homeTeam: 'Minnesota Timberwolves',
+              awayTeam: 'Denver Nuggets',
+              selections: {
+                a: {
+                  selection1: 'Minnesota Timberwolves',
+                  participant1: 'Minnesota Timberwolves',
+                  selection1Id: 'Moneyline:Minnesota_Timberwolves',
+                  selection2: 'Denver Nuggets',
+                  participant2: 'Denver Nuggets',
+                  selection2Id: 'Moneyline:Denver_Nuggets',
+                  odds: {
+                    NoVigApp: { odds1: 175, odds2: -200 }
+                  }
+                }
+              },
+              defaultKey: 'a'
+            }
+          ]
+        }),
+        queryOddsHistory: async () => ({
+          NoVigApp: [
+            { odds: -118, start_ts: 1 },
+            { odds: -130, start_ts: 2 }
+          ]
+        }),
+        healthStatus: async () => ({ ok: true, screen: { reachable: true } })
+      }
+    });
+
+    const result = await handlers.query_sharp_plays({
+      book: 'NoVigApp',
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      minConsensusBookCount: 1,
+      limit: 5,
+      maxAgeMs: 60 * 60 * 1000,
+      debug: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.result, []);
+    assert.deepEqual(result.resultMeta.classificationSummary, {
+      totalRowsClassified: 2,
+      verdictCounts: { Pass: 2 },
+      passReasonCounts: {
+        consensus_book_count_below_1: 2,
+        movement_source_is_target_book: 2
+      }
+    });
+    assert.ok(result.resultMeta.emptyState);
+    assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
+    assert.equal(result.resultMeta.emptyState.scannedRowCount, 2);
+    assert.equal(result.resultMeta.emptyState.failureBreakdown.consensus_book_count_below_1, 2);
+    assert.equal(result.resultMeta.emptyState.failureBreakdown.movement_source_is_target_book, 2);
+    assert.equal(result.resultMeta.emptyState.topNearMisses.length, 2);
+    assert.equal(result.resultMeta.emptyState.topNearMisses[0].movementSourceBook, 'NoVigApp');
+    assert.equal(typeof result.resultMeta.emptyState.topNearMisses[0].marketBookCount, 'number');
+    assert.equal(typeof result.resultMeta.emptyState.topNearMisses[0].supportBookCount, 'number');
+    assert.equal(typeof result.resultMeta.emptyState.topNearMisses[0].executionQuality, 'string');
+  });
+
+  it('query_sharp_plays returns no_ranked_rows_scanned when no rows were classified', async () => {
+    const { client } = createRankedScreenClientStub({ rankedPayload: { game_data: [] } });
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_sharp_plays({
+      book: 'NoVigApp',
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      minConsensusBookCount: 1,
+      limit: 5,
+      debug: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.result, []);
+    assert.deepEqual(result.resultMeta.classificationSummary, {
+      totalRowsClassified: 0,
+      verdictCounts: {},
+      passReasonCounts: {}
+    });
+    assert.ok(result.resultMeta.emptyState);
+    assert.equal(result.resultMeta.emptyState.reason, 'no_ranked_rows_scanned');
+    assert.equal(result.resultMeta.emptyState.scannedRowCount, 0);
+    assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, {});
+    assert.deepEqual(result.resultMeta.emptyState.topNearMisses, []);
+  });
+
   it('query_sharp_plays fans out across multiple targetBooks and keeps per-book rows', async () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
@@ -751,6 +1035,58 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.result.length, 2);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
+  });
+
+  it('query_sharp_plays exposes a UFC shortlist in metadata when UFC rows are scanned', async () => {
+    const sharedUfcRow = {
+      gameId: 'ufc-game-1',
+      game: 'Costa vs Allen',
+      participant: 'Costa',
+      pick: 'Costa ML',
+      odds: 133,
+      price: 133,
+      currentOdds: 133,
+      market: 'Moneyline',
+      scanMarket: 'Moneyline',
+      league: 'UFC',
+      scanLeague: 'UFC',
+      targetBook: 'NoVigApp',
+      executionBook: 'NoVigApp',
+      book: 'NoVigApp',
+      lineHistoryUsable: false,
+      movementLabel: 'insufficient_history',
+      consensusBookCount: 9,
+      consensusEdge: 2.5,
+      screenScore: 12.7,
+      gatePassed: true
+    };
+
+    const handlers = createMcpHandlers({
+      client: {
+        querySportsbook: async () => [],
+        queryScreenOdds: async () => ({ ok: true, rows: [] }),
+        queryScreenOddsBestComps: async () => ({ game_data: [sharedUfcRow] }),
+        queryOddsHistory: async () => ({}),
+        healthStatus: async () => ({ ok: true, screen: { reachable: true } })
+      }
+    });
+
+    const result = await handlers.query_sharp_plays({
+      book: 'NoVigApp',
+      leagues: ['UFC'],
+      markets: ['Moneyline'],
+      minConsensusBookCount: 2,
+      limit: 5,
+      includePasses: true,
+      debug: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(result.resultMeta.ufcShortlist);
+    assert.equal(result.resultMeta.ufcShortlist.league, 'UFC');
+    assert.equal(result.resultMeta.ufcShortlist.officialCount, 0);
+    assert.equal(result.resultMeta.ufcShortlist.leanCount, 1);
+    assert.equal(result.resultMeta.ufcShortlist.bestLooks[0].participant, 'Costa');
   });
 
   it('query_sport_screen routes non-tennis leagues through the ranked league flow', async () => {

@@ -8,6 +8,7 @@ const {
   rankLeagueScreenRows,
   extractScreenRows
 } = require('../lib/propprofessor-screen-utils');
+const { buildUfcShortlist } = require('../lib/propprofessor-sharp-plays');
 const {
   buildRankedScreenResponse: buildRankedScreenResponseShared,
   getIncludeAll,
@@ -19,14 +20,6 @@ const {
   getDebugFlag
 } = require('../lib/propprofessor-mcp-ranked-screen');
 const { getSharpBookComparisonSet, getSharpBookContext } = require('../lib/propprofessor-sharp-books');
-const {
-  buildSharpPlaysFromRankedRows,
-  resolveSharpPlayLeagues,
-  resolveSharpPlayMarkets,
-  
-  resolveTargetBooks,
-  uniqueBooks
-} = require('../lib/propprofessor-sharp-plays');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
 const {
   categorizeError,
@@ -36,6 +29,7 @@ const {
   createStdioMessageReader
 } = require('../lib/propprofessor-mcp-stdio');
 const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
+const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -64,7 +58,7 @@ async function mapWithConcurrency(items, worker, { concurrency = VALIDATED_EV_CO
 
 // league preset inspector
 function buildLeaguePresetSummary() {
-  const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
+  const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'UFC', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
   return leagues.map((league) => {
     const preset = getLeagueRankingPreset(league);
     const isSharpLeague = ['NBA', 'NFL', 'MLB'].includes(league);
@@ -318,96 +312,49 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       : runLeagueScreen(args, presetLeague || requestedLeague);
   }
 
-  async function runSharpPlays(args = {}) {
-    const targetBooks = resolveTargetBooks(args);
-    const targetBook = targetBooks[0];
-    const leagues = resolveSharpPlayLeagues(args);
-    const markets = resolveSharpPlayMarkets(args);
-    const targetPlusSharpBooks = (league, market, executionBook) =>
-      uniqueBooks([
-        executionBook,
-        ...getSharpBookComparisonSet({
-          league,
-          market,
-          requestedBooks: Array.isArray(args.sharpBooks) && args.sharpBooks.length ? args.sharpBooks : undefined
-        })
-      ]);
-    const rankedResponses = [];
-
-    for (const executionBook of targetBooks) {
-      for (const league of leagues) {
-        for (const market of markets) {
-          const books = targetPlusSharpBooks(league, market, executionBook);
-          const rankedArgs = {
-            ...args,
-            league,
-            market,
-            book: executionBook,
-            targetBook: executionBook,
-            books,
-            historySportsbooks: books,
-            includeAll: true,
-            limit: Number.isFinite(Number(args.scanLimit)) && Number(args.scanLimit) > 0 ? Number(args.scanLimit) : Math.max(20, getLimit(args) * 3)
-          };
-          const response = String(getLeagueRankingPreset(league).league || league).toUpperCase() === 'TENNIS'
-            ? await handlers.query_tennis_screen(rankedArgs)
-            : await runLeagueScreen(rankedArgs, getLeagueRankingPreset(league).league || league);
-          rankedResponses.push({ targetBook: executionBook, league, market, response });
-        }
-      }
-    }
-
-    const rankedRows = rankedResponses.flatMap(({ targetBook: executionBook, league, market, response }) =>
-      (Array.isArray(response?.result) ? response.result : []).map((row) => ({
-        ...row,
-        book: executionBook,
-        targetBook: executionBook,
-        executionBook,
-        scanTargetBook: executionBook,
-        scanLeague: league,
-        scanMarket: market
-      }))
-    );
-    const result = buildSharpPlaysFromRankedRows(rankedRows, {
+  async function runUfcCard(args = {}) {
+    const normalizedMarkets = Array.isArray(args.markets)
+      ? args.markets.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+    const market = normalizedMarkets[0] || String(args.market || 'Moneyline').trim() || 'Moneyline';
+    const targetBook = String(args.book || args.targetBook || '').trim();
+    const rankedArgs = {
       ...args,
+      market,
+      books: targetBook ? [targetBook] : Array.isArray(args.books) ? args.books : []
+    };
+    const rankedResponse = await runLeagueScreen(rankedArgs, 'UFC');
+    const rankedRows = Array.isArray(rankedResponse?.result) ? rankedResponse.result : [];
+    const shortlist = buildUfcShortlist(rankedRows, {
+      ...args,
+      market,
       targetBook,
-      strict: args.strict !== undefined ? Boolean(args.strict) : true,
       limit: getLimit(args)
     });
-    const perTargetBook = Object.fromEntries(
-      targetBooks.map((book) => {
-        const scanned = rankedRows.filter((row) => row.executionBook === book).length;
-        const returned = result.filter((row) => (row.executionBook || row.targetBook || row.book) === book).length;
-        return [book, { scanned, returned }];
-      })
-    );
-
+    const count = shortlist.shortlistMeta?.filteredCount ?? shortlist.officialCount;
+    const cardWindow = shortlist.shortlistMeta?.cardWindow || shortlist.shortlistCardWindow || null;
+    const eventDate = shortlist.shortlistMeta?.eventDate || shortlist.shortlistEventDate || null;
     return {
       ok: true,
-      count: result.length,
-      result,
+      league: 'UFC',
+      officialPlays: shortlist.bestBets,
+      bestLooks: shortlist.bestLooks,
+      passes: shortlist.bestPasses,
+      summaryText: shortlist.summaryText,
+      count,
       resultMeta: {
-        source: 'sharp_plays_addon',
-        targetBook,
-        targetBooks,
-        targetBookCount: targetBooks.length,
-        leagues,
-        markets,
-        strict: args.strict !== undefined ? Boolean(args.strict) : true,
-        includePasses: Boolean(args.includePasses),
-        minConsensusBookCount: Number.isFinite(Number(args.minConsensusBookCount)) ? Number(args.minConsensusBookCount) : 2,
-        minOdds: args.minOdds ?? null,
-        maxOdds: args.maxOdds ?? null,
-        lookbackHoursUsed: getLookbackHours(args),
-        scannedRowCount: rankedRows.length,
-        scannedQueryCount: rankedResponses.length,
-        perTargetBook,
-        workflow:
-          'Target book is execution only. Supportive movement must come from a non-target sharp book; target-book-only movement is downgraded.'
+        ...rankedResponse.resultMeta,
+        source: 'ufc_card',
+        cardWindow,
+        eventDate,
+        count,
+        shortlist: {
+          ...shortlist,
+          count
+        }
       }
     };
   }
-
   const handlers = {
     async query_positive_ev_candidates(args = {}) {
       const payload = await client.querySportsbook({
@@ -522,7 +469,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return runSportScreen(args);
     },
     async query_sharp_plays(args = {}) {
-      return runSharpPlays(args);
+      return runSharpPlays(args, {
+        queryLeagueScreen: runLeagueScreen,
+        queryTennisScreen: (rankedArgs) => handlers.query_tennis_screen(rankedArgs)
+      });
     },
     async query_nba_screen(args = {}) {
       return runLeagueScreen(args, 'NBA');
@@ -538,6 +488,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
     async query_nhl_screen(args = {}) {
       return runLeagueScreen(args, 'NHL');
+    },
+    async query_ufc_screen(args = {}) {
+      return runLeagueScreen(args, 'UFC');
+    },
+    async query_ufc_card(args = {}) {
+      return runUfcCard(args);
     },
     async query_soccer_screen(args = {}) {
       return runLeagueScreen(args, 'Soccer');

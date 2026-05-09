@@ -92,6 +92,24 @@ describe('propprofessor sharp history helpers', () => {
     assert.equal(typeof summary.recentClvPct, 'number');
   });
 
+  it('prefers a sharp-book time series over target-book history when both exist', () => {
+    const summary = summarizeSharpMovement({
+      lineHistory: [
+        { book: 'NoVigApp', odds: -104, time: 1 },
+        { book: 'NoVigApp', odds: -112, time: 2 },
+        { book: 'Pinnacle', odds: -108, time: 1 },
+        { book: 'Pinnacle', odds: -120, time: 2 }
+      ],
+      preferredBook: 'NoVigApp',
+      sharpBooks: ['Pinnacle', 'Circa', 'BetOnline'],
+      options: { recentWindowHours: 6 }
+    });
+
+    assert.equal(summary.movementMode, 'same_book');
+    assert.equal(summary.movementSourceBook, 'Pinnacle');
+    assert.equal(summary.movementQuality, 'high');
+  });
+
   it('falls back to mixed-book movement when no same-book trail is usable', () => {
     const summary = summarizeSharpMovement({
       lineHistory: [

@@ -13,12 +13,12 @@
     "./ranked-screen": "./lib/propprofessor-mcp-ranked-screen.js",
     "./screen-utils": "./lib/propprofessor-screen-utils.js",
     "./sharp-books": "./lib/propprofessor-sharp-books.js",
-    "./sharp-plays": "./lib/propprofessor-sharp-plays.js"
+    "./sharp-plays": "./lib/propprofessor-sharp-plays.js",
+    "./sharp-plays-service": "./lib/propprofessor-sharp-plays-service.js"
   },
   "bin": {
     "pp-mcp": "scripts/propprofessor-mcp-server.js",
-    "pp-query": "scripts/query-propprofessor.js",
-    "pp-sharp-plays-dashboard": "scripts/propprofessor-sharp-plays-dashboard.js"
+    "pp-query": "scripts/query-propprofessor.js"
   },
   "files": [
     "lib/",

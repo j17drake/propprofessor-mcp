@@ -294,6 +294,66 @@ describe('tennis screen ranking helpers', () => {
     );
   });
 
+  it('derives consensus from the matched non-default extracted prop selection', () => {
+    const payload = {
+      game_data: [
+        {
+          league: 'MLB',
+          market: 'Player Outs',
+          gameId: 'g1',
+          defaultKey: 'a',
+          selections: {
+            a: {
+              selection1: 'Player A Over 15.5',
+              participant1: 'Player A',
+              selection1Id: 'Player_Outs:Player_A_Over_15.5',
+              line1: 15.5,
+              selection2: 'Player A Under 15.5',
+              participant2: 'Player A',
+              selection2Id: 'Player_Outs:Player_A_Under_15.5',
+              line2: 15.5,
+              odds: {
+                NoVigApp: { odds1: -110, odds2: -110 },
+                Pinnacle: { odds1: -120, odds2: 100 },
+                DraftKings: { odds1: -118, odds2: -102 }
+              }
+            },
+            b: {
+              selection1: 'Kyle Harrison Over 15.5',
+              participant1: 'Kyle Harrison',
+              selection1Id: 'Player_Outs:Kyle_Harrison_Over_15.5',
+              line1: 15.5,
+              selection2: 'Kyle Harrison Under 15.5',
+              participant2: 'Kyle Harrison',
+              selection2Id: 'Player_Outs:Kyle_Harrison_Under_15.5',
+              line2: 15.5,
+              odds: {
+                NoVigApp: { odds1: -104, odds2: -118 },
+                Pinnacle: { odds1: -112, odds2: -108 },
+                DraftKings: { odds1: -110, odds2: -110 },
+                BetMGM: { odds1: -111, odds2: -109 }
+              }
+            }
+          }
+        }
+      ]
+    };
+
+    const extracted = extractScreenRows(payload, [{ book: 'NoVigApp' }]).filter((row) =>
+      String(row.selectionId).includes('Kyle_Harrison')
+    );
+    const ranked = rankScreenRows(extracted, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings', 'BetMGM'],
+      includeAll: true
+    });
+
+    assert.equal(ranked.length, 2);
+    assert.equal(ranked.every((row) => row.hasConsensus), true);
+    assert.equal(ranked.every((row) => row.consensusBookCount === 3), true);
+    assert.equal(ranked.every((row) => Number.isFinite(row.consensusEdge)), true);
+  });
+
   it('ranks general screen rows with consensus and movement metadata', () => {
     const nowMs = Date.now();
     const rows = [
@@ -615,5 +675,442 @@ describe('tennis screen ranking helpers', () => {
     const { normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
     assert.deepEqual(normalizeTennisMarketQuery('Spread'), ['Game Handicap', 'Set Handicap', 'Point Spread']);
     assert.deepEqual(normalizeTennisMarketQuery('Total'), ['Total Sets', 'Total Games', 'Over/Under']);
+  });
+
+  it('exposes the misleading consensusBookCount=0 for props with multiple comparison books (Kyle Freeland fixture)', () => {
+    const payload = [
+      {
+        league: 'MLB',
+        market: 'Pitcher Outs Recorded',
+        gameId: 'mlb-kyle',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Kyle Freeland Over 17.5',
+            participant1: 'Kyle Freeland',
+            selection1Id: 'Pitcher_Outs:Kyle_Freeland_Over_17.5',
+            line1: 17.5,
+            selection2: 'Kyle Freeland Under 17.5',
+            participant2: 'Kyle Freeland',
+            selection2Id: 'Pitcher_Outs:Kyle_Freeland_Under_17.5',
+            line2: 17.5,
+            odds: {
+              NoVigApp: { odds1: 100, odds2: -120 },
+              Pinnacle: { odds1: null, odds2: -112 },
+              DraftKings: { odds1: null, odds2: -108 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Kyle Freeland') && String(r.odds) === '100');
+    assert.ok(row, 'Kyle Freeland Over row should exist');
+    assert.equal(row.consensusBookCount, 0);
+    assert.equal(row.marketBookCount, 0);
+    assert.equal(row.supportBookCount, 0);
+    assert.ok(Array.isArray(row.marketBooks));
+    assert.ok(Array.isArray(row.supportBooks));
+    assert.equal(row.executionQuality, 'unknown');
+  });
+
+  it('exposes the misleading consensusBookCount=0 for props with multiple comparison books (Spencer Strider fixture)', () => {
+    const payload = [
+      {
+        league: 'MLB',
+        market: 'Pitcher Outs Recorded',
+        gameId: 'mlb-strider',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Spencer Strider Over 15.5',
+            participant1: 'Spencer Strider',
+            selection1Id: 'Pitcher_Outs:Spencer_Strider_Over_15.5',
+            line1: 15.5,
+            selection2: 'Spencer Strider Under 15.5',
+            participant2: 'Spencer Strider',
+            selection2Id: 'Pitcher_Outs:Spencer_Strider_Under_15.5',
+            line2: 15.5,
+            odds: {
+              NoVigApp: { odds1: -110, odds2: -110 },
+              Pinnacle: { odds1: null, odds2: -104 },
+              DraftKings: { odds1: null, odds2: -106 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Spencer Strider') && r.odds === -110);
+    assert.ok(row, 'Spencer Strider Over row should exist');
+    assert.equal(row.consensusBookCount, 0);
+    assert.equal(row.marketBookCount, 0);
+    assert.equal(row.supportBookCount, 0);
+    assert.ok(Array.isArray(row.marketBooks));
+    assert.ok(Array.isArray(row.supportBooks));
+    assert.equal(row.executionQuality, 'unknown');
+  });
+
+  it('exposes the misleading consensusBookCount=0 for props with multiple comparison books (Jared McCain fixture)', () => {
+    const payload = [
+      {
+        league: 'NBA',
+        market: 'Player Points',
+        gameId: 'nba-mccain',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Jared McCain Over 7.5',
+            participant1: 'Jared McCain',
+            selection1Id: 'Player_Points:Jared_McCain_Over_7.5',
+            line1: 7.5,
+            selection2: 'Jared McCain Under 7.5',
+            participant2: 'Jared McCain',
+            selection2Id: 'Player_Points:Jared_McCain_Under_7.5',
+            line2: 7.5,
+            odds: {
+              NoVigApp: { odds1: -112, odds2: -108 },
+              FanDuel: { odds1: null, odds2: 100 },
+              DraftKings: { odds1: null, odds2: -104 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'FanDuel', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Jared McCain') && r.odds === -112);
+    assert.ok(row, 'Jared McCain Over row should exist');
+    assert.equal(row.consensusBookCount, 0);
+    assert.equal(row.marketBookCount, 0);
+    assert.equal(row.supportBookCount, 0);
+    assert.ok(Array.isArray(row.marketBooks));
+    assert.ok(Array.isArray(row.supportBooks));
+    assert.equal(row.executionQuality, 'unknown');
+  });
+
+  it('exposes marketBookCount and supportBookCount for props with valid comparison book odds', () => {
+    const payload = [
+      {
+        league: 'MLB',
+        market: 'Pitcher Outs Recorded',
+        gameId: 'mlb-harrison',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Kyle Harrison Over 15.5',
+            participant1: 'Kyle Harrison',
+            selection1Id: 'Pitcher_Outs:Kyle_Harrison_Over_15.5',
+            line1: 15.5,
+            selection2: 'Kyle Harrison Under 15.5',
+            participant2: 'Kyle Harrison',
+            selection2Id: 'Pitcher_Outs:Kyle_Harrison_Under_15.5',
+            line2: 15.5,
+            odds: {
+              NoVigApp: { odds1: -104, odds2: -118 },
+              Pinnacle: { odds1: -112, odds2: -108 },
+              DraftKings: { odds1: -110, odds2: -110 },
+              BetMGM: { odds1: -111, odds2: -109 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings', 'BetMGM'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Kyle Harrison') && r.odds === -104);
+    assert.ok(row, 'Kyle Harrison Over row should exist');
+    assert.equal(row.consensusBookCount, 3);
+    assert.equal(row.marketBookCount, 3);
+    assert.deepEqual(row.marketBooks.sort(), ['BetMGM', 'DraftKings', 'Pinnacle'].sort());
+    assert.equal(row.supportBookCount, 3);
+    assert.deepEqual(row.supportBooks.sort(), ['BetMGM', 'DraftKings', 'Pinnacle'].sort());
+    assert.ok(Array.isArray(row.marketBooks));
+    assert.ok(Array.isArray(row.supportBooks));
+  });
+
+  it('classifies execution quality as best when target book has the best odds', () => {
+    const payload = [
+      {
+        league: 'NBA',
+        market: 'Player Points',
+        gameId: 'game-eq-1',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Player A Over 10.5',
+            participant1: 'Player A',
+            selection1Id: 'Player_Points:Player_A_Over_10.5',
+            line1: 10.5,
+            selection2: 'Player A Under 10.5',
+            participant2: 'Player A',
+            selection2Id: 'Player_Points:Player_A_Under_10.5',
+            line2: 10.5,
+            odds: {
+              NoVigApp: { odds1: -105, odds2: -115 },
+              Pinnacle: { odds1: -110, odds2: -110 },
+              DraftKings: { odds1: -108, odds2: -112 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Player A') && r.odds === -105);
+    assert.ok(row);
+    assert.equal(row.executionQuality, 'best');
+    assert.equal(row.targetBookOdds, -105);
+    assert.equal(row.bestAvailableOdds, -108);
+  });
+
+  it('classifies execution quality as playable when target book is slightly worse than best', () => {
+    const payload = [
+      {
+        league: 'NBA',
+        market: 'Player Points',
+        gameId: 'game-eq-2',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Player B Over 20.5',
+            participant1: 'Player B',
+            selection1Id: 'Player_Points:Player_B_Over_20.5',
+            line1: 20.5,
+            selection2: 'Player B Under 20.5',
+            participant2: 'Player B',
+            selection2Id: 'Player_Points:Player_B_Under_20.5',
+            line2: 20.5,
+            odds: {
+              NoVigApp: { odds1: -112, odds2: -108 },
+              Pinnacle: { odds1: -105, odds2: -115 },
+              DraftKings: { odds1: -108, odds2: -112 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Player B') && r.odds === -112);
+    assert.ok(row);
+    assert.equal(row.executionQuality, 'playable');
+    assert.equal(row.targetBookOdds, -112);
+    assert.equal(row.bestAvailableOdds, -105);
+  });
+
+  it('classifies execution quality as bad when target book is clearly worse', () => {
+    const payload = [
+      {
+        league: 'NBA',
+        market: 'Player Points',
+        gameId: 'game-eq-3',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Player C Over 5.5',
+            participant1: 'Player C',
+            selection1Id: 'Player_Points:Player_C_Over_5.5',
+            line1: 5.5,
+            selection2: 'Player C Under 5.5',
+            participant2: 'Player C',
+            selection2Id: 'Player_Points:Player_C_Under_5.5',
+            line2: 5.5,
+            odds: {
+              NoVigApp: { odds1: -130, odds2: 110 },
+              Pinnacle: { odds1: -105, odds2: -115 },
+              DraftKings: { odds1: -108, odds2: -112 }
+            }
+          }
+        }
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Player C') && r.odds === -130);
+    assert.ok(row);
+    assert.equal(row.executionQuality, 'bad');
+    assert.equal(row.targetBookOdds, -130);
+    assert.equal(row.bestAvailableOdds, -105);
+  });
+
+  it('kyle_freeland_over_17_5_outs regression: ranked row exposes correct fields', () => {
+    const payload = [
+      {
+        league: 'MLB',
+        market: 'Pitcher Outs Recorded',
+        gameId: 'mlb-kyle-reg',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Kyle Freeland Over 17.5',
+            participant1: 'Kyle Freeland',
+            selection1Id: 'Pitcher_Outs:Kyle_Freeland_Over_17.5',
+            line1: 17.5,
+            selection2: 'Kyle Freeland Under 17.5',
+            participant2: 'Kyle Freeland',
+            selection2Id: 'Pitcher_Outs:Kyle_Freeland_Under_17.5',
+            line2: 17.5,
+            odds: {
+              NoVigApp: { odds1: 100, odds2: -120 },
+              Pinnacle: { odds1: -104, odds2: -112 },
+              DraftKings: { odds1: -108, odds2: -108 }
+            }
+          }
+        },
+        lineHistory: [
+          { book: 'Pinnacle', odds: -112, time: Date.now() - 4 * 60 * 60 * 1000 },
+          { book: 'Pinnacle', odds: -104, time: Date.now() - 30 * 60 * 1000 }
+        ],
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Kyle Freeland') && r.odds === 100);
+    assert.ok(row);
+    assert.equal(row.consensusBookCount, 2);
+    assert.equal(row.marketBookCount, 2);
+    assert.equal(row.supportBookCount, 2);
+    assert.equal(row.movementSourceBook, 'Pinnacle');
+    assert.equal(row.lineHistoryUsable, true);
+    assert.equal(row.executionQuality, 'best');
+    assert.ok(row.marketBooks.includes('Pinnacle'));
+    assert.ok(row.marketBooks.includes('DraftKings'));
+  });
+
+  it('jared_mccain_over_7_5_points regression: ranked row exposes correct fields', () => {
+    const payload = [
+      {
+        league: 'NBA',
+        market: 'Player Points',
+        gameId: 'nba-mccain-reg',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Jared McCain Over 7.5',
+            participant1: 'Jared McCain',
+            selection1Id: 'Player_Points:Jared_McCain_Over_7.5',
+            line1: 7.5,
+            selection2: 'Jared McCain Under 7.5',
+            participant2: 'Jared McCain',
+            selection2Id: 'Player_Points:Jared_McCain_Under_7.5',
+            line2: 7.5,
+            odds: {
+              NoVigApp: { odds1: -112, odds2: -108 },
+              FanDuel: { odds1: -120, odds2: 100 },
+              DraftKings: { odds1: -116, odds2: -104 }
+            }
+          }
+        },
+        lineHistory: [
+          { book: 'FanDuel', odds: -130, time: Date.now() - 3 * 60 * 60 * 1000 },
+          { book: 'FanDuel', odds: -120, time: Date.now() - 45 * 60 * 1000 }
+        ],
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'FanDuel', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Jared McCain') && r.odds === -112);
+    assert.ok(row);
+    assert.equal(row.consensusBookCount, 2);
+    assert.equal(row.marketBookCount, 2);
+    assert.equal(row.supportBookCount, 2);
+    assert.equal(row.movementSourceBook, 'FanDuel');
+    assert.equal(row.lineHistoryUsable, true);
+    assert.equal(row.executionQuality, 'best');
+  });
+
+  it('tigers_ml target-book-only movement regression: still has target book as movement source', () => {
+    const payload = [
+      {
+        league: 'MLB',
+        market: 'Moneyline',
+        gameId: 'mlb-tigers-reg',
+        homeTeam: 'Detroit Tigers',
+        awayTeam: 'New York Yankees',
+        defaultKey: 'a',
+        selections: {
+          a: {
+            selection1: 'Detroit Tigers',
+            participant1: 'Detroit Tigers',
+            selection1Id: 'Moneyline:Detroit_Tigers',
+            selection2: 'New York Yankees',
+            participant2: 'New York Yankees',
+            selection2Id: 'Moneyline:New_York_Yankees',
+            odds: {
+              NoVigApp: { odds1: 135, odds2: -155 },
+              Pinnacle: { odds1: 130, odds2: -150 },
+              DraftKings: { odds1: 128, odds2: -148 }
+            }
+          }
+        },
+        lineHistory: [
+          { book: 'NoVigApp', odds: 120, time: Date.now() - 5 * 60 * 60 * 1000 },
+          { book: 'NoVigApp', odds: 135, time: Date.now() - 30 * 60 * 1000 }
+        ],
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    const ranked = rankScreenRows(payload, {
+      limit: 10,
+      preferredBooks: ['NoVigApp', 'Pinnacle', 'DraftKings'],
+      includeAll: true
+    });
+
+    const row = ranked.find((r) => r.participant && r.participant.includes('Detroit Tigers'));
+    assert.ok(row);
+    assert.equal(row.movementSourceBook, 'NoVigApp');
+    assert.equal(row.consensusBookCount, 2);
+    assert.equal(row.executionQuality, 'best');
   });
 });

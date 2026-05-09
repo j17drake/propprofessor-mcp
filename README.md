@@ -4,9 +4,9 @@ Use PropProfessor from AI clients that support MCP.
 
 This project gives you:
 
-- `pp-mcp`, an MCP server for AI agents
-- `pp-query`, a local CLI for setup checks and direct testing
-- `pp-sharp-plays-dashboard`, a local refreshable dashboard for sharp-supported top plays
+- `pp-mcp`, the MCP server for AI agents
+- `pp-query`, the local CLI for setup checks and direct testing
+- `sharp-plays-service`, the reusable package export for shared sharp-play orchestration
 
 Works best with local MCP clients like Claude Desktop, Cursor, and Cline.
 
@@ -59,7 +59,6 @@ After `npm link`, these commands are available on your PATH:
 
 - `pp-mcp`
 - `pp-query`
-- `pp-sharp-plays-dashboard`
 
 ## Set Up Auth
 
@@ -188,38 +187,8 @@ The local CLI is mainly for setup checks and quick direct testing.
 - `pp-query nba --market Moneyline`
 - `pp-query tennis --market Moneyline --limit 10`
 - `pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis --market Moneyline --limit 10`
-- `pp-sharp-plays-dashboard --book Fliff`
+- `pp-query ufc-card --book NoVigApp --market Moneyline`
 - `pp-query list`
-
-## Local Sharp Plays Dashboard
-
-Run a local auto-refreshing board:
-
-```bash
-pp-sharp-plays-dashboard --book Fliff
-```
-
-For NoVig, use either `NoVigApp` or the friendly alias `Novig`:
-
-```bash
-pp-sharp-plays-dashboard --book NoVigApp --leagues NBA,MLB,NHL,Tennis --markets Moneyline
-```
-
-Then open the printed URL, usually:
-
-```bash
-http://127.0.0.1:3477/
-```
-
-Useful options:
-
-```bash
-pp-sharp-plays-dashboard --book NoVigApp --leagues all --markets all --broad
-```
-
-The page has dropdowns for target book (`Fliff`, `NoVig`), league (`All`, NBA, MLB, NHL, Tennis, WNBA), and market (`Moneyline`, `Spread`, `Total`, `All main markets`).
-
-The dashboard calls the same `query_sharp_plays` scanner as the MCP tool and CLI. It treats the target book as execution only, so target-book-only movement is downgraded instead of counted as sharp support. The page refreshes automatically every 60 seconds and also exposes JSON at `/api/plays`.
 
 ## Full MCP Tool List
 
@@ -234,6 +203,8 @@ The dashboard calls the same `query_sharp_plays` scanner as the MCP tool and CLI
 - `query_mlb_screen`
 - `query_nfl_screen`
 - `query_nhl_screen`
+- `query_ufc_screen`
+- `query_ufc_card`
 - `query_soccer_screen`
 - `query_ncaab_screen`
 - `query_ncaaf_screen`

@@ -57,10 +57,44 @@ describe('query-propprofessor CLI parsing', () => {
     assert.equal(parsed.opts.line, '-3');
   });
 
+  it('accepts dedicated UFC card aliases and flags', () => {
+    const parsed = parseArgs([
+      'node',
+      'query',
+      'ufc-card',
+      '--target-book',
+      'NoVigApp',
+      '--markets',
+      'Moneyline,Total',
+      '--event-date',
+      '2026-05-10',
+      '--card-window',
+      'today',
+      '--upcoming-only',
+      '--max-hours-away',
+      '24',
+      '--scan-limit',
+      '10'
+    ]);
+
+    assert.equal(parsed.command, 'ufc-card');
+    assert.equal(parsed.opts.book, 'NoVigApp');
+    assert.equal(parsed.opts.targetBook, 'NoVigApp');
+    assert.equal(parsed.opts.market, 'Moneyline,Total');
+    assert.equal(parsed.opts.markets, 'Moneyline,Total');
+    assert.equal(parsed.opts.eventDate, '2026-05-10');
+    assert.equal(parsed.opts.cardWindow, 'today');
+    assert.equal(parsed.opts.upcomingOnly, true);
+    assert.equal(parsed.opts.maxHoursAway, '24');
+    assert.equal(parsed.opts.scanLimit, '10');
+  });
+
   it('resolves documented screen aliases to supported leagues', () => {
     assert.deepEqual(resolveScreenCommand('sport', { league: 'WNBA' }), { command: 'screen', league: 'WNBA' });
     assert.deepEqual(resolveScreenCommand('nba', {}), { command: 'screen', league: 'NBA' });
     assert.deepEqual(resolveScreenCommand('wnba', {}), { command: 'screen', league: 'WNBA' });
+    assert.deepEqual(resolveScreenCommand('ufc', {}), { command: 'screen', league: 'UFC' });
+    assert.deepEqual(resolveScreenCommand('mma', {}), { command: 'screen', league: 'UFC' });
     assert.deepEqual(resolveScreenCommand('soccer', {}), { command: 'screen', league: 'Soccer' });
   });
 
@@ -79,6 +113,9 @@ describe('query-propprofessor CLI parsing', () => {
       'mlb',
       'nfl',
       'nhl',
+      'ufc',
+      'ufc-card',
+      'mma',
       'soccer',
       'ncaab',
       'ncaaf',
@@ -95,6 +132,7 @@ describe('query-propprofessor CLI parsing', () => {
     assert.match(help, /Start here:/);
     assert.match(help, /install-auth/);
     assert.match(help, /pp-query doctor/);
+    assert.match(help, /pp-query ufc-card/);
     assert.match(help, /Auth file lookup order:/);
   });
 });
@@ -163,6 +201,90 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(payload.league, 'WNBA');
   });
 
+  it('routes ufc-card through query_ufc_card with UFC card flags', async () => {
+    const { logger, lines } = createLogger();
+    const calls = [];
+
+    await main({
+      argv: [
+        'node',
+        'query',
+        'ufc-card',
+        '--book',
+        'NoVigApp',
+        '--markets',
+        'Moneyline,Total',
+        '--eventDate',
+        '2026-05-10',
+        '--cardWindow',
+        'today',
+        '--upcomingOnly',
+        '--maxHoursAway',
+        '48',
+        '--limit',
+        '5',
+        '--scanLimit',
+        '10',
+        '--debug',
+        '--live',
+        '--json'
+      ],
+      client: {
+        queryScreenOddsBestComps: async (filters) => {
+          calls.push(filters);
+          return { game_data: [] };
+        }
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].league, 'UFC');
+    assert.equal(calls[0].market, 'Moneyline');
+    assert.equal(calls[0].is_live, true);
+    assert.equal(payload.league, 'UFC');
+    assert.ok(Array.isArray(payload.officialPlays));
+  });
+
+  it('renders concise UFC output for non-json command output', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'ufc-card'],
+      client: {
+        queryScreenOddsBestComps: async () => ({ game_data: [] })
+      },
+      logger
+    });
+
+    const output = lines.join('\n');
+    assert.match(output, /Official UFC bets/);
+    assert.match(output, /Best UFC looks/);
+    assert.match(output, /Passes/);
+    assert.match(output, /Summary/);
+  });
+
+  it('preserves structured payloads when json output is requested for ufc-card', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'ufc-card', '--json'],
+      client: {
+        queryScreenOddsBestComps: async () => ({ game_data: [] })
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.league, 'UFC');
+    assert.ok(Array.isArray(payload.officialPlays));
+    assert.ok(Array.isArray(payload.bestLooks));
+    assert.ok(Array.isArray(payload.passes));
+    assert.equal(payload.resultMeta.source, 'ufc_card');
+  });
+
   it('routes the nba shorthand alias through screen ranking', async () => {
     const { logger, lines } = createLogger();
     const calls = [];
@@ -189,6 +311,8 @@ describe('query-propprofessor CLI command execution', () => {
     ['mlb', 'MLB'],
     ['nfl', 'NFL'],
     ['nhl', 'NHL'],
+    ['ufc', 'UFC'],
+    ['mma', 'UFC'],
     ['soccer', 'Soccer'],
     ['ncaab', 'NCAAB'],
     ['ncaaf', 'NCAAF']
