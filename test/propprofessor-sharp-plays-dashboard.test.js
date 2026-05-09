@@ -9,9 +9,9 @@ const path = require('node:path');
 
 const {
   buildQueryString,
-  buildResearchDiagnostics,
+  
   cleanResearchSummary,
-  createDecisionStore,
+  
   createResearchQueue,
   createSharpPlaysDashboardServer,
   extractStartTime,
@@ -29,9 +29,9 @@ const {
   isTennisPlay,
   normalizeBookName,
   normalizeDashboardFilters,
-  parseDashboardArgv,
+  
   parseResearchVerdict,
-  renderFilters,
+  
   renderPage
 } = require('../lib/propprofessor-sharp-plays-dashboard');
 
@@ -103,6 +103,7 @@ describe('sharp plays dashboard helpers', () => {
     const url = new URL('http://local/?book=NoVigApp&leagues=NBA,MLB&markets=Moneyline,Spread&limit=7&broad=1&includePasses=1');
     const filters = normalizeDashboardFilters(url);
     assert.equal(filters.book, 'NoVigApp');
+    assert.deepEqual(filters.targetBooks, ['NoVigApp']);
     assert.deepEqual(filters.leagues, ['NBA', 'MLB']);
     assert.deepEqual(filters.markets, ['Moneyline', 'Spread']);
     assert.equal(filters.limit, 7);
@@ -128,6 +129,12 @@ describe('sharp plays dashboard helpers', () => {
     assert.equal(normalizeDashboardFilters(new URL('http://local/?book=Novig')).book, 'NoVigApp');
   });
 
+  it('defaults dashboard execution books to Fliff and NoVig and parses multi-book query payloads', () => {
+    assert.deepEqual(normalizeDashboardFilters(new URL('http://local/')).targetBooks, ['Fliff', 'NoVigApp']);
+    assert.deepEqual(normalizeDashboardFilters(new URL('http://local/?targetBooksCsv=Fliff,Novig')).targetBooks, ['Fliff', 'NoVigApp']);
+    assert.deepEqual(normalizeDashboardFilters(new URL('http://local/?targetBooks=Fliff&targetBooks=NoVig')).targetBooks, ['Fliff', 'NoVigApp']);
+  });
+
   it('supports all dropdown values for leagues and markets', () => {
     const filters = normalizeDashboardFilters(new URL('http://local/?book=NoVig&leagues=all&markets=all'));
     assert.equal(filters.book, 'NoVigApp');
@@ -137,6 +144,7 @@ describe('sharp plays dashboard helpers', () => {
 
   it('builds a stable query string for refresh links', () => {
     const query = buildQueryString({
+      targetBooks: ['Fliff', 'NoVigApp'],
       book: 'Fliff',
       leagues: ['NBA'],
       markets: ['Moneyline'],
@@ -150,6 +158,7 @@ describe('sharp plays dashboard helpers', () => {
       plusMoneyOnly: true
     });
     assert.match(query, /book=Fliff/);
+    assert.match(query, /targetBooksCsv=Fliff%2CNoVigApp/);
     assert.match(query, /leagues=NBA/);
     assert.match(query, /markets=Moneyline/);
     assert.match(query, /timeWindow=next1h/);
@@ -157,9 +166,10 @@ describe('sharp plays dashboard helpers', () => {
     assert.match(query, /plusMoneyOnly=1/);
   });
 
-  it('renders toggle-off sentinels and selected comma-separated filter payloads', () => {
+  it('renders multi-book command controls, toggle-off sentinels, and selected comma-separated payloads', () => {
     const html = require('../lib/propprofessor-sharp-plays-dashboard').renderFilters({
       book: 'Fliff',
+      targetBooks: ['Fliff', 'NoVigApp'],
       leagues: ['NBA', 'MLB'],
       markets: ['Moneyline', 'Spread'],
       limit: 10,
@@ -176,6 +186,9 @@ describe('sharp plays dashboard helpers', () => {
       strongSupportOnly: false,
       plusMoneyOnly: false
     });
+    assert.match(html, /name="targetBooks" type="checkbox" value="Fliff" checked/);
+    assert.match(html, /name="targetBooks" type="checkbox" value="NoVigApp" checked/);
+    assert.match(html, /Advanced filters/);
     assert.match(html, /name="hidePlaced" value="0"/);
     assert.match(html, /name="hideHidden" value="0"/);
     assert.match(html, /name="leaguesCsv" value="NBA,MLB"/);
@@ -197,7 +210,7 @@ describe('sharp plays dashboard helpers', () => {
   it('parses price status into playable, too expensive, missing, and verify states', () => {
     const playable = getPriceStatus({ odds: 120 }, { summary: 'Verdict: Bet\nPlayable price: +108\nAction: Bet it.' });
     const tooExpensive = getPriceStatus({ odds: 100 }, { summary: 'Verdict: Bet\nPlayable price: +108\nAction: Bet it.' });
-    const missing = getPriceStatus({}, { summary: 'Verdict: Bet\nPlayable price: +108\nAction: Bet it.' });
+    const missing = getPriceStatus({/* intentionally left empty */}, { summary: 'Verdict: Bet\nPlayable price: +108\nAction: Bet it.' });
     const verify = getPriceStatus({ odds: 120 }, { summary: 'Verdict: Bet\nAction: Check it.' });
     assert.equal(playable.status, 'Playable');
     assert.equal(tooExpensive.status, 'Too expensive');
@@ -275,7 +288,7 @@ describe('sharp plays dashboard helpers', () => {
   it('marks stale researching entries failed when their process is gone', () => {
     assert.equal(isPidAlive(-999), false);
     const statePath = path.join(os.tmpdir(), `pp-sharp-stale-research-${Date.now()}-${Math.random()}.json`);
-    const queue = createResearchQueue({ statePath, runner: () => {} });
+    const queue = createResearchQueue({ statePath, runner: () => {/* intentionally left empty */} });
     queue.update('stale-job', { id: 'stale-job', status: 'researching', pid: 999999, promptPath: statePath, play: { pick: 'Dead agent' } });
     const entry = queue.get('stale-job');
     assert.equal(entry.status, 'failed');
@@ -373,7 +386,7 @@ describe('sharp plays dashboard helpers', () => {
       else process.env.PP_SHARP_PLAYS_ALLOW_FIRECRAWL_RESEARCH = oldAllowFirecrawl;
       if (oldHermesHome === undefined) delete process.env.HERMES_HOME;
       else process.env.HERMES_HOME = oldHermesHome;
-      try { fs.unlinkSync(envPath); } catch {}
+      try { fs.unlinkSync(envPath); } catch {/* intentionally left empty */}
     }
   });
 
@@ -452,7 +465,7 @@ describe('sharp plays dashboard helpers', () => {
     });
     assert.doesNotMatch(html, /Queued ML/);
     assert.doesNotMatch(html, /Done ML/);
-    assert.match(html, /No clean sharp-supported plays right now/);
+    assert.match(html, /No clean plays/);
   });
 
   it('reports movement notes and actionable hero stats for mixed research states', () => {
@@ -516,7 +529,7 @@ describe('sharp plays dashboard server', () => {
     } finally {
       if (oldEnvPath === undefined) delete process.env.PP_SHARP_PLAYS_RESEARCH_ENV_PATH;
       else process.env.PP_SHARP_PLAYS_RESEARCH_ENV_PATH = oldEnvPath;
-      try { fs.unlinkSync(envPath); } catch {}
+      try { fs.unlinkSync(envPath); } catch {/* intentionally left empty */}
     }
   });
 
@@ -544,8 +557,8 @@ describe('sharp plays dashboard server', () => {
 
       researchQueue.update(id, { status: 'failed', error: 'boom' });
       const failId = `${id}-failed`;
-      researchQueue.update(failId, { id: failId, status: 'failed', play, filters: {}, summary: 'bad' });
-      await postForm(port, '/actions/research-clear-failed', {});
+      researchQueue.update(failId, { id: failId, status: 'failed', play, filters: {/* intentionally left empty */}, summary: 'bad' });
+      await postForm(port, '/actions/research-clear-failed', {/* intentionally left empty */});
       assert.equal(researchQueue.get(failId), null);
     } finally {
       server.close();
@@ -578,7 +591,7 @@ describe('sharp plays dashboard server', () => {
       else process.env.PP_SHARP_PLAYS_RESEARCH_TIMEOUT_MS = originalTimeout;
       if (originalCommand === undefined) delete process.env.PP_SHARP_PLAYS_RESEARCH_COMMAND;
       else process.env.PP_SHARP_PLAYS_RESEARCH_COMMAND = originalCommand;
-      try { fs.unlinkSync(scriptPath); } catch {}
+      try { fs.unlinkSync(scriptPath); } catch {/* intentionally left empty */}
       server.close();
     }
   });

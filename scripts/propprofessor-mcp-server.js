@@ -23,7 +23,8 @@ const {
   buildSharpPlaysFromRankedRows,
   resolveSharpPlayLeagues,
   resolveSharpPlayMarkets,
-  resolveTargetBook,
+  
+  resolveTargetBooks,
   uniqueBooks
 } = require('../lib/propprofessor-sharp-plays');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
@@ -318,12 +319,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
 
   async function runSharpPlays(args = {}) {
-    const targetBook = resolveTargetBook(args);
+    const targetBooks = resolveTargetBooks(args);
+    const targetBook = targetBooks[0];
     const leagues = resolveSharpPlayLeagues(args);
     const markets = resolveSharpPlayMarkets(args);
-    const targetPlusSharpBooks = (league, market) =>
+    const targetPlusSharpBooks = (league, market, executionBook) =>
       uniqueBooks([
-        targetBook,
+        executionBook,
         ...getSharpBookComparisonSet({
           league,
           market,
@@ -332,29 +334,36 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       ]);
     const rankedResponses = [];
 
-    for (const league of leagues) {
-      for (const market of markets) {
-        const books = targetPlusSharpBooks(league, market);
-        const rankedArgs = {
-          ...args,
-          league,
-          market,
-          book: targetBook,
-          books,
-          historySportsbooks: books,
-          includeAll: true,
-          limit: Number.isFinite(Number(args.scanLimit)) && Number(args.scanLimit) > 0 ? Number(args.scanLimit) : Math.max(20, getLimit(args) * 3)
-        };
-        const response = String(getLeagueRankingPreset(league).league || league).toUpperCase() === 'TENNIS'
-          ? await handlers.query_tennis_screen(rankedArgs)
-          : await runLeagueScreen(rankedArgs, getLeagueRankingPreset(league).league || league);
-        rankedResponses.push({ league, market, response });
+    for (const executionBook of targetBooks) {
+      for (const league of leagues) {
+        for (const market of markets) {
+          const books = targetPlusSharpBooks(league, market, executionBook);
+          const rankedArgs = {
+            ...args,
+            league,
+            market,
+            book: executionBook,
+            targetBook: executionBook,
+            books,
+            historySportsbooks: books,
+            includeAll: true,
+            limit: Number.isFinite(Number(args.scanLimit)) && Number(args.scanLimit) > 0 ? Number(args.scanLimit) : Math.max(20, getLimit(args) * 3)
+          };
+          const response = String(getLeagueRankingPreset(league).league || league).toUpperCase() === 'TENNIS'
+            ? await handlers.query_tennis_screen(rankedArgs)
+            : await runLeagueScreen(rankedArgs, getLeagueRankingPreset(league).league || league);
+          rankedResponses.push({ targetBook: executionBook, league, market, response });
+        }
       }
     }
 
-    const rankedRows = rankedResponses.flatMap(({ league, market, response }) =>
+    const rankedRows = rankedResponses.flatMap(({ targetBook: executionBook, league, market, response }) =>
       (Array.isArray(response?.result) ? response.result : []).map((row) => ({
         ...row,
+        book: executionBook,
+        targetBook: executionBook,
+        executionBook,
+        scanTargetBook: executionBook,
         scanLeague: league,
         scanMarket: market
       }))
@@ -365,6 +374,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       strict: args.strict !== undefined ? Boolean(args.strict) : true,
       limit: getLimit(args)
     });
+    const perTargetBook = Object.fromEntries(
+      targetBooks.map((book) => {
+        const scanned = rankedRows.filter((row) => row.executionBook === book).length;
+        const returned = result.filter((row) => (row.executionBook || row.targetBook || row.book) === book).length;
+        return [book, { scanned, returned }];
+      })
+    );
 
     return {
       ok: true,
@@ -373,6 +389,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       resultMeta: {
         source: 'sharp_plays_addon',
         targetBook,
+        targetBooks,
+        targetBookCount: targetBooks.length,
         leagues,
         markets,
         strict: args.strict !== undefined ? Boolean(args.strict) : true,
@@ -383,6 +401,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         lookbackHoursUsed: getLookbackHours(args),
         scannedRowCount: rankedRows.length,
         scannedQueryCount: rankedResponses.length,
+        perTargetBook,
         workflow:
           'Target book is execution only. Supportive movement must come from a non-target sharp book; target-book-only movement is downgraded.'
       }

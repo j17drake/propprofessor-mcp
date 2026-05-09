@@ -713,15 +713,44 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.ok, true);
     assert.equal(result.resultMeta.source, 'sharp_plays_addon');
     assert.equal(result.resultMeta.targetBook, 'NoVigApp');
+    assert.deepEqual(result.resultMeta.targetBooks, ['NoVigApp']);
+    assert.equal(result.resultMeta.targetBookCount, 1);
     assert.equal(result.resultMeta.scannedQueryCount, 1);
     assert.equal(calls.queryScreenOddsBestComps.length, 1);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.ok(Array.isArray(result.result));
-    assert.equal(result.result.length, 1);
+    assert.equal(result.result.length, 2);
+    assert.equal(result.result[0].executionBook, 'NoVigApp');
     assert.equal(result.result[0].verdict, 'Bet candidate');
+    assert.equal(result.result[0].targetBook, 'NoVigApp');
+    assert.equal(result.result[0].executionBook, 'NoVigApp');
     assert.equal(result.result[0].sharpPlaySupport.movementIsSharpSourced, true);
     assert.equal(result.result[0].sharpPlaySupport.sourceIsTargetBook, false);
     assert.notEqual(result.result[0].movementSourceBook, 'NoVigApp');
+  });
+
+  it('query_sharp_plays fans out across multiple targetBooks and keeps per-book rows', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_sharp_plays({
+      targetBooks: ['Fliff', 'NoVig'],
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      minConsensusBookCount: 1,
+      limit: 10,
+      debug: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.resultMeta.targetBooks, ['Fliff', 'NoVigApp']);
+    assert.equal(result.resultMeta.targetBookCount, 2);
+    assert.equal(result.resultMeta.scannedQueryCount, 2);
+    assert.equal(calls.queryScreenOddsBestComps.length, 2);
+    assert.deepEqual(calls.queryScreenOddsBestComps.map((call) => call.books[0]), ['Fliff', 'NoVigApp']);
+    assert.equal(result.result.length, 2);
+    assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
+    assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
   });
 
   it('query_sport_screen routes non-tennis leagues through the ranked league flow', async () => {
