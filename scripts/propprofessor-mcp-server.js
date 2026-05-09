@@ -19,6 +19,13 @@ const {
   getDebugFlag
 } = require('../lib/propprofessor-mcp-ranked-screen');
 const { getSharpBookComparisonSet, getSharpBookContext } = require('../lib/propprofessor-sharp-books');
+const {
+  buildSharpPlaysFromRankedRows,
+  resolveSharpPlayLeagues,
+  resolveSharpPlayMarkets,
+  resolveTargetBook,
+  uniqueBooks
+} = require('../lib/propprofessor-sharp-plays');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
 const {
   categorizeError,
@@ -310,6 +317,78 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       : runLeagueScreen(args, presetLeague || requestedLeague);
   }
 
+  async function runSharpPlays(args = {}) {
+    const targetBook = resolveTargetBook(args);
+    const leagues = resolveSharpPlayLeagues(args);
+    const markets = resolveSharpPlayMarkets(args);
+    const targetPlusSharpBooks = (league, market) =>
+      uniqueBooks([
+        targetBook,
+        ...getSharpBookComparisonSet({
+          league,
+          market,
+          requestedBooks: Array.isArray(args.sharpBooks) && args.sharpBooks.length ? args.sharpBooks : undefined
+        })
+      ]);
+    const rankedResponses = [];
+
+    for (const league of leagues) {
+      for (const market of markets) {
+        const books = targetPlusSharpBooks(league, market);
+        const rankedArgs = {
+          ...args,
+          league,
+          market,
+          book: targetBook,
+          books,
+          historySportsbooks: books,
+          includeAll: true,
+          limit: Number.isFinite(Number(args.scanLimit)) && Number(args.scanLimit) > 0 ? Number(args.scanLimit) : Math.max(20, getLimit(args) * 3)
+        };
+        const response = String(getLeagueRankingPreset(league).league || league).toUpperCase() === 'TENNIS'
+          ? await handlers.query_tennis_screen(rankedArgs)
+          : await runLeagueScreen(rankedArgs, getLeagueRankingPreset(league).league || league);
+        rankedResponses.push({ league, market, response });
+      }
+    }
+
+    const rankedRows = rankedResponses.flatMap(({ league, market, response }) =>
+      (Array.isArray(response?.result) ? response.result : []).map((row) => ({
+        ...row,
+        scanLeague: league,
+        scanMarket: market
+      }))
+    );
+    const result = buildSharpPlaysFromRankedRows(rankedRows, {
+      ...args,
+      targetBook,
+      strict: args.strict !== undefined ? Boolean(args.strict) : true,
+      limit: getLimit(args)
+    });
+
+    return {
+      ok: true,
+      count: result.length,
+      result,
+      resultMeta: {
+        source: 'sharp_plays_addon',
+        targetBook,
+        leagues,
+        markets,
+        strict: args.strict !== undefined ? Boolean(args.strict) : true,
+        includePasses: Boolean(args.includePasses),
+        minConsensusBookCount: Number.isFinite(Number(args.minConsensusBookCount)) ? Number(args.minConsensusBookCount) : 2,
+        minOdds: args.minOdds ?? null,
+        maxOdds: args.maxOdds ?? null,
+        lookbackHoursUsed: getLookbackHours(args),
+        scannedRowCount: rankedRows.length,
+        scannedQueryCount: rankedResponses.length,
+        workflow:
+          'Target book is execution only. Supportive movement must come from a non-target sharp book; target-book-only movement is downgraded.'
+      }
+    };
+  }
+
   const handlers = {
     async query_positive_ev_candidates(args = {}) {
       const payload = await client.querySportsbook({
@@ -422,6 +501,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
     async query_sport_screen(args = {}) {
       return runSportScreen(args);
+    },
+    async query_sharp_plays(args = {}) {
+      return runSharpPlays(args);
     },
     async query_nba_screen(args = {}) {
       return runLeagueScreen(args, 'NBA');

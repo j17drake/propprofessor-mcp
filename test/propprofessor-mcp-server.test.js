@@ -68,13 +68,16 @@ function createRankedScreenClientStub({
         calls.queryScreenOddsBestComps.push(filters);
         return rankedPayload;
       },
-      queryOddsHistory: async () => ({
-        NoVigApp: [
-          { odds: -118, start_ts: 1 },
-          { odds: -130, start_ts: 2 }
-        ],
-        Polymarket: [{ odds: -125, start_ts: 3 }]
-      }),
+      queryOddsHistory: async ({ sportsbooks } = {}) => {
+        const requested = Array.isArray(sportsbooks) && sportsbooks.length ? sportsbooks : ['NoVigApp'];
+        const book = requested.length > 1 ? requested[1] : requested[0];
+        return {
+          [book]: [
+            { odds: -118, start_ts: 1 },
+            { odds: -130, start_ts: 2 }
+          ]
+        };
+      },
       healthStatus: async () => {
         calls.healthStatus += 1;
         return healthPayload;
@@ -206,7 +209,7 @@ function waitForNdjsonMessage(proc, timeoutMs = 5000) {
 describe('propprofessor MCP server stdio contract', () => {
   // Direct smoke coverage checklist for public MCP tools:
   // covered: query_positive_ev_candidates, query_validated_positive_ev_candidates, query_screen_odds, query_screen_odds_best_comps, query_screen_odds_ranked,
-  // query_sport_screen, query_nba_screen, query_wnba_screen, query_mlb_screen,
+  // query_sharp_plays, query_sport_screen, query_nba_screen, query_wnba_screen, query_mlb_screen,
   // query_nfl_screen, query_nhl_screen, query_soccer_screen, query_ncaab_screen,
   // query_ncaaf_screen, query_tennis_screen, league_presets, health_status.
   it('responds to initialize and lists the expected tools', async () => {
@@ -247,6 +250,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_screen_odds',
         'query_screen_odds_best_comps',
         'query_screen_odds_ranked',
+        'query_sharp_plays',
         'query_soccer_screen',
         'query_sport_screen',
         'query_tennis_screen',
@@ -691,6 +695,33 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'filteredLineHistory'), false);
     assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'droppedHistoryReasons'), false);
     assert.ok(result.result[0].rankingProvenance);
+  });
+
+  it('query_sharp_plays returns only non-target sharp-supported bet candidates by default', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.query_sharp_plays({
+      book: 'NoVigApp',
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      minConsensusBookCount: 1,
+      limit: 5,
+      debug: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.resultMeta.source, 'sharp_plays_addon');
+    assert.equal(result.resultMeta.targetBook, 'NoVigApp');
+    assert.equal(result.resultMeta.scannedQueryCount, 1);
+    assert.equal(calls.queryScreenOddsBestComps.length, 1);
+    assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
+    assert.ok(Array.isArray(result.result));
+    assert.equal(result.result.length, 1);
+    assert.equal(result.result[0].verdict, 'Bet candidate');
+    assert.equal(result.result[0].sharpPlaySupport.movementIsSharpSourced, true);
+    assert.equal(result.result[0].sharpPlaySupport.sourceIsTargetBook, false);
+    assert.notEqual(result.result[0].movementSourceBook, 'NoVigApp');
   });
 
   it('query_sport_screen routes non-tennis leagues through the ranked league flow', async () => {

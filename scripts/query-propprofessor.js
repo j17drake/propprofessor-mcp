@@ -38,6 +38,7 @@ function getCommandInventory() {
     { command: 'sportsbook', description: 'Fetch sportsbook +EV rows' },
     { command: 'smart', description: 'Fetch smart money rows' },
     { command: 'tennis', description: 'Query and rank tennis screen rows' },
+    { command: 'sharp-plays', description: 'Scan target-book plays with supportive non-target sharp movement' },
     { command: 'screen', description: 'Query and rank any supported league screen with --league' },
     { command: 'sport', description: 'Alias for screen, use --league to pick the sport' },
     { command: 'nba', description: 'NBA screen shorthand' },
@@ -70,6 +71,7 @@ function buildHelpText() {
     '  pp-query doctor',
     '  pp-query health',
     '  pp-query screen --league NBA --market Moneyline',
+    '  pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis --market Moneyline',
     '  pp-query nba --market Moneyline',
     '  pp-query tennis --market Moneyline --limit 10',
     '',
@@ -183,6 +185,35 @@ function parseArgs(argv) {
     } else if (arg === '--books' || arg === '-b') {
       opts.books = next;
       i += 1;
+    } else if (arg === '--book' || arg === '--target-book' || arg === '--targetBook') {
+      opts.book = next;
+      opts.targetBook = next;
+      i += 1;
+    } else if (arg === '--leagues') {
+      opts.leagues = next;
+      i += 1;
+    } else if (arg === '--markets') {
+      opts.markets = next;
+      i += 1;
+    } else if (arg === '--scan-limit' || arg === '--scanLimit') {
+      opts.scanLimit = next;
+      i += 1;
+    } else if (arg === '--min-odds' || arg === '--minOdds') {
+      opts.minOdds = next;
+      i += 1;
+    } else if (arg === '--max-odds' || arg === '--maxOdds') {
+      opts.maxOdds = next;
+      i += 1;
+    } else if (arg === '--min-consensus-book-count' || arg === '--minConsensusBookCount') {
+      opts.minConsensusBookCount = next;
+      i += 1;
+    } else if (arg === '--broad') {
+      opts.broad = true;
+      opts.strict = false;
+    } else if (arg === '--include-passes' || arg === '--includePasses') {
+      opts.includePasses = true;
+    } else if (arg === '--allow-recent-only' || arg === '--allowRecentOnly') {
+      opts.allowRecentOnly = true;
     } else if (arg === '--source') {
       opts.source = next;
       i += 1;
@@ -321,6 +352,8 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       is_live: Boolean(opts.live)
     });
     payload = payloads[0] || { game_data: [] };
+  } else if (command === 'sharp-plays') {
+    payload = { game_data: [] };
   } else if (screenCommand.command === 'screen') {
     payload = await client.queryScreenOddsBestComps({
       league: screenCommand.league,
@@ -371,6 +404,44 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
   const rows = extractRows(payload);
   const lookbackHours = getOddsHistoryLookbackHours(opts.lookbackHours);
   const debug = getDebugFlag(opts.debug, true);
+  if (command === 'sharp-plays') {
+    const targetBook = opts.book || opts.targetBook || opts.books?.split(',')?.[0] || 'NoVigApp';
+    const leagues = opts.leagues
+      ? String(opts.leagues)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : opts.league
+        ? [opts.league]
+        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
+    const markets = opts.markets
+      ? String(opts.markets)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [opts.market || 'Moneyline'];
+    const { createMcpHandlers } = require('./propprofessor-mcp-server');
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.query_sharp_plays({
+      book: targetBook,
+      leagues,
+      markets,
+      limit: opts.limit ? Number(opts.limit) : 10,
+      scanLimit: opts.scanLimit ? Number(opts.scanLimit) : undefined,
+      minOdds: opts.minOdds !== undefined ? Number(opts.minOdds) : undefined,
+      maxOdds: opts.maxOdds !== undefined ? Number(opts.maxOdds) : undefined,
+      minConsensusBookCount: opts.minConsensusBookCount !== undefined ? Number(opts.minConsensusBookCount) : undefined,
+      includePasses: Boolean(opts.includePasses),
+      strict: opts.strict !== undefined ? opts.strict : !opts.broad,
+      allowRecentOnly: Boolean(opts.allowRecentOnly),
+      maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : undefined,
+      lookbackHours,
+      debug,
+      is_live: Boolean(opts.live)
+    });
+    emitJson(logger, result);
+    return;
+  }
   if (command === 'tennis') {
     const tennisBooks = opts.books
       ? String(opts.books)

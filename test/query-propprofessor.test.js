@@ -71,6 +71,7 @@ describe('query-propprofessor CLI parsing', () => {
       'sportsbook',
       'smart',
       'tennis',
+      'sharp-plays',
       'screen',
       'sport',
       'nba',
