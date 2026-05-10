@@ -9,10 +9,14 @@ const path = require('path');
 const {
   buildPropProfessorCookieHeader,
   createPropProfessorClient,
+  createTimeoutError,
   fetchAccessToken,
+  isAbortLikeError,
+  normalizeSelectionId,
   readAuthState
 } = require('../lib/propprofessor-api');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
+const { getLookbackHours, DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS } = require('../lib/propprofessor-mcp-ranked-screen');
 
 function makeTempAuthState(payload) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-auth-'));
@@ -50,6 +54,37 @@ describe('buildPropProfessorCookieHeader', () => {
   });
 });
 
+describe('normalizeSelectionId', () => {
+  it('strips a sportsbook prefix when the id has more than two colon-delimited parts', () => {
+    assert.equal(
+      normalizeSelectionId('Rebet:Point_Spread:San_Antonio_Spurs_-5.5'),
+      'Point_Spread:San_Antonio_Spurs_-5.5'
+    );
+    assert.equal(
+      normalizeSelectionId('DraftKings:Player_Points:Jalen_Brunson_26.5'),
+      'Player_Points:Jalen_Brunson_26.5'
+    );
+  });
+
+  it('leaves already-normalized ids unchanged', () => {
+    assert.equal(normalizeSelectionId('Point_Spread:San_Antonio_Spurs_-5.5'), 'Point_Spread:San_Antonio_Spurs_-5.5');
+  });
+});
+
+describe('timeout helpers', () => {
+  it('recognizes abort-like errors and tags timeout failures', () => {
+    assert.equal(isAbortLikeError({ name: 'AbortError' }), true);
+    assert.equal(isAbortLikeError({ code: 'ABORT_ERR' }), true);
+    assert.equal(isAbortLikeError({ message: 'boom' }), false);
+
+    const error = createTimeoutError({ source: 'HTTP', timeoutMs: 3210, cause: new Error('aborted') });
+    assert.equal(error.code, 'PROPPROFESSOR_TIMEOUT_ERROR');
+    assert.equal(error.category, 'transport');
+    assert.equal(error.retryable, true);
+    assert.match(error.message, /3210ms/);
+  });
+});
+
 describe('fetchAccessToken', () => {
   it('uses the auth cookies and returns the token payload', async () => {
     const { dir, file } = makeTempAuthState({
@@ -63,7 +98,7 @@ describe('fetchAccessToken', () => {
     const calls = [];
     const result = await fetchAccessToken({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         calls.push(options);
         return {
           body: JSON.stringify({
@@ -86,6 +121,36 @@ describe('fetchAccessToken', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('mentions the resolved auth file path when no PropProfessor cookies are present', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.example.com', name: 'ignore', value: 'nope' }],
+      origins: []
+    });
+
+    try {
+      await assert.rejects(fetchAccessToken({ authFile: file }), (error) => {
+        assert.match(error.message, /No PropProfessor cookies found/);
+        assert.match(
+          error.message,
+          new RegExp(path.escape ? path.escape(file) : file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        );
+        return true;
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ranked screen lookback defaults', () => {
+  it('uses the shared default lookback when args omit lookbackHours', () => {
+    assert.equal(getLookbackHours({}), DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS);
+  });
+
+  it('keeps explicit lookbackHours overrides', () => {
+    assert.equal(getLookbackHours({ lookbackHours: 8 }), 8);
+  });
 });
 
 describe('createPropProfessorClient', () => {
@@ -104,7 +169,7 @@ describe('createPropProfessorClient', () => {
     const fetchCalls = [];
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         tokenCalls.push(options);
         return {
           body: JSON.stringify({
@@ -167,7 +232,7 @@ describe('createPropProfessorClient', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ([{ id: 'row-1', updatedAt: new Date().toISOString() }])
+          json: async () => [{ id: 'row-1', updatedAt: new Date().toISOString() }]
         };
       }
     });
@@ -183,7 +248,7 @@ describe('createPropProfessorClient', () => {
     }
   });
 
-  it('posts fantasy queries to the fantasy picks endpoint', async () => {
+  it('normalizes screen league names to the backend-supported casing', async () => {
     const { dir, file } = makeTempAuthState({
       cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
       origins: []
@@ -194,9 +259,9 @@ describe('createPropProfessorClient', () => {
       authFile: file,
       gotScrapingImpl: async () => ({
         body: JSON.stringify({
-          token: 'jwt-fantasy',
+          token: 'jwt-screen',
           exp: Math.floor(Date.now() / 1000) + 600,
-          perm: { fantasy: true }
+          perm: { sportsbook: true }
         }),
         statusCode: 200
       }),
@@ -205,20 +270,231 @@ describe('createPropProfessorClient', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ([{ fantasyApp: 'Underdog', ev: 12.3 }])
+          json: async () => []
         };
       }
     });
 
     try {
-      await client.queryFantasyPicks({ fantasyApps: ['Underdog'], minSlipEV: 5 });
-      assert.equal(fetchCalls[0].url, 'https://backend.propprofessor.com/fantasy');
+      await client.queryScreenOdds({ market: 'Moneyline', league: 'SOCCER', books: ['NoVigApp'] });
+      await client.queryScreenOdds({ market: 'Moneyline', league: 'TENNIS', books: ['NoVigApp'] });
+      await client.queryScreenOddsBestComps({ market: 'Moneyline', league: 'SOCCER' });
+      const first = JSON.parse(fetchCalls[0].options.body);
+      const second = JSON.parse(fetchCalls[1].options.body);
+      const third = JSON.parse(fetchCalls[2].options.body);
+      assert.equal(first.league, 'Soccer');
+      assert.equal(second.league, 'Tennis');
+      assert.equal(third.league, 'Soccer');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('queryScreenOddsBestComps keeps default books when books is omitted, but allows explicit undefined to pass through', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const fetchCalls = [];
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({
+          token: 'jwt-screen',
+          exp: Math.floor(Date.now() / 1000) + 600,
+          perm: { sportsbook: true }
+        }),
+        statusCode: 200
+      }),
+      fetchImpl: async (url, options) => {
+        fetchCalls.push({ url, options });
+        return {
+          ok: true,
+          status: 200,
+          json: async () => []
+        };
+      }
+    });
+
+    try {
+      await client.queryScreenOddsBestComps({ market: 'Moneyline', league: 'NBA' });
+      await client.queryScreenOddsBestComps({ market: 'Player Points', league: 'NBA' });
+      await client.queryScreenOddsBestComps({ market: 'Moneyline', league: 'NBA', books: [] });
+      const first = JSON.parse(fetchCalls[0].options.body);
+      const second = JSON.parse(fetchCalls[1].options.body);
+      const third = JSON.parse(fetchCalls[2].options.body);
+      assert.deepEqual(first.books, ['Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
+      assert.deepEqual(second.books, ['FanDuel', 'BookMaker', 'PropBuilder', 'NoVigApp', 'Pinnacle']);
+      assert.deepEqual(third.books, ['Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not expose the removed fantasy query helpers on the screen-only client', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({
+          token: 'jwt-screen-only',
+          exp: Math.floor(Date.now() / 1000) + 600,
+          perm: { sportsbook: true }
+        }),
+        statusCode: 200
+      })
+    });
+
+    try {
+      assert.equal(typeof client.queryFantasyPicks, 'undefined');
+      assert.equal(typeof client.queryFantasyPicksSorted, 'undefined');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('posts odds-history queries to the backend odds history endpoint', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const fetchCalls = [];
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({
+          token: 'jwt-history',
+          exp: Math.floor(Date.now() / 1000) + 600,
+          perm: { sportsbook: true }
+        }),
+        statusCode: 200
+      }),
+      fetchImpl: async (url, options) => {
+        fetchCalls.push({ url, options });
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            FanDuel: [
+              { odds: -110, start_ts: 1 },
+              { odds: -120, start_ts: 2 }
+            ]
+          })
+        };
+      }
+    });
+
+    try {
+      const payload = await client.queryOddsHistory({
+        gameId: 'game-1',
+        selectionId: 'Rebet:Point_Spread:San_Antonio_Spurs_-5.5',
+        sportsbooks: ['Rebet'],
+        startTimestamp: 123
+      });
+      assert.equal(fetchCalls[0].url, 'https://backend.propprofessor.com/odds_history_new');
       const body = JSON.parse(fetchCalls[0].options.body);
-      assert.equal(body.fantasyApps[0], 'Underdog');
-      assert.equal(body.minSlipEV, 5);
-      assert.equal(body.minOdds, -9999);
-      assert.equal(body.maxOdds, 9999);
-      assert.equal(body.liveStatus, 'prematch');
+      assert.equal(body.gameId, 'game-1');
+      assert.equal(body.selectionId, 'Point_Spread:San_Antonio_Spurs_-5.5');
+      assert.deepEqual(body.sportsbooks, ['Rebet']);
+      assert.equal(body.startTimestamp, 123);
+      assert.equal(payload.FanDuel[0].odds, -110);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns screen-only health status when the screen endpoint fails', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const fetchCalls = [];
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({
+          token: 'jwt-health',
+          exp: Math.floor(Date.now() / 1000) + 600,
+          perm: { sportsbook: true, fantasy: true }
+        }),
+        statusCode: 200
+      }),
+      fetchImpl: async (url) => {
+        fetchCalls.push(String(url));
+        return {
+          ok: false,
+          status: 500,
+          text: async () => 'screen failed'
+        };
+      },
+      retryDelaysMs: [0]
+    });
+
+    try {
+      const health = await client.healthStatus();
+      assert.equal(health.ok, false);
+      assert.equal(health.endpoints.screen, 'error');
+      assert.equal('fantasy' in health.endpoints, false);
+      assert.match(health.errors.screen, /500|screen failed/);
+      assert.equal('fantasy' in health.errors, false);
+      assert.equal('fantasy' in health.freshness, false);
+      assert.equal(fetchCalls.length, 2);
+      assert.ok(fetchCalls.every((url) => /\/screen/.test(url)));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('healthStatus reports non-null freshness ages and timestamp sources for screen rows', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    const nowMs = Date.parse('2026-04-20T22:58:00.000Z');
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({
+          token: 'jwt-health-rows',
+          exp: Math.floor(nowMs / 1000) + 600,
+          perm: { sportsbook: true }
+        }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          game_data: [
+            { id: 'row-1', updatedAt: new Date(nowMs - 12 * 1000).toISOString() },
+            { id: 'row-2', payload: { updatedAt: new Date(nowMs - 40 * 1000).toISOString() } },
+            { id: 'row-3', meta: { timestamp: new Date(nowMs - 25 * 1000).toISOString() } }
+          ]
+        })
+      }),
+      now: () => nowMs
+    });
+
+    try {
+      const health = await client.healthStatus();
+      assert.equal(health.ok, true);
+      assert.equal(health.freshness.screen.rowCount, 3);
+      assert.equal(health.freshness.screen.newestAgeMs, 12000);
+      assert.equal(health.freshness.screen.oldestAgeMs, 40000);
+      assert.equal(health.freshness.screen.freshnessFallbackUsed, false);
+      assert.deepEqual(health.freshness.screen.timestampSources, {
+        updatedAt: 1,
+        'payload.updatedAt': 1,
+        'meta.timestamp': 1
+      });
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -233,7 +509,7 @@ describe('createPropProfessorClient', () => {
     const tokenCalls = [];
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async options => {
+      gotScrapingImpl: async (options) => {
         tokenCalls.push(options);
         const token = tokenCalls.length === 1 ? 'jwt-1' : 'jwt-2';
         return {
@@ -302,34 +578,370 @@ describe('createPropProfessorClient', () => {
     }
   });
 
-  it('query_tennis_screen ranks rows from the screen game_data payload', async () => {
+  it('query_nba_screen expands nested /screen rows before ranking', async () => {
     const calls = [];
     const handlers = createMcpHandlers({
       client: {
-        queryScreenOdds: async filters => {
+        queryScreenOddsBestComps: async (filters) => {
           calls.push(filters);
           return {
             game_data: [
               {
-                league: 'Tennis',
-                book: 'NoVigApp',
-                participant: 'Player A',
-                market: 'Moneyline',
-                value: 3.2,
-                odds: 110
+                gameId: 'game-1',
+                league: 'NBA',
+                market: 'Point Spread',
+                homeTeam: 'Houston Rockets',
+                awayTeam: 'Los Angeles Lakers',
+                selections: {
+                  '-2.5': {
+                    selection1: 'Houston Rockets -2.5',
+                    participant1: 'Houston Rockets',
+                    selection1Id: 'Point_Spread:Houston_Rockets_-2.5',
+                    line1: -2.5,
+                    selection2: 'Los Angeles Lakers +2.5',
+                    participant2: 'Los Angeles Lakers',
+                    selection2Id: 'Point_Spread:Los_Angeles_Lakers_+2.5',
+                    line2: 2.5,
+                    odds: {
+                      NoVigApp: { odds1: -128, odds2: 104 },
+                      Polymarket: { odds1: -126, odds2: 102 }
+                    }
+                  }
+                }
               }
             ]
+          };
+        },
+        queryOddsHistory: async ({ gameId, selectionId }) => ({
+          NoVigApp: String(selectionId).includes('Houston_Rockets')
+            ? [
+                { odds: -128, start_ts: 1 },
+                { odds: -140, start_ts: 2 }
+              ]
+            : [
+                { odds: 104, start_ts: 1 },
+                { odds: 116, start_ts: 2 }
+              ],
+          Polymarket: [{ odds: -126, start_ts: 3 }],
+          meta: { gameId }
+        })
+      }
+    });
+
+    const result = await handlers.query_nba_screen({ market: 'Point Spread', books: ['NoVigApp'] });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.length >= 1, true);
+    assert.equal(result.result[0].book, 'NoVigApp');
+    assert.equal(result.result[0].selectionId, 'Point_Spread:Houston_Rockets_-2.5');
+    assert.equal(result.result[0].lineHistoryAvailable, true);
+    assert.equal(result.result[0].lineHistorySource, 'odds_history');
+    assert.equal(result.result[0].historyGameId, 'game-1');
+    assert.equal(result.result[0].normalizedSelectionId, 'Point_Spread:Houston_Rockets_-2.5');
+    assert.equal(result.result[0].historyMatchedBy, 'selectionId');
+    assert.equal(Array.isArray(result.result[0].lineHistory), true);
+    assert.equal(result.result[0].lineHistory.length >= 2, true);
+    assert.equal(typeof result.result[0].clvProxyPct, 'number');
+    assert.equal(result.result[0].hasLineMovement, true);
+    assert.deepEqual(calls[0].books, ['NoVigApp']);
+  });
+
+  it('query_screen_odds_ranked uses the shared ranked screen flow with hydration and freshness', async () => {
+    const screenCalls = [];
+    const historyCalls = [];
+    const handlers = createMcpHandlers({
+      client: {
+        queryScreenOddsBestComps: async (filters) => {
+          screenCalls.push(filters);
+          return {
+            game_data: [
+              {
+                gameId: 'game-ranked-1',
+                league: 'NBA',
+                market: 'Moneyline',
+                updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+                homeTeam: 'Boston Celtics',
+                awayTeam: 'Miami Heat',
+                selections: {
+                  a: {
+                    selection1: 'Boston Celtics',
+                    participant1: 'Boston Celtics',
+                    selection1Id: 'Moneyline:Boston_Celtics',
+                    selection2: 'Miami Heat',
+                    participant2: 'Miami Heat',
+                    selection2Id: 'Moneyline:Miami_Heat',
+                    odds: {
+                      NoVigApp: { odds1: -142, odds2: 122 },
+                      Polymarket: { odds1: -150, odds2: 128 }
+                    }
+                  }
+                },
+                defaultKey: 'a'
+              }
+            ]
+          };
+        },
+        queryOddsHistory: async ({ gameId, selectionId, sportsbooks }) => {
+          historyCalls.push({ gameId, selectionId, sportsbooks });
+          return {
+            NoVigApp: String(selectionId).includes('Boston_Celtics')
+              ? [
+                  { odds: -142, start_ts: 1 },
+                  { odds: -155, start_ts: 2 }
+                ]
+              : [
+                  { odds: 122, start_ts: 1 },
+                  { odds: 135, start_ts: 2 }
+                ],
+            Polymarket: [{ odds: -150, start_ts: 3 }],
+            meta: { gameId }
           };
         }
       }
     });
 
-    const result = await handlers.query_tennis_screen({ market: 'Moneyline', limit: 5 });
+    const result = await handlers.query_screen_odds_ranked({
+      league: 'NBA',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      lookbackHours: 6
+    });
     assert.equal(result.ok, true);
-    assert.equal(Array.isArray(result.result), true);
-    assert.equal(result.result.length, 1);
-    assert.equal(result.result[0].participant, 'Player A');
-    assert.deepEqual(calls[0].books, ['NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']);
+    assert.equal(result.freshness.rowCount, 2);
+    assert.equal(result.freshness.newestAgeMs !== null, true);
+    assert.equal(result.resultMeta.lookbackHoursUsed, 6);
+    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['NoVigApp']);
+    assert.equal(result.resultMeta.debugEnabled, true);
+    assert.equal(result.resultMeta.freshnessFallbackUsed, false);
+    assert.deepEqual(result.resultMeta.timestampSources, { updatedAt: 2 });
+    assert.equal(result.result[0].lineHistoryAvailable, true);
+    assert.equal(result.result[0].lineHistorySource, 'odds_history');
+    assert.equal(result.result[0].historyGameId, 'game-ranked-1');
+    assert.equal(result.result[0].normalizedSelectionId, 'Moneyline:Boston_Celtics');
+    assert.equal(result.result[0].historyMatchedBy, 'selectionId');
+    assert.equal(result.result[0].lineHistoryLookbackHours, 6);
+    assert.equal(result.result[0].freshnessSource, 'updatedAt');
+    assert.equal(result.result[0].freshnessFallbackUsed, false);
+    assert.equal(typeof result.result[0].freshnessAgeMs, 'number');
+    assert.equal(typeof result.result[0].clvProxyPct, 'number');
+    assert.equal(result.result[0].movementMode, 'same_book');
+    assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
+    assert.equal(result.result[0].lineHistoryUsable, true);
+    assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
+    assert.equal(typeof result.result[0].movementDebug, 'object');
+    assert.equal(Array.isArray(result.result[0].filteredLineHistory), true);
+    assert.equal(typeof result.result[0].droppedHistoryReasons, 'object');
+    assert.equal(typeof result.result[0].openToCurrentClvPct, 'number');
+    assert.equal(result.result[0].rankingProvenance.focusBook, 'NoVigApp');
+    assert.equal(result.result[0].rankingProvenance.historyMatchedBy, 'selectionId');
+    assert.equal(result.result[0].rankingProvenance.lineHistorySource, 'odds_history');
+    assert.equal(result.result[0].rankingProvenance.normalizedSelectionId, 'Moneyline:Boston_Celtics');
+    assert.deepEqual(screenCalls[0].books, ['NoVigApp']);
+    assert.equal(historyCalls.length >= 1, true);
+    assert.deepEqual(historyCalls[0].sportsbooks, ['NoVigApp']);
+  });
+
+  it('query_screen_odds_ranked omits verbose movement debug when disabled', async () => {
+    const handlers = createMcpHandlers({
+      client: {
+        queryScreenOddsBestComps: async () => ({
+          game_data: [
+            {
+              gameId: 'game-ranked-2',
+              league: 'NBA',
+              market: 'Moneyline',
+              updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
+              homeTeam: 'Cleveland Cavaliers',
+              awayTeam: 'Detroit Pistons',
+              selections: {
+                a: {
+                  selection1: 'Cleveland Cavaliers',
+                  participant1: 'Cleveland Cavaliers',
+                  selection1Id: 'Moneyline:Cleveland_Cavaliers',
+                  selection2: 'Detroit Pistons',
+                  participant2: 'Detroit Pistons',
+                  selection2Id: 'Moneyline:Detroit_Pistons',
+                  odds: {
+                    NoVigApp: { odds1: -130, odds2: 110 },
+                    Polymarket: { odds1: -138, odds2: 118 }
+                  }
+                }
+              },
+              defaultKey: 'a'
+            }
+          ]
+        }),
+        queryOddsHistory: async ({ gameId }) => ({
+          NoVigApp: [
+            { odds: -125, start_ts: 1 },
+            { odds: -130, start_ts: 2 }
+          ],
+          meta: { gameId }
+        })
+      }
+    });
+
+    const result = await handlers.query_screen_odds_ranked({
+      league: 'NBA',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      debug: false
+    });
+
+    assert.equal(result.resultMeta.debugEnabled, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'movementDebug'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'filteredLineHistory'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'droppedHistoryReasons'), false);
+    assert.ok(result.result[0].rankingProvenance);
+  });
+
+  it('query_sport_screen reuses the ranked league flow for non-tennis leagues', async () => {
+    const screenCalls = [];
+    const historyCalls = [];
+    const handlers = createMcpHandlers({
+      client: {
+        queryScreenOddsBestComps: async (filters) => {
+          screenCalls.push(filters);
+          return {
+            game_data: [
+              {
+                gameId: 'game-sport-1',
+                league: 'NBA',
+                market: 'Moneyline',
+                updatedAt: new Date(Date.now() - 45 * 1000).toISOString(),
+                homeTeam: 'Knicks',
+                awayTeam: 'Pacers',
+                selections: {
+                  a: {
+                    selection1: 'Knicks',
+                    participant1: 'Knicks',
+                    selection1Id: 'Moneyline:Knicks',
+                    selection2: 'Pacers',
+                    participant2: 'Pacers',
+                    selection2Id: 'Moneyline:Pacers',
+                    odds: {
+                      NoVigApp: { odds1: -118, odds2: 104 },
+                      Polymarket: { odds1: -125, odds2: 110 }
+                    }
+                  }
+                },
+                defaultKey: 'a'
+              }
+            ]
+          };
+        },
+        queryOddsHistory: async ({ gameId, selectionId }) => {
+          historyCalls.push({ gameId, selectionId });
+          return {
+            NoVigApp: [
+              { odds: -130, start_ts: 1 },
+              { odds: String(selectionId).includes('Knicks') ? -118 : 104, start_ts: 2 }
+            ],
+            Polymarket: [{ odds: -125, start_ts: 3 }],
+            meta: { gameId }
+          };
+        }
+      }
+    });
+
+    const result = await handlers.query_sport_screen({
+      league: 'nba',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      lookbackHours: 8
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.league, 'NBA');
+    assert.equal(result.freshness.rowCount, 2);
+    assert.equal(result.result[0].leaguePreset, 'NBA');
+    assert.equal(result.result[0].lineHistoryAvailable, true);
+    assert.equal(result.result[0].lineHistorySource, 'odds_history');
+    assert.equal(result.result[0].historyGameId, 'game-sport-1');
+    assert.equal(result.result[0].normalizedSelectionId, 'Moneyline:Knicks');
+    assert.equal(result.result[0].historyMatchedBy, 'selectionId');
+    assert.equal(result.result[0].lineHistoryLookbackHours, 8);
+    assert.equal(screenCalls[0].league, 'NBA');
+    assert.equal(historyCalls.length >= 1, true);
+  });
+
+  it('query_tennis_screen hydrates missing line history through the shared ranked flow', async () => {
+    const screenCalls = [];
+    const historyCalls = [];
+    const handlers = createMcpHandlers({
+      client: {
+        queryScreenOdds: async (filters) => {
+          screenCalls.push(filters);
+          return {
+            game_data: [
+              {
+                gameId: 'tennis-game-1',
+                league: 'Tennis',
+                market: 'Moneyline',
+                updatedAt: new Date(Date.now() - 20 * 1000).toISOString(),
+                homeTeam: 'Player A',
+                awayTeam: 'Player B',
+                selections: {
+                  a: {
+                    selection1: 'Player A',
+                    participant1: 'Player A',
+                    selection1Id: 'Moneyline:Player_A',
+                    selection2: 'Player B',
+                    participant2: 'Player B',
+                    selection2Id: 'Moneyline:Player_B',
+                    odds: {
+                      Fliff: { odds1: 120, odds2: -130 },
+                      NoVigApp: { odds1: 118, odds2: -128 },
+                      Polymarket: { odds1: 110, odds2: -120 },
+                      Kalshi: { odds1: 108, odds2: -122 },
+                      BetOnline: { odds1: 115, odds2: -125 },
+                      Circa: { odds1: 112, odds2: -123 }
+                    }
+                  }
+                },
+                defaultKey: 'a'
+              }
+            ]
+          };
+        },
+        queryOddsHistory: async ({ gameId, selectionId }) => {
+          historyCalls.push({ gameId, selectionId });
+          return {
+            Fliff: String(selectionId).includes('Player_A')
+              ? [
+                  { odds: 130, start_ts: 1 },
+                  { odds: 120, start_ts: 2 }
+                ]
+              : [
+                  { odds: -118, start_ts: 1 },
+                  { odds: -130, start_ts: 2 }
+                ],
+            NoVigApp: [{ odds: 118, start_ts: 3 }],
+            Polymarket: [{ odds: 110, start_ts: 4 }],
+            meta: { gameId }
+          };
+        }
+      }
+    });
+
+    const result = await handlers.query_tennis_screen({
+      market: 'Moneyline',
+      book: 'Fliff',
+      limit: 5,
+      lookbackHours: 4
+    });
+    const tennisRow = result.result.find(
+      (row) => row.selectionId === 'Moneyline:Player_A' || row.normalizedSelectionId === 'Moneyline:Player_A'
+    );
+    assert.ok(tennisRow);
+    assert.equal(tennisRow.book, 'Fliff');
+    assert.equal(tennisRow.lineHistoryAvailable, true);
+    assert.equal(tennisRow.lineHistorySource, 'odds_history');
+    assert.equal(tennisRow.historyGameId, 'tennis-game-1');
+    assert.equal(tennisRow.normalizedSelectionId, 'Moneyline:Player_A');
+    assert.equal(tennisRow.historyMatchKey, 'selectionId');
+    assert.equal(tennisRow.lineHistoryLookbackHours, 4);
+    assert.equal(tennisRow.tennisMarket, 'moneyline');
+    assert.equal(historyCalls.length >= 1, true);
+    assert.equal(screenCalls[0].league, 'Tennis');
   });
 
   it('returns tennis ranking explanations and score breakdowns', async () => {
@@ -375,42 +987,40 @@ describe('createPropProfessorClient', () => {
     assert.equal(typeof result.result[0].scoreBreakdown.total, 'number');
   });
 
-  it('sorts fantasy rows by value descending', async () => {
-    const { dir, file } = makeTempAuthState({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie' }], origins: [] });
-    const client = createPropProfessorClient({
-      authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
-      fetchImpl: async () => ({ ok: true, status: 200, json: async () => [{ id: 'a', value: 1 }, { id: 'b', value: 3 }] })
-    });
-
-    try {
-      const rows = await client.queryFantasyPicksSorted({});
-      assert.equal(rows[0].id, 'b');
-      assert.equal(rows[1].id, 'a');
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('does not retry non-retryable HTTP client errors', async () => {
+  it('retries once after a 401 by refreshing the access token', async () => {
     const { dir, file } = makeTempAuthState({
       cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
       origins: []
     });
     let fetchAttempts = 0;
+    const tokenCalls = [];
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      gotScrapingImpl: async (options) => {
+        tokenCalls.push(options);
+        return {
+          body: JSON.stringify({
+            token: tokenCalls.length === 1 ? 'jwt-1' : 'jwt-2',
+            exp: Math.floor(Date.now() / 1000) + 600
+          }),
+          statusCode: 200
+        };
+      },
       fetchImpl: async () => {
         fetchAttempts += 1;
-        return { ok: false, status: 401, text: async () => 'unauthorized' };
+        if (fetchAttempts === 1) {
+          return { ok: false, status: 401, text: async () => 'unauthorized' };
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
       },
       retryDelaysMs: [0, 0]
     });
 
     try {
-      await assert.rejects(() => client.queryScreenOdds({}), /401/);
-      assert.equal(fetchAttempts, 1);
+      const result = await client.queryScreenOdds({});
+      assert.deepEqual(result, { ok: true });
+      assert.equal(fetchAttempts, 2);
+      assert.equal(tokenCalls.length, 2);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -424,7 +1034,10 @@ describe('createPropProfessorClient', () => {
     let fetchAttempts = 0;
     const client = createPropProfessorClient({
       authFile: file,
-      gotScrapingImpl: async () => ({ body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }), statusCode: 200 }),
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
       fetchImpl: async () => {
         fetchAttempts += 1;
         if (fetchAttempts < 3) {
@@ -439,6 +1052,146 @@ describe('createPropProfessorClient', () => {
       const result = await client.queryScreenOdds({});
       assert.deepEqual(result, { ok: true });
       assert.equal(fetchAttempts, 3);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('retries timeout failures and reports them as transport errors when retries are exhausted', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+
+    let fetchAttempts = 0;
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => {
+        fetchAttempts += 1;
+        const error = new Error('request aborted');
+        error.name = 'AbortError';
+        throw error;
+      },
+      retryDelaysMs: [0],
+      requestTimeoutMs: 1
+    });
+
+    try {
+      await assert.rejects(
+        () => client.queryScreenOdds({}),
+        (error) => {
+          assert.equal(error.category, 'transport');
+          assert.equal(error.code, 'PROPPROFESSOR_TIMEOUT_ERROR');
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /timed out/i);
+          return true;
+        }
+      );
+      assert.equal(fetchAttempts, 2);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tags 401 screen failures as auth errors with status metadata', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({ ok: false, status: 401, text: async () => 'unauthorized' }),
+      retryDelaysMs: [0]
+    });
+
+    try {
+      await assert.rejects(
+        () => client.queryScreenOdds({}),
+        (error) => {
+          assert.equal(error.category, 'auth');
+          assert.equal(error.code, 'PROPPROFESSOR_AUTH_ERROR');
+          assert.equal(error.status, 401);
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /401/);
+          return true;
+        }
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tags HTML checkpoint responses as transport errors', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({
+        ok: false,
+        status: 429,
+        text: async () => '<html><title>Just a moment...</title></html>'
+      }),
+      retryDelaysMs: [0]
+    });
+
+    try {
+      await assert.rejects(
+        () => client.queryScreenOdds({}),
+        (error) => {
+          assert.equal(error.category, 'transport');
+          assert.equal(error.code, 'PROPPROFESSOR_TRANSPORT_ERROR');
+          assert.equal(error.status, 429);
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /checkpoint|429|Just a moment/i);
+          return true;
+        }
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tags 5xx TRPC failures as backend errors with status metadata', async () => {
+    const { dir, file } = makeTempAuthState({
+      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
+      origins: []
+    });
+    const client = createPropProfessorClient({
+      authFile: file,
+      gotScrapingImpl: async () => ({
+        body: JSON.stringify({ token: 'jwt', exp: Math.floor(Date.now() / 1000) + 600 }),
+        statusCode: 200
+      }),
+      fetchImpl: async () => ({ ok: false, status: 503, text: async () => 'service unavailable' }),
+      retryDelaysMs: [0]
+    });
+
+    try {
+      await assert.rejects(
+        () => client.getHiddenBets(),
+        (error) => {
+          assert.equal(error.category, 'backend');
+          assert.equal(error.code, 'PROPPROFESSOR_BACKEND_ERROR');
+          assert.equal(error.status, 503);
+          assert.equal(error.retryable, true);
+          assert.match(error.message, /503|service unavailable/i);
+          return true;
+        }
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

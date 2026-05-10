@@ -1,25 +1,110 @@
 # PropProfessor MCP Auth Guide
 
-This repo uses a saved PropProfessor browser session to fetch short-lived access tokens.
+This project uses a saved logged-in PropProfessor browser session to fetch short-lived access tokens.
 
-## Required file
+## Recommended Location
 
-- `auth.json`, saved in the repo root
+Easiest option:
 
-The file is ignored by git. Copy it from your existing PropProfessor setup or save a fresh session after logging in.
+```bash
+pp-query install-auth --source /path/to/auth.json
+```
 
-## How the token flow works
+That installs your saved browser session into:
 
-1. The client reads PropProfessor cookies from `auth.json`
-2. It sends those cookies to PropProfessor's access-token endpoint
-3. It uses the returned bearer token for `/screen`, `/fantasy`, and related requests
+```bash
+~/.propprofessor/auth.json
+```
 
-## If you need a fresh session
+That is the default user-level location.
 
-Use your normal browser login flow for PropProfessor, then save the browser storage state into this repo as `auth.json`.
+## Auth Lookup Order
+
+The project checks auth in this order:
+
+1. `AUTH_FILE`
+2. `~/.propprofessor/auth.json`
+3. `auth.json` in the repo root
+
+For most users, the best choice is `~/.propprofessor/auth.json`.
+
+## What Should Be In `auth.json`
+
+It should be a saved browser session from a logged-in PropProfessor session.
+
+The important part is that it includes PropProfessor cookies.
+
+## How The Auth Flow Works
+
+1. The client reads PropProfessor cookies from your saved session file.
+2. It sends those cookies to PropProfessor's access-token endpoint.
+3. It uses the returned bearer token for live requests.
+
+## If You Need A Fresh Session
+
+1. Log in to PropProfessor in your browser.
+2. Export the browser session or storage state.
+3. Run `pp-query install-auth --source /path/to/exported-auth.json`.
+
+## How To Export `auth.json`
+
+Any method is fine as long as it produces a JSON file that contains your logged-in PropProfessor browser cookies.
+
+Common options:
+
+1. Browser automation tools that can save storage state
+2. A browser extension that can export cookies or full session state as JSON
+3. Your existing personal PropProfessor automation or scraping setup, if you already have one
+
+What to look for in the exported file:
+
+- it should be JSON
+- it should contain a `cookies` array
+- it should include cookies for `propprofessor.com` or its subdomains
+
+After exporting, install it with:
+
+```bash
+pp-query install-auth --source /path/to/exported-auth.json
+```
+
+Then verify it with:
+
+```bash
+pp-query doctor
+```
+
+If `doctor` says `No PropProfessor cookies found`, the export did not include the right cookies and you should export again from a logged-in browser session.
+
+## Easiest Way To Check Your Setup
+
+Run:
+
+```bash
+pp-query doctor
+```
+
+That will tell you:
+
+- whether an auth file was found
+- which path was selected
+- whether the file appears usable
+- whether PropProfessor responds
 
 ## Troubleshooting
 
-- If you see `No PropProfessor cookies found in auth.json`, the session file is missing or stale
-- If requests start failing with auth errors, refresh `auth.json` from a logged-in browser session
-- If you are testing locally, keep `auth.json` next to `package.json`
+If you see `No PropProfessor cookies found`:
+
+- the file exists, but it does not contain PropProfessor cookies
+- export a fresh logged-in browser session
+
+If auth was found but live requests fail:
+
+- the session may be stale
+- log in again and export a fresh file
+
+If you want to keep auth somewhere else:
+
+```bash
+AUTH_FILE=/path/to/auth.json pp-query doctor
+```

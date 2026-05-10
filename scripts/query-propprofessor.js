@@ -1,7 +1,162 @@
+#!/usr/bin/env node
 'use strict';
 
-const { createPropProfessorClient } = require('../lib/propprofessor-api');
-const { analyzePlayerPropBet, parseBetPrompt, rankScreenRows, rankTennisScreenRows, rankLeagueScreenRows, extractScreenRows, summarizeFreshness, getLeagueRankingPreset } = require('../lib/propprofessor-analysis');
+const os = require('node:os');
+
+const {
+  createPropProfessorClient,
+  DEFAULT_USER_AUTH_FILE,
+  installAuthFile,
+  inspectAuthSetup
+} = require('../lib/propprofessor-api');
+const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
+const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
+const {
+  rankTennisScreenRows,
+  rankLeagueScreenRows,
+  extractScreenRows,
+  getLeagueRankingPreset,
+  normalizeTennisMarketQuery
+} = require('../lib/propprofessor-screen-utils');
+const { buildRankedScreenResponse, getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
+const { createMcpHandlers } = require('./propprofessor-mcp-server');
+
+const LEAGUE_ALIASES = {
+  sport: null,
+  nba: 'NBA',
+  wnba: 'WNBA',
+  mlb: 'MLB',
+  nfl: 'NFL',
+  nhl: 'NHL',
+  ufc: 'UFC',
+  mma: 'UFC',
+  soccer: 'Soccer',
+  ncaab: 'NCAAB',
+  ncaaf: 'NCAAF'
+};
+
+function getCommandInventory() {
+  return [
+    { command: 'opinion', description: 'Analyze a single prop from sportsbook rows' },
+    { command: 'sportsbook', description: 'Fetch sportsbook +EV rows' },
+    { command: 'smart', description: 'Fetch smart money rows' },
+    { command: 'tennis', description: 'Query and rank tennis screen rows' },
+    { command: 'sharp-plays', description: 'Scan target-book plays with supportive non-target sharp movement' },
+    { command: 'screen', description: 'Query and rank any supported league screen with --league' },
+    { command: 'sport', description: 'Alias for screen, use --league to pick the sport' },
+    { command: 'nba', description: 'NBA screen shorthand' },
+    { command: 'wnba', description: 'WNBA screen shorthand' },
+    { command: 'mlb', description: 'MLB screen shorthand' },
+    { command: 'nfl', description: 'NFL screen shorthand' },
+    { command: 'nhl', description: 'NHL screen shorthand' },
+    { command: 'ufc', description: 'UFC screen shorthand' },
+    { command: 'ufc-card', description: 'Query a UFC card shortlist' },
+    { command: 'mma', description: 'MMA alias for UFC screen shorthand' },
+    { command: 'soccer', description: 'Soccer screen shorthand' },
+    { command: 'ncaab', description: 'NCAAB screen shorthand' },
+    { command: 'ncaaf', description: 'NCAAF screen shorthand' },
+    { command: 'presets', description: 'Show active league ranking presets' },
+    { command: 'list', description: 'Show the command inventory' },
+    { command: 'health', description: 'Check auth and endpoint health' },
+    { command: 'doctor', description: 'Run first-time setup checks and explain next steps' },
+    { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' }
+  ];
+}
+
+function buildHelpText() {
+  return [
+    'PropProfessor query CLI',
+    '',
+    'Start here:',
+    '  pp-query install-auth --source /path/to/auth.json',
+    '  pp-query doctor',
+    '  pp-query health',
+    '',
+    'Common commands:',
+    '  pp-query install-auth --source /path/to/auth.json',
+    '  pp-query doctor',
+    '  pp-query health',
+    '  pp-query screen --league NBA --market Moneyline',
+    '  pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis,WNBA,UFC --market Moneyline',
+    '  pp-query nba --market Moneyline',
+    '  pp-query ufc --market Moneyline',
+    '  pp-query ufc-card --book NoVigApp --market Moneyline',
+    '  pp-query tennis --market Moneyline --limit 10',
+    '',
+    'Useful flags:',
+    '  --league NBA',
+    '  --market Moneyline',
+    '  --books NoVigApp,Polymarket',
+    '  --lookback-hours 6',
+    '  --limit 10',
+    '',
+    'Auth file lookup order:',
+    '  1. AUTH_FILE',
+    `  2. ${os.homedir()}/.propprofessor/auth.json`,
+    '  3. ./auth.json in this repo',
+    '',
+    'If you are new here, install your browser session with:',
+    '  pp-query install-auth --source /path/to/auth.json',
+    '',
+    'Default auth location:',
+    `  ${os.homedir()}/.propprofessor/auth.json`
+  ].join('\n');
+}
+
+function buildInstallAuthReport(result) {
+  return {
+    command: 'install-auth',
+    ok: true,
+    sourceFile: result.sourceFile,
+    destinationFile: result.destinationFile,
+    usedExistingFile: Boolean(result.usedExistingFile),
+    nextStep: 'Run `pp-query doctor` to verify that the installed auth file works.'
+  };
+}
+
+function getNodeVersionStatus() {
+  const major = Number(String(process.versions?.node || '').split('.')[0] || 0);
+  return {
+    ok: major >= 18,
+    current: process.versions?.node || 'unknown',
+    required: '18+'
+  };
+}
+
+function buildDoctorReport(healthResult) {
+  const node = getNodeVersionStatus();
+  const auth = inspectAuthSetup();
+  const endpointOk = Boolean(healthResult?.ok);
+
+  let nextStep = 'Ready to add this server to your MCP client.';
+  if (!node.ok) {
+    nextStep = 'Install Node.js 18 or newer, then rerun `pp-query doctor`.';
+  } else if (!auth.ok) {
+    nextStep = `Save your PropProfessor browser session to ${auth.defaultUserAuthFile} or set AUTH_FILE, then rerun \`pp-query doctor\`.`;
+  } else if (!endpointOk) {
+    nextStep =
+      'Your auth file was found, but the live health check failed. Refresh your browser session and rerun `pp-query doctor`.';
+  }
+
+  return {
+    command: 'doctor',
+    ok: node.ok && auth.ok && endpointOk,
+    checks: {
+      node,
+      auth,
+      endpoint: {
+        ok: endpointOk,
+        details: healthResult || null
+      }
+    },
+    summary: {
+      node: node.ok ? 'ok' : 'error',
+      auth: auth.ok ? 'ok' : 'error',
+      endpoint: endpointOk ? 'ok' : 'error'
+    },
+    nextStep
+  };
+}
 
 function parseArgs(argv) {
   const args = argv.slice(2);
@@ -26,16 +181,73 @@ function parseArgs(argv) {
     } else if (arg === '--limit') {
       opts.limit = next;
       i += 1;
+    } else if (arg === '--max-age-ms' || arg === '--maxAgeMs') {
+      opts.maxAgeMs = next;
+      i += 1;
+    } else if (arg === '--lookback-hours' || arg === '--lookbackHours') {
+      opts.lookbackHours = next;
+      i += 1;
     } else if (arg === '--league' || arg === '-g') {
       opts.league = next;
       i += 1;
     } else if (arg === '--books' || arg === '-b') {
       opts.books = next;
       i += 1;
+    } else if (arg === '--book' || arg === '--target-book' || arg === '--targetBook') {
+      opts.book = next;
+      opts.targetBook = next;
+      i += 1;
+    } else if (arg === '--leagues') {
+      opts.leagues = next;
+      i += 1;
+    } else if (arg === '--markets') {
+      opts.market = next;
+      opts.markets = next;
+      i += 1;
+    } else if (arg === '--event-date' || arg === '--eventDate') {
+      opts.eventDate = next;
+      i += 1;
+    } else if (arg === '--card-window' || arg === '--cardWindow') {
+      opts.cardWindow = next;
+      i += 1;
+    } else if (arg === '--upcoming-only' || arg === '--upcomingOnly') {
+      opts.upcomingOnly = true;
+    } else if (arg === '--max-hours-away' || arg === '--maxHoursAway') {
+      opts.maxHoursAway = next;
+      i += 1;
+    } else if (arg === '--scan-limit' || arg === '--scanLimit') {
+      opts.scanLimit = next;
+      i += 1;
+    } else if (arg === '--min-odds' || arg === '--minOdds') {
+      opts.minOdds = next;
+      i += 1;
+    } else if (arg === '--max-odds' || arg === '--maxOdds') {
+      opts.maxOdds = next;
+      i += 1;
+    } else if (arg === '--min-consensus-book-count' || arg === '--minConsensusBookCount') {
+      opts.minConsensusBookCount = next;
+      i += 1;
+    } else if (arg === '--broad') {
+      opts.broad = true;
+      opts.strict = false;
+    } else if (arg === '--include-passes' || arg === '--includePasses') {
+      opts.includePasses = true;
+    } else if (arg === '--allow-recent-only' || arg === '--allowRecentOnly') {
+      opts.allowRecentOnly = true;
+    } else if (arg === '--source') {
+      opts.source = next;
+      i += 1;
+    } else if (arg === '--dest' || arg === '--destination') {
+      opts.destination = next;
+      i += 1;
     } else if (arg === '--live') {
       opts.live = true;
     } else if (arg === '--json') {
       opts.json = true;
+    } else if (arg === '--debug') {
+      opts.debug = true;
+    } else if (arg === '--no-debug') {
+      opts.debug = false;
     }
   }
 
@@ -46,40 +258,130 @@ function extractRows(payload) {
   return extractScreenRows(payload);
 }
 
+function emitJson(logger, payload) {
+  logger.log(JSON.stringify(payload, null, 2));
+}
+
+async function queryTennisPayloads(client, { market, books, is_live } = {}) {
+  const tennisQuery =
+    typeof client.queryScreenOdds === 'function'
+      ? client.queryScreenOdds.bind(client)
+      : client.queryScreenOddsBestComps.bind(client);
+  const payloads = [];
+
+  for (const tennisMarket of normalizeTennisMarketQuery(market || 'Moneyline')) {
+    payloads.push(
+      await tennisQuery({
+        league: 'Tennis',
+        market: tennisMarket,
+        books,
+        is_live
+      })
+    );
+  }
+
+  return payloads;
+}
+
+function resolveScreenCommand(command, opts = {}) {
+  if (Object.prototype.hasOwnProperty.call(LEAGUE_ALIASES, command)) {
+    return {
+      command: 'screen',
+      league: LEAGUE_ALIASES[command] || opts.league || 'NBA'
+    };
+  }
+  return {
+    command,
+    league: opts.league || 'NBA'
+  };
+}
+
+function formatLocalStart(value, timeZone = getLocalTimezone()) {
+  if (!value) return null;
+  const raw = String(value);
+  const hasExplicitZone = /([zZ]|[+-]\d\d:?\d\d)$/.test(raw);
+  const date = new Date(hasExplicitZone ? raw : `${raw}Z`);
+  if (Number.isNaN(date.getTime())) return raw;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  }).format(date);
+}
+
+function normalizeScreenRowTimes(rows, timeZone = getLocalTimezone()) {
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const startLabel = formatLocalStart(row?.start, timeZone);
+    return {
+      ...row,
+      startRaw: row?.start ?? null,
+      startLocal: startLabel,
+      startDisplay: startLabel
+    };
+  });
+}
+
+function getMultiValueOption(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  if (value === undefined || value === null || value === '') return [];
+  return String(value).split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function toBooleanOption(value) {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return false;
+  return !['false', '0', 'no', 'off'].includes(normalized);
+}
+
+function renderUfcCardOutput(result, logger = console) {
+  const officialPlays = Array.isArray(result?.officialPlays) ? result.officialPlays : [];
+  const bestLooks = Array.isArray(result?.bestLooks) ? result.bestLooks : [];
+  const passes = Array.isArray(result?.passes) ? result.passes : [];
+  const summaryText = result?.summaryText || result?.summary || `UFC card: ${officialPlays.length} official bet${officialPlays.length === 1 ? '' : 's'}, ${bestLooks.length} look${bestLooks.length === 1 ? '' : 's'}, ${passes.length} pass${passes.length === 1 ? '' : 'es'}.`;
+
+  const lines = [];
+  const addSection = (title, rows) => {
+    lines.push(title);
+    if (!rows.length) {
+      lines.push('  (none)');
+      return;
+    }
+    rows.slice(0, 10).forEach((row, index) => {
+      const label = row?.summary || row?.label || row?.name || row?.fighter || row?.participant || row?.selection || row?.market || row?.title || JSON.stringify(row);
+      lines.push(`  ${index + 1}. ${label}`);
+    });
+  };
+
+  addSection('Official UFC bets', officialPlays);
+  addSection('Best UFC looks', bestLooks);
+  addSection('Passes', passes);
+  lines.push('Summary');
+  lines.push(`  ${summaryText}`);
+
+  logger.log(lines.join('\n'));
+}
+
 async function main({ argv = process.argv, client = createPropProfessorClient(), logger = console } = {}) {
   const { command, opts } = parseArgs(argv);
+  const screenCommand = resolveScreenCommand(command, opts);
+
   if (command === 'help') {
-    logger.log([
-      'Usage: node scripts/query-propprofessor.js <command> [options]',
-      '',
-      'Commands:',
-      '  opinion   Analyze a single prop from the sportsbook screen',
-      '  sportsbook  Fetch sportsbook +EV rows',
-      '  smart     Fetch smart money rows',
-      '  fantasy   Fetch fantasy rows',
-      '  tennis    Query and rank tennis screen rows',
-      '  screen    Query any sport screen with --league',
-      '  sport     Alias for screen, use --league to pick the sport',
-      '  nba       NBA screen shorthand',
-      '  wnba      WNBA screen shorthand',
-      '  mlb       MLB screen shorthand',
-      '  nfl       NFL screen shorthand',
-      '  nhl       NHL screen shorthand',
-      '  soccer    Soccer screen shorthand',
-      '  ncaab     NCAAB screen shorthand',
-      '  ncaaf     NCAAF screen shorthand',
-      '  presets   Show the active league presets',
-      '  list      Show the command inventory',
-      '  health    Check auth and endpoint health',
-      '',
-      'Examples:',
-      '  pp-query nba --market Moneyline',
-      '  pp-query wnba --market Moneyline',
-      '  pp-query sport --league WNBA --market Moneyline',
-      '  pp-query tennis --market Moneyline --limit 10',
-      '  pp-query opinion --player "James Harden" --market Points --line 18.5 --side over'
-    ].join('\n'));
+    logger.log(buildHelpText());
     process.exitCode = 0;
+    return;
+  }
+
+  if (command === 'list') {
+    emitJson(logger, { command, commands: getCommandInventory() });
     return;
   }
 
@@ -92,109 +394,248 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       side: opts.side
     };
     const result = analyzePlayerPropBet(query, rows);
-    console.log(JSON.stringify(result, null, 2));
+    emitJson(logger, result);
     return;
   }
 
   let payload;
+  let payloads = null;
   if (command === 'sportsbook') {
     payload = await client.querySportsbook();
-  } else if (command === 'smart') {
-    payload = await client.querySmartMoney();
-  } else if (command === 'fantasy') {
-    payload = await client.queryFantasyPicks();
-  } else if (command === 'tennis') {
-    payload = await client.queryScreenOddsBestComps({
-      league: 'Tennis',
-      market: opts.market || 'Moneyline',
-      books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
+  } else if (command === 'ufc-card') {
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.query_ufc_card({
+      book: opts.book || opts.targetBook,
+      targetBook: opts.targetBook || opts.book,
+      markets: getMultiValueOption(opts.markets || opts.market),
+      eventDate: opts.eventDate,
+      cardWindow: opts.cardWindow,
+      upcomingOnly: toBooleanOption(opts.upcomingOnly),
+      maxHoursAway: opts.maxHoursAway !== undefined ? Number(opts.maxHoursAway) : undefined,
+      limit: opts.limit !== undefined ? Number(opts.limit) : undefined,
+      scanLimit: opts.scanLimit !== undefined ? Number(opts.scanLimit) : undefined,
+      debug: toBooleanOption(opts.debug),
       is_live: Boolean(opts.live)
     });
-  } else if (command === 'screen' || command === 'sport' || command === 'nba' || command === 'mlb' || command === 'nfl' || command === 'nhl' || command === 'soccer' || command === 'ncaab' || command === 'ncaaf' || command === 'wnba') {
-    const leagueMap = {
-      screen: opts.league || 'NBA',
-      sport: opts.league || 'NBA',
-      nba: 'NBA',
-      wnba: 'WNBA',
-      mlb: 'MLB',
-      nfl: 'NFL',
-      nhl: 'NHL',
-      soccer: 'SOCCER',
-      ncaab: 'NCAAB',
-      ncaaf: 'NCAAF'
-    };
-    const league = leagueMap[command];
-    payload = await client.queryScreenOddsBestComps({
-      league,
+    if (opts.json) {
+      emitJson(logger, result);
+    } else {
+      renderUfcCardOutput(result, logger);
+    }
+    return;
+  } else if (command === 'smart') {
+    payload = await client.querySmartMoney();
+  } else if (command === 'tennis') {
+    payloads = await queryTennisPayloads(client, {
       market: opts.market || 'Moneyline',
-      books: opts.books ? String(opts.books).split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      books: opts.books
+        ? String(opts.books)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+      is_live: Boolean(opts.live)
+    });
+    payload = payloads[0] || { game_data: [] };
+  } else if (command === 'sharp-plays') {
+    payload = { game_data: [] };
+  } else if (screenCommand.command === 'screen') {
+    payload = await client.queryScreenOddsBestComps({
+      league: screenCommand.league,
+      market: opts.market || 'Moneyline',
+      books: opts.books
+        ? String(opts.books)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
       is_live: Boolean(opts.live)
     });
   } else if (command === 'presets') {
-    const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
-    const presets = leagues.map(league => getLeagueRankingPreset(league));
-    console.log(JSON.stringify({ command, presets }, null, 2));
-    return;
-  } else if (command === 'list') {
-    console.log(JSON.stringify({
-      command,
-      commands: ['sportsbook', 'smart', 'fantasy', 'screen', 'sport', 'nba', 'wnba', 'mlb', 'nfl', 'nhl', 'soccer', 'ncaab', 'ncaaf', 'tennis', 'presets', 'health', 'opinion'],
-      aliases: {
-        screen: 'Generic screen query, defaults to NBA unless --league is set',
-        sport: 'Generic screen query, defaults to NBA unless --league is set',
-        nba: 'NBA screen shorthand',
-        wnba: 'WNBA screen shorthand',
-        mlb: 'MLB screen shorthand',
-        nfl: 'NFL screen shorthand',
-        nhl: 'NHL screen shorthand',
-        soccer: 'Soccer screen shorthand',
-        ncaab: 'NCAAB screen shorthand',
-        ncaaf: 'NCAAF screen shorthand'
-      }
-    }, null, 2));
+    const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'UFC', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
+    const presets = leagues.map((league) => getLeagueRankingPreset(league));
+    emitJson(logger, { command, presets });
     return;
   } else if (command === 'health') {
     const result = await client.healthStatus();
-    console.log(JSON.stringify({ command, ...result }, null, 2));
+    emitJson(logger, { command, ...result });
+    return;
+  } else if (command === 'doctor') {
+    let healthResult;
+    try {
+      healthResult = await client.healthStatus();
+    } catch (error) {
+      healthResult = {
+        ok: false,
+        error: String(error?.message || error)
+      };
+    }
+    emitJson(logger, buildDoctorReport(healthResult));
+    return;
+  } else if (command === 'install-auth') {
+    if (!opts.source) {
+      throw new Error(`install-auth requires --source. Example: pp-query install-auth --source /path/to/auth.json`);
+    }
+    const installResult = installAuthFile({
+      sourceFile: opts.source,
+      destinationFile: opts.destination || DEFAULT_USER_AUTH_FILE
+    });
+    emitJson(logger, buildInstallAuthReport(installResult));
     return;
   } else {
     throw new Error(`Unknown command: ${command}`);
   }
 
   const rows = extractRows(payload);
+  const lookbackHours = getOddsHistoryLookbackHours(opts.lookbackHours);
+  const debug = getDebugFlag(opts.debug, true);
+  if (command === 'sharp-plays') {
+    const targetBook = opts.book || opts.targetBook || opts.books?.split(',')?.[0] || 'NoVigApp';
+    const leagues = opts.leagues
+      ? String(opts.leagues)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : opts.league
+        ? [opts.league]
+        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA', 'UFC'];
+    const markets = opts.markets
+      ? String(opts.markets)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [opts.market || 'Moneyline'];
+    const { createMcpHandlers } = require('./propprofessor-mcp-server');
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.query_sharp_plays({
+      book: targetBook,
+      leagues,
+      markets,
+      limit: opts.limit ? Number(opts.limit) : 10,
+      scanLimit: opts.scanLimit ? Number(opts.scanLimit) : undefined,
+      minOdds: opts.minOdds !== undefined ? Number(opts.minOdds) : undefined,
+      maxOdds: opts.maxOdds !== undefined ? Number(opts.maxOdds) : undefined,
+      minConsensusBookCount: opts.minConsensusBookCount !== undefined ? Number(opts.minConsensusBookCount) : undefined,
+      includePasses: Boolean(opts.includePasses),
+      strict: opts.strict !== undefined ? opts.strict : !opts.broad,
+      allowRecentOnly: Boolean(opts.allowRecentOnly),
+      maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : undefined,
+      lookbackHours,
+      debug,
+      is_live: Boolean(opts.live)
+    });
+    emitJson(logger, result);
+    return;
+  }
   if (command === 'tennis') {
-    const ranked = rankTennisScreenRows(rows, { limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
-    console.log(JSON.stringify({
-      command,
-      count: ranked.length,
-      sample: ranked,
-      freshness: summarizeFreshness(rows),
-      notes: {
-        consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
-        clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: ranked.some(row => row.clvProxyPct !== null)
+    const tennisBooks = opts.books
+      ? String(opts.books)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const result = await buildRankedScreenResponse({
+      client,
+      payloads: Array.isArray(payloads) && payloads.length ? payloads : [payload],
+      args: {
+        books: tennisBooks,
+        historySportsbooks: tennisBooks,
+        limit: opts.limit ? Number(opts.limit) : 12,
+        includeAll: true,
+        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+        lookbackHours,
+        debug
+      },
+      league: 'Tennis',
+      focusBook: tennisBooks[0] || 'Pinnacle',
+      rankRows: (hydratedRows, { debug: rankedDebug } = {}) =>
+        rankTennisScreenRows(hydratedRows, {
+          limit: opts.limit ? Number(opts.limit) : 12,
+          includeAll: true,
+          maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+          preferredBook: tennisBooks[0] || 'Pinnacle',
+          debug: rankedDebug
+        }),
+      resultMeta: {
+        command,
+        notes: {
+          consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+          clvProxy: 'open odds vs current odds when history fields are present',
+          timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+        }
       }
-    }, null, 2));
+    });
+    const normalized = normalizeScreenRowTimes(result.result);
+    result.result = normalized;
+    result.count = normalized.length;
+    result.sample = normalized;
+    result.notes = {
+      ...(result.notes || {}),
+      movementAvailable: normalized.some((row) => row.lineHistoryUsable || row.clvProxyPct !== null),
+      consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+      clvProxy: 'open odds vs current odds when history fields are present',
+      timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+    };
+    emitJson(logger, result);
     return;
   }
 
-  if (command === 'screen') {
-    const ranked = rankLeagueScreenRows(rows, { league: opts.league || 'NBA', limit: opts.limit ? Number(opts.limit) : 12, includeAll: true, maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null });
-    console.log(JSON.stringify({
-      command,
-      count: ranked.length,
-      sample: ranked,
-      freshness: summarizeFreshness(rows),
-      notes: {
-        consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
-        clvProxy: 'open odds vs current odds when history fields are present',
-        movementAvailable: ranked.some(row => row.clvProxyPct !== null)
+  if (screenCommand.command === 'screen') {
+    const screenBooks = opts.books
+      ? String(opts.books)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : ['NoVigApp', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const result = await buildRankedScreenResponse({
+      client,
+      payloads: [payload],
+      args: {
+        books: screenBooks,
+        historySportsbooks: screenBooks,
+        limit: opts.limit ? Number(opts.limit) : 12,
+        includeAll: true,
+        maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+        lookbackHours,
+        debug
+      },
+      league: screenCommand.league,
+      focusBook: screenBooks[0] || 'NoVigApp',
+      rankRows: (hydratedRows, { debug: rankedDebug } = {}) =>
+        rankLeagueScreenRows(hydratedRows, {
+          league: screenCommand.league,
+          market: opts.market || 'Moneyline',
+          limit: opts.limit ? Number(opts.limit) : 12,
+          includeAll: true,
+          maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
+          books: screenBooks,
+          debug: rankedDebug
+        }),
+      resultMeta: {
+        command,
+        notes: {
+          consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+          clvProxy: 'open odds vs current odds when history fields are present',
+          timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+        }
       }
-    }, null, 2));
+    });
+    const normalized = normalizeScreenRowTimes(result.result);
+    result.result = normalized;
+    result.count = normalized.length;
+    result.sample = normalized;
+    result.notes = {
+      ...(result.notes || {}),
+      movementAvailable: normalized.some((row) => row.lineHistoryUsable || row.clvProxyPct !== null),
+      consensusEdgeSource: 'row.value/row.ev/row.edge if exposed by PP',
+      clvProxy: 'open odds vs current odds when history fields are present',
+      timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
+    };
+    emitJson(logger, result);
     return;
   }
 
-  const filtered = rows.filter(row => {
+  const filtered = rows.filter((row) => {
     const text = JSON.stringify(row).toLowerCase();
     const playerOk = !opts.player || text.includes(String(opts.player).toLowerCase());
     const marketOk = !opts.market || text.includes(String(opts.market).toLowerCase());
@@ -202,18 +643,23 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     const sideOk = !opts.side || text.includes(String(opts.side).toLowerCase());
     return playerOk && marketOk && lineOk && sideOk;
   });
-  console.log(JSON.stringify({ command, count: filtered.length, sample: filtered.slice(0, 10) }, null, 2));
+  emitJson(logger, { command, count: filtered.length, sample: filtered.slice(0, 10) });
 }
 
 if (require.main === module) {
-  main().catch(err => {
+  main().catch((err) => {
     console.error(err.stack || err.message);
     process.exitCode = 1;
   });
 }
 
 module.exports = {
+  buildDoctorReport,
+  buildHelpText,
+  buildInstallAuthReport,
+  getCommandInventory,
   parseArgs,
+  resolveScreenCommand,
   extractRows,
   main
 };

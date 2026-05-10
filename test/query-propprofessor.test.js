@@ -2,219 +2,469 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
-const { main } = require('../scripts/query-propprofessor');
+const {
+  buildDoctorReport,
+  buildHelpText,
+  buildInstallAuthReport,
+  getCommandInventory,
+  main,
+  parseArgs,
+  resolveScreenCommand
+} = require('../scripts/query-propprofessor');
 
-describe('query-propprofessor ranking commands', () => {
-  it('supports a tennis ranking command that uses the sharper screen helper', async () => {
-    const logs = [];
-    const client = {
-      queryScreenOddsBestComps: async () => ({
-        game_data: [
-          {
-            league: 'Tennis',
-            book: 'NoVigApp',
-            participant: 'Player A',
-            market: 'Moneyline',
-            value: 4.2,
-            odds: 110,
-            lineHistory: [130, 110],
-            oddsHistory: [130, 110],
-            selections: {
-              a: {
-                selection1: 'Player A',
-                selection2: 'Player B',
-                odds: {
-                  NoVigApp: { odds1: 110, odds2: -120 },
-                  Polymarket: { odds1: 108, odds2: -118 },
-                  Kalshi: { odds1: 105, odds2: -115 },
-                  BetOnline: { odds1: 107, odds2: -117 },
-                  Circa: { odds1: 106, odds2: -116 }
-                }
-              }
-            },
-            defaultKey: 'a'
+describe('query-propprofessor CLI parsing', () => {
+  it('accepts lookback-hours aliases', () => {
+    const dashed = parseArgs(['node', 'query', 'screen', '--lookback-hours', '4']);
+    assert.equal(dashed.command, 'screen');
+    assert.equal(dashed.opts.lookbackHours, '4');
+
+    const camel = parseArgs(['node', 'query', 'screen', '--lookbackHours', '8']);
+    assert.equal(camel.command, 'screen');
+    assert.equal(camel.opts.lookbackHours, '8');
+  });
+
+  it('accepts debug flags', () => {
+    const enabled = parseArgs(['node', 'query', 'screen', '--debug']);
+    assert.equal(enabled.opts.debug, true);
+
+    const disabled = parseArgs(['node', 'query', 'screen', '--no-debug']);
+    assert.equal(disabled.opts.debug, false);
+  });
+
+  it('accepts positive EV discovery flags', () => {
+    const parsed = parseArgs([
+      'node',
+      'query',
+      'sportsbook',
+      '--league',
+      'NBA',
+      '--books',
+      'Fliff,NoVigApp',
+      '--market',
+      'Player Props',
+      '--line',
+      '-3'
+    ]);
+
+    assert.equal(parsed.command, 'sportsbook');
+    assert.equal(parsed.opts.league, 'NBA');
+    assert.equal(parsed.opts.books, 'Fliff,NoVigApp');
+    assert.equal(parsed.opts.market, 'Player Props');
+    assert.equal(parsed.opts.line, '-3');
+  });
+
+  it('accepts dedicated UFC card aliases and flags', () => {
+    const parsed = parseArgs([
+      'node',
+      'query',
+      'ufc-card',
+      '--target-book',
+      'NoVigApp',
+      '--markets',
+      'Moneyline,Total',
+      '--event-date',
+      '2026-05-10',
+      '--card-window',
+      'today',
+      '--upcoming-only',
+      '--max-hours-away',
+      '24',
+      '--scan-limit',
+      '10'
+    ]);
+
+    assert.equal(parsed.command, 'ufc-card');
+    assert.equal(parsed.opts.book, 'NoVigApp');
+    assert.equal(parsed.opts.targetBook, 'NoVigApp');
+    assert.equal(parsed.opts.market, 'Moneyline,Total');
+    assert.equal(parsed.opts.markets, 'Moneyline,Total');
+    assert.equal(parsed.opts.eventDate, '2026-05-10');
+    assert.equal(parsed.opts.cardWindow, 'today');
+    assert.equal(parsed.opts.upcomingOnly, true);
+    assert.equal(parsed.opts.maxHoursAway, '24');
+    assert.equal(parsed.opts.scanLimit, '10');
+  });
+
+  it('resolves documented screen aliases to supported leagues', () => {
+    assert.deepEqual(resolveScreenCommand('sport', { league: 'WNBA' }), { command: 'screen', league: 'WNBA' });
+    assert.deepEqual(resolveScreenCommand('nba', {}), { command: 'screen', league: 'NBA' });
+    assert.deepEqual(resolveScreenCommand('wnba', {}), { command: 'screen', league: 'WNBA' });
+    assert.deepEqual(resolveScreenCommand('ufc', {}), { command: 'screen', league: 'UFC' });
+    assert.deepEqual(resolveScreenCommand('mma', {}), { command: 'screen', league: 'UFC' });
+    assert.deepEqual(resolveScreenCommand('soccer', {}), { command: 'screen', league: 'Soccer' });
+  });
+
+  it('exposes the documented command inventory', () => {
+    const inventory = getCommandInventory().map((entry) => entry.command);
+    assert.deepEqual(inventory, [
+      'opinion',
+      'sportsbook',
+      'smart',
+      'tennis',
+      'sharp-plays',
+      'screen',
+      'sport',
+      'nba',
+      'wnba',
+      'mlb',
+      'nfl',
+      'nhl',
+      'ufc',
+      'ufc-card',
+      'mma',
+      'soccer',
+      'ncaab',
+      'ncaaf',
+      'presets',
+      'list',
+      'health',
+      'doctor',
+      'install-auth'
+    ]);
+  });
+
+  it('prints beginner-friendly help text', () => {
+    const help = buildHelpText();
+    assert.match(help, /Start here:/);
+    assert.match(help, /install-auth/);
+    assert.match(help, /pp-query doctor/);
+    assert.match(help, /pp-query ufc-card/);
+    assert.match(help, /Auth file lookup order:/);
+  });
+});
+
+describe('query-propprofessor CLI command execution', () => {
+  function createLogger() {
+    const lines = [];
+    return {
+      logger: {
+        log(value) {
+          lines.push(String(value));
+        }
+      },
+      lines
+    };
+  }
+
+  it('renders presets without throwing and includes WNBA', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'presets'],
+      client: {},
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'presets');
+    assert.ok(Array.isArray(payload.presets));
+    assert.ok(payload.presets.some((entry) => entry.league === 'WNBA'));
+  });
+
+  it('renders the command list locally', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'list'],
+      client: {},
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'list');
+    assert.ok(Array.isArray(payload.commands));
+    assert.ok(payload.commands.some((entry) => entry.command === 'sport'));
+  });
+
+  it('routes the sport alias through screen ranking with the requested league', async () => {
+    const { logger, lines } = createLogger();
+    const calls = [];
+
+    await main({
+      argv: ['node', 'query', 'sport', '--league', 'WNBA', '--market', 'Moneyline'],
+      client: {
+        queryScreenOddsBestComps: async (filters) => {
+          calls.push(filters);
+          return { game_data: [] };
+        }
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].league, 'WNBA');
+    assert.equal(payload.league, 'WNBA');
+  });
+
+  it('routes ufc-card through query_ufc_card with UFC card flags', async () => {
+    const { logger, lines } = createLogger();
+    const calls = [];
+
+    await main({
+      argv: [
+        'node',
+        'query',
+        'ufc-card',
+        '--book',
+        'NoVigApp',
+        '--markets',
+        'Moneyline,Total',
+        '--eventDate',
+        '2026-05-10',
+        '--cardWindow',
+        'today',
+        '--upcomingOnly',
+        '--maxHoursAway',
+        '48',
+        '--limit',
+        '5',
+        '--scanLimit',
+        '10',
+        '--debug',
+        '--live',
+        '--json'
+      ],
+      client: {
+        queryScreenOddsBestComps: async (filters) => {
+          calls.push(filters);
+          return { game_data: [] };
+        }
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].league, 'UFC');
+    assert.equal(calls[0].market, 'Moneyline');
+    assert.equal(calls[0].is_live, true);
+    assert.equal(payload.league, 'UFC');
+    assert.ok(Array.isArray(payload.officialPlays));
+  });
+
+  it('renders concise UFC output for non-json command output', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'ufc-card'],
+      client: {
+        queryScreenOddsBestComps: async () => ({ game_data: [] })
+      },
+      logger
+    });
+
+    const output = lines.join('\n');
+    assert.match(output, /Official UFC bets/);
+    assert.match(output, /Best UFC looks/);
+    assert.match(output, /Passes/);
+    assert.match(output, /Summary/);
+  });
+
+  it('preserves structured payloads when json output is requested for ufc-card', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'ufc-card', '--json'],
+      client: {
+        queryScreenOddsBestComps: async () => ({ game_data: [] })
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.league, 'UFC');
+    assert.ok(Array.isArray(payload.officialPlays));
+    assert.ok(Array.isArray(payload.bestLooks));
+    assert.ok(Array.isArray(payload.passes));
+    assert.equal(payload.resultMeta.source, 'ufc_card');
+  });
+
+  it('routes the nba shorthand alias through screen ranking', async () => {
+    const { logger, lines } = createLogger();
+    const calls = [];
+
+    await main({
+      argv: ['node', 'query', 'nba', '--market', 'Moneyline'],
+      client: {
+        queryScreenOddsBestComps: async (filters) => {
+          calls.push(filters);
+          return { game_data: [] };
+        }
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].league, 'NBA');
+    assert.equal(payload.league, 'NBA');
+  });
+
+  for (const [command, expectedLeague] of [
+    ['wnba', 'WNBA'],
+    ['mlb', 'MLB'],
+    ['nfl', 'NFL'],
+    ['nhl', 'NHL'],
+    ['ufc', 'UFC'],
+    ['mma', 'UFC'],
+    ['soccer', 'Soccer'],
+    ['ncaab', 'NCAAB'],
+    ['ncaaf', 'NCAAF']
+  ]) {
+    it(`smoke-routes ${command} through screen ranking`, async () => {
+      const { logger, lines } = createLogger();
+      const calls = [];
+
+      await main({
+        argv: ['node', 'query', command, '--market', 'Moneyline'],
+        client: {
+          queryScreenOddsBestComps: async (filters) => {
+            calls.push(filters);
+            return { game_data: [] };
           }
-        ]
-      })
-    };
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    console.log = (...args) => logs.push(args.join(' '));
-    console.error = (...args) => logs.push(args.join(' '));
-
-    try {
-      await main({
-        argv: ['node', 'query-propprofessor.js', 'tennis'],
-        client,
-        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+        },
+        logger
       });
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-    }
 
-    assert.equal(logs.length, 1);
-    const output = JSON.parse(logs[0]);
-    assert.equal(output.command, 'tennis');
-    assert.ok(Array.isArray(output.sample));
-    assert.ok(output.sample.length > 0);
-    assert.ok(output.sample[0].rankingReason);
-    assert.equal(output.sample[0].hasConsensus, true);
-    assert.ok(output.freshness);
+      const payload = JSON.parse(lines[0]);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].league, expectedLeague);
+      assert.equal(payload.league, expectedLeague);
+    });
+  }
+
+  it('smoke-runs the documented health command', async () => {
+    const { logger, lines } = createLogger();
+
+    await main({
+      argv: ['node', 'query', 'health'],
+      client: {
+        healthStatus: async () => ({ ok: true, endpoints: { screen: 'ok' } })
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'health');
+    assert.equal(payload.ok, true);
+    assert.deepEqual(payload.endpoints, { screen: 'ok' });
   });
 
-  it('supports nba as a shorthand screen command', async () => {
-    const logs = [];
-    const seen = [];
-    const client = {
-      queryScreenOddsBestComps: async filters => {
-        seen.push(filters);
-        return { game_data: [{ league: 'NBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 3.1 }] };
-      }
-    };
+  it('smoke-runs the doctor command and reports success when health passes', async () => {
+    const { logger, lines } = createLogger();
 
-    const originalLog = console.log;
-    const originalError = console.error;
-    console.log = (...args) => logs.push(args.join(' '));
-    console.error = (...args) => logs.push(args.join(' '));
+    await main({
+      argv: ['node', 'query', 'doctor'],
+      client: {
+        healthStatus: async () => ({ ok: true, endpoints: { screen: 'ok' } })
+      },
+      logger
+    });
 
-    try {
-      await main({
-        argv: ['node', 'query-propprofessor.js', 'nba'],
-        client,
-        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
-      });
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-    }
-
-    assert.equal(seen[0].league, 'NBA');
-    const output = JSON.parse(logs[0]);
-    assert.equal(output.command, 'nba');
-    assert.ok(Array.isArray(output.sample));
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'doctor');
+    assert.equal(typeof payload.checks.auth.selectedAuthFile, 'string');
+    assert.equal(payload.summary.endpoint, 'ok');
   });
 
-  it('supports soccer as a shorthand screen command', async () => {
-    const logs = [];
-    const seen = [];
-    const client = {
-      queryScreenOddsBestComps: async filters => {
-        seen.push(filters);
-        return { game_data: [{ league: 'SOCCER', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.1 }] };
-      }
-    };
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    console.log = (...args) => logs.push(args.join(' '));
-    console.error = (...args) => logs.push(args.join(' '));
+  it('smoke-runs the install-auth command and copies a source file', async () => {
+    const { logger, lines } = createLogger();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-cli-install-auth-'));
+    const sourceFile = path.join(tempDir, 'source-auth.json');
+    const destinationFile = path.join(tempDir, '.propprofessor', 'auth.json');
+    fs.writeFileSync(
+      sourceFile,
+      JSON.stringify({ cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }] }),
+      'utf8'
+    );
 
     try {
       await main({
-        argv: ['node', 'query-propprofessor.js', 'soccer'],
-        client,
-        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
-      });
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-    }
-
-    assert.equal(seen[0].league, 'SOCCER');
-    const output = JSON.parse(logs[0]);
-    assert.equal(output.command, 'soccer');
-    assert.ok(Array.isArray(output.sample));
-  });
-
-  it('supports wnba as a shorthand screen command', async () => {
-    const logs = [];
-    const seen = [];
-    const client = {
-      queryScreenOddsBestComps: async filters => {
-        seen.push(filters);
-        return { game_data: [{ league: 'WNBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.4 }] };
-      }
-    };
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    console.log = (...args) => logs.push(args.join(' '));
-    console.error = (...args) => logs.push(args.join(' '));
-
-    try {
-      await main({
-        argv: ['node', 'query-propprofessor.js', 'wnba'],
-        client,
-        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
-      });
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-    }
-
-    assert.equal(seen[0].league, 'WNBA');
-    const output = JSON.parse(logs[0]);
-    assert.equal(output.command, 'wnba');
-    assert.ok(Array.isArray(output.sample));
-  });
-
-  it('supports sport as a generic shorthand screen command', async () => {
-    const logs = [];
-    const seen = [];
-    const client = {
-      queryScreenOddsBestComps: async filters => {
-        seen.push(filters);
-        return { game_data: [{ league: 'WNBA', participant: 'Player A', market: 'Moneyline', odds: 110, value: 2.4 }] };
-      }
-    };
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    console.log = (...args) => logs.push(args.join(' '));
-    console.error = (...args) => logs.push(args.join(' '));
-
-    try {
-      await main({
-        argv: ['node', 'query-propprofessor.js', 'sport', '--league', 'WNBA'],
-        client,
-        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
-      });
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-    }
-
-    assert.equal(seen[0].league, 'WNBA');
-    const output = JSON.parse(logs[0]);
-    assert.equal(output.command, 'sport');
-    assert.ok(Array.isArray(output.sample));
-  });
-
-  it('supports list as a command inventory shortcut', async () => {
-    const logs = [];
-    const originalLog = console.log;
-    const originalError = console.error;
-    console.log = (...args) => logs.push(args.join(' '));
-    console.error = (...args) => logs.push(args.join(' '));
-
-    try {
-      await main({
-        argv: ['node', 'query-propprofessor.js', 'list'],
+        argv: ['node', 'query', 'install-auth', '--source', sourceFile, '--destination', destinationFile],
         client: {},
-        logger: { log: msg => logs.push(msg), error: msg => logs.push(msg) }
+        logger
       });
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-    }
 
-    const output = JSON.parse(logs[0]);
-    assert.equal(output.command, 'list');
-    assert.ok(output.commands.includes('wnba'));
-    assert.ok(output.aliases.sport);
+      const payload = JSON.parse(lines[0]);
+      assert.equal(payload.command, 'install-auth');
+      assert.equal(payload.ok, true);
+      assert.equal(fs.existsSync(destinationFile), true);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
+  it('smoke-runs the documented sportsbook and smart commands', async () => {
+    const sportsbook = createLogger();
+    await main({
+      argv: ['node', 'query', 'sportsbook'],
+      client: {
+        querySportsbook: async () => [{ player: 'A' }]
+      },
+      logger: sportsbook.logger
+    });
+    const sportsbookPayload = JSON.parse(sportsbook.lines[0]);
+    assert.equal(sportsbookPayload.command, 'sportsbook');
+    assert.equal(sportsbookPayload.count, 1);
+
+    const smart = createLogger();
+    await main({
+      argv: ['node', 'query', 'smart'],
+      client: {
+        querySmartMoney: async () => [{ player: 'B' }]
+      },
+      logger: smart.logger
+    });
+    const smartPayload = JSON.parse(smart.lines[0]);
+    assert.equal(smartPayload.command, 'smart');
+    assert.equal(smartPayload.count, 1);
+  });
+
+  it('expands tennis market aliases the same way as MCP tennis queries', async () => {
+    const { logger, lines } = createLogger();
+    const calls = [];
+
+    await main({
+      argv: ['node', 'query', 'tennis', '--market', 'Spread'],
+      client: {
+        queryScreenOdds: async (filters) => {
+          calls.push(filters);
+          return { game_data: [] };
+        }
+      },
+      logger
+    });
+
+    const payload = JSON.parse(lines[0]);
+    assert.equal(calls.length, 3);
+    assert.deepEqual(
+      calls.map((call) => call.market),
+      ['Game Handicap', 'Set Handicap', 'Point Spread']
+    );
+    assert.equal(payload.league, 'Tennis');
+  });
+
+  it('builds a doctor report with a clear next step when endpoint health fails', () => {
+    const report = buildDoctorReport({ ok: false, error: 'boom' });
+    assert.equal(report.command, 'doctor');
+    assert.equal(report.summary.endpoint, 'error');
+    assert.equal(typeof report.nextStep, 'string');
+  });
+
+  it('builds an install-auth report with a follow-up step', () => {
+    const report = buildInstallAuthReport({
+      sourceFile: '/tmp/source.json',
+      destinationFile: '/tmp/auth.json',
+      usedExistingFile: false
+    });
+    assert.equal(report.command, 'install-auth');
+    assert.equal(report.ok, true);
+    assert.match(report.nextStep, /pp-query doctor/);
+  });
 });

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.6
+
+- Added a reusable `sharp-plays-service` package export so PP-MCP business logic can be shared without importing the MCP script entrypoint
+- Fixed `superjson` loading in the CommonJS API client by using a cached dynamic import, restoring Node 18 compatibility for TRPC hide-row serialization
+- Added CI and local verification coverage across Node 18 and Node 20, including lint and Prettier checks
+- Kept the release version ahead of the already-published `v1.0.5` tag so the next GitHub release can be tagged cleanly as `v1.0.6`
+
+## 1.0.5
+
+- Restored `query_positive_ev_candidates` as an MCP sportsbook discovery helper so Hermes can scan broad +EV candidates before validating finalists with `/screen`
+- Added `query_validated_positive_ev_candidates` so PP-MCP can run sportsbook discovery plus built-in odds-history and sharp-movement validation in one MCP call
+- Left `minValue` optional on the +EV MCP helpers so the frontend Positive EV screen can remain the source of truth when it already enforces `-3`
+- Added MCP contract coverage for the restored +EV discovery tools, including `tools/list` parity, unset-`minValue` behavior, and validated ranking output
+- Clarified README wording so the MCP surface is documented as screen-first with intentional sportsbook discovery and validation exceptions
+- Added ranked response `debug=true|false` gating, defaulting to verbose debug metadata while allowing lean MCP and CLI payloads
+- Added row-level `freshnessSource`, `freshnessAgeMs`, `freshnessFallbackUsed`, and `rankingProvenance` metadata for explainability and traceability
+- Added `npm run smoke:live` for a lightweight live `/screen` ranked-response verification flow before tagging releases
+- Shipped the sharp-history and ranked lookback work into the MCP ranked response path and export tooling
+- Made `health_status` freshness ages non-null for populated screen payloads, with timestamp-source reporting and explicit fallback metadata when rows are undated
+- Exposed richer ranked movement/debug metadata, including filtered history trails, dropped-point reasons, movement debug summaries, and lookback/result metadata
+- Added bounded request timeouts across HTTP and TRPC calls so MCP and CLI requests fail predictably instead of hanging indefinitely
+- Changed `query_validated_positive_ev_candidates` to use hybrid validation failure handling: partial validation returns warnings plus validation counts, while fully unvalidated requests fail explicitly
+- Aligned `pp-query tennis` market expansion with the MCP tennis flow for spread and total aliases
+- Hardened ranked preferred-book matching so regex-special characters in book names cannot crash ranking
+- Added executable shebangs to the published `pp-mcp` and `pp-query` bin entrypoints
+
+## 1.0.4
+
+- Added configurable ranked odds-history lookback defaults via `PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS`
+- Added per-request ranked lookback overrides through MCP `lookbackHours` and local CLI `--lookback-hours`
+- Kept the default ranked odds-history window at 6 hours across MCP, library helpers, and local export/query scripts
+- Tightened package metadata to describe the screen-first MCP surface and the broader local CLI split
+- Synced package-lock metadata with package.json after the screen-only cleanup follow-up
+- Added MCP regression coverage for removed fantasy tool names returning `Unknown tool`
+- Fixed `pp-query sport` so it returns ranked screen output like `pp-query screen`
+- Fixed `pp-query list` so the documented `list` command is included in the emitted command inventory
+
 ## 1.0.3
 
 - Added WNBA sport support across the MCP server, CLI, and ranking presets
