@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.7
+
+- Consolidated MCP tools from 21 to 8: `ev_discover`, `ev_validate`, `screen`, `screen_raw`, `sharp_plays`, `ufc_card`, `consensus_windows`, `health`
+- Removed 13 redundant tools (now CLI-only): all 9 per-league screens, `query_screen_odds_best_comps`, `query_screen_odds_ranked`, `league_presets`
+- The `screen` tool now accepts a `league` param for any supported sport
+- Per-league shorthand commands still available via CLI: `pp-query nba`, `pp-query tennis`, etc.
+
 ## 1.0.6
 
 - Added a reusable `sharp-plays-service` package export so PP-MCP business logic can be shared without importing the MCP script entrypoint
