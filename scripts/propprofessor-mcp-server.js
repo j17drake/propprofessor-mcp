@@ -313,7 +313,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     }
     const presetLeague = getLeagueRankingPreset(requestedLeague).league;
     return presetLeague === 'TENNIS'
-      ? handlers.query_tennis_screen(args)
+      ? runTennisScreen(args)
       : runLeagueScreen(args, presetLeague || requestedLeague);
   }
 
@@ -360,8 +360,113 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
     };
   }
+
+  // Internal tennis screen function (not exposed as MCP tool, used by screen + sharp_plays)
+  async function runTennisScreen(args = {}) {
+    const preferredBook = String(args.book || 'NoVigApp').trim() || 'NoVigApp';
+    const requestedBooks = normalizeBookList(args.books);
+    const marketQuery = normalizeTennisMarketQuery(args.market || 'Moneyline');
+    const queryFn =
+      typeof client.queryScreenOdds === 'function'
+        ? client.queryScreenOdds.bind(client)
+        : client.queryScreenOddsBestComps.bind(client);
+
+    // Phase 1: Try /screen (existing behavior)
+    const payloads = [];
+    for (const market of marketQuery) {
+      const payload = await queryFn({
+        market,
+        league: 'Tennis',
+        books: requestedBooks.length ? requestedBooks : ALL_SCREEN_BOOKS,
+        is_live: Boolean(args.is_live)
+      });
+      payloads.push(payload);
+    }
+
+    const rows = payloads.flatMap(payload => extractScreenRows(payload));
+
+    // Check if /screen returned actionable data (not just Polymarket-only)
+    const hasScreenBooks = rows.some(row => {
+      const text = JSON.stringify(row || '');
+      return text.includes('"Pinnacle"') || text.includes('"Circa"') || text.includes('"BetOnline"') || text.includes('"Kalshi"');
+    });
+    const hasScreenConsensus = rows.some(row => {
+      const text = JSON.stringify(row || '');
+      return text.includes('"consensus"') || text.includes('"ev"') || text.includes('"value"');
+    });
+
+    if (hasScreenBooks || hasScreenConsensus) {
+      // /screen has real data -- use existing ranking
+      return buildRankedScreenResponseShared({
+        client,
+        payloads,
+        args,
+        league: 'Tennis',
+        focusBook: preferredBook,
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankTennisScreenRows(hydratedRows, {
+            limit: getLimit(args),
+            preferredBook,
+            includeAll: getIncludeAll(args),
+            maxAgeMs: getMaxAgeMs(args),
+            debug
+          })
+      });
+    }
+
+    // Phase 2: /screen returned only Polymarket odds -- fall back to +EV endpoint
+    let evResult;
+    try {
+      evResult = await client.querySportsbook({
+        leagues: ['Tennis'],
+        sportsbooks: ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle', 'Polymarket', 'Circa', 'BetOnline', 'Kalshi', 'NoVigApp'],
+        minOdds: -9999,
+        maxOdds: 9999,
+        minValue: 0,
+        maxHoursAway: 48,
+        isLive: Boolean(args.is_live)
+      });
+    } catch {
+      return {
+        ok: true,
+        result: [],
+        freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
+        warning: 'No tennis data available from either /screen or +EV endpoint'
+      };
+    }
+
+    const evCandidates = Array.isArray(evResult)
+      ? evResult.filter(row => String(row.league || '').toLowerCase() === 'tennis')
+      : [];
+
+    if (!evCandidates.length) {
+      return {
+        ok: true,
+        result: [],
+        freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
+        warning: '/screen returned only Polymarket odds and +EV endpoint has no tennis candidates today'
+      };
+    }
+
+    // Enrich +EV candidates with odds history and rank them
+    const ranked = await enrichTennisEvCandidates(evCandidates, client, {
+      preferredBook,
+      limit: getLimit(args),
+      lookbackHours: getLookbackHours(args)
+    });
+
+    return {
+      ok: true,
+      result: ranked,
+      freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
+      source: '+ev_enriched',
+      note: '/screen returned insufficient tennis data; results enriched from +EV endpoint with odds history'
+    };
+  }
+
+  // The 8 MCP tool handlers exposed to clients
   const handlers = {
-    async query_positive_ev_candidates(args = {}) {
+    async ev_discover(args = {}) {
       const payload = await client.querySportsbook({
         isLive: args.isLive,
         showBreakOnly: args.showBreakOnly,
@@ -391,14 +496,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         result: rows,
         notes: {
           workflow:
-            'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
+            'Use these rows as fast discovery candidates, then validate finalists with /screen and odds-history movement.',
           minValueBehavior: args.minValue === undefined ? 'unset_here_use_frontend_filter' : 'explicit_request_override'
         }
       };
     },
 
-    async query_validated_positive_ev_candidates(args = {}) {
-      const discovery = await handlers.query_positive_ev_candidates(args);
+    async ev_validate(args = {}) {
+      const discovery = await handlers.ev_discover(args);
       return validatePositiveEvCandidates({
         client,
         candidates: discovery.result,
@@ -406,7 +511,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
     },
 
-    async query_screen_odds(args = {}) {
+    async screen_raw(args = {}) {
       const payload = await client.queryScreenOdds({
         market: args.market || 'Moneyline',
         league: args.league || 'NBA',
@@ -418,202 +523,22 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return { ok: true, result: payload };
     },
 
-    async query_screen_odds_best_comps(args = {}) {
-      const payload = await client.queryScreenOddsBestComps({
-        market: args.market,
-        league: args.league,
-        games: Array.isArray(args.games) ? args.games : [],
-        participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : undefined,
-        is_live: Boolean(args.is_live)
-      });
-      return {
-        ok: true,
-        result: payload,
-        comparisonBooks: getSharpBookComparisonSet({
-          league: args.league || 'NBA',
-          market: args.market,
-          requestedBooks: Array.isArray(args.books) ? args.books : undefined
-        }),
-        sharpBookResearch: getSharpBookContext({ league: args.league || 'NBA', market: args.market })
-      };
-    },
-    async query_screen_odds_ranked(args = {}) {
-      const requestedBooks = normalizeBookList(args.books);
-      const league = args.league || 'NBA';
-      const market = args.market || 'Moneyline';
-      const preset = getLeagueRankingPreset(league, market);
-      const focusBook = requestedBooks[0] || preset.preferredBooks[0];
-      const payload = await client.queryScreenOddsBestComps({
-        market,
-        league,
-        games: Array.isArray(args.games) ? args.games : [],
-        participants: Array.isArray(args.participants) ? args.participants : [],
-        books: requestedBooks,
-        is_live: Boolean(args.is_live)
-      });
-      return buildRankedScreenResponseShared({
-        client,
-        payloads: [payload],
-        args,
-        league,
-        focusBook,
-        rankRows: (hydratedRows, { debug } = {}) =>
-          rankLeagueScreenRows(hydratedRows, {
-            league,
-            market,
-            limit: getLimit(args),
-            books: requestedBooks.length ? requestedBooks : undefined,
-            includeAll: getIncludeAll(args),
-            maxAgeMs: getMaxAgeMs(args),
-            debug
-          })
-      });
-    },
-    async query_sport_screen(args = {}) {
-      return runSportScreen(args);
-    },
-    async query_sharp_plays(args = {}) {
+    async sharp_plays(args = {}) {
       return runSharpPlays(args, {
         queryLeagueScreen: runLeagueScreen,
-        queryTennisScreen: (rankedArgs) => handlers.query_tennis_screen(rankedArgs)
+        queryTennisScreen: (rankedArgs) => runTennisScreen(rankedArgs)
       });
     },
-    async query_nba_screen(args = {}) {
-      return runLeagueScreen(args, 'NBA');
+
+    async screen(args = {}) {
+      return runSportScreen(args);
     },
-    async query_wnba_screen(args = {}) {
-      return runLeagueScreen(args, 'WNBA');
-    },
-    async query_mlb_screen(args = {}) {
-      return runLeagueScreen(args, 'MLB');
-    },
-    async query_nfl_screen(args = {}) {
-      return runLeagueScreen(args, 'NFL');
-    },
-    async query_nhl_screen(args = {}) {
-      return runLeagueScreen(args, 'NHL');
-    },
-    async query_ufc_screen(args = {}) {
-      return runLeagueScreen(args, 'UFC');
-    },
-    async query_ufc_card(args = {}) {
+
+    async ufc_card(args = {}) {
       return runUfcCard(args);
     },
-    async query_soccer_screen(args = {}) {
-      return runLeagueScreen(args, 'Soccer');
-    },
-    async query_ncaab_screen(args = {}) {
-      return runLeagueScreen(args, 'NCAAB');
-    },
-    async query_ncaaf_screen(args = {}) {
-      return runLeagueScreen(args, 'NCAAF');
-    },
-    async query_tennis_screen(args = {}) {
-      const preferredBook = String(args.book || 'NoVigApp').trim() || 'NoVigApp';
-      const requestedBooks = normalizeBookList(args.books);
-      const marketQuery = normalizeTennisMarketQuery(args.market || 'Moneyline');
-      const queryFn =
-        typeof client.queryScreenOdds === 'function'
-          ? client.queryScreenOdds.bind(client)
-          : client.queryScreenOddsBestComps.bind(client);
 
-      // Phase 1: Try /screen (existing behavior)
-      const payloads = [];
-      for (const market of marketQuery) {
-        const payload = await queryFn({
-          market,
-          league: 'Tennis',
-          books: requestedBooks.length
-            ? requestedBooks
-            : ALL_SCREEN_BOOKS,
-          is_live: Boolean(args.is_live)
-        });
-        payloads.push(payload);
-      }
-
-      const rows = payloads.flatMap(payload => extractScreenRows(payload));
-
-      // Check if /screen returned actionable data (not just Polymarket-only)
-      const hasScreenBooks = rows.some(row => {
-        const text = JSON.stringify(row || '');
-        return text.includes('"Pinnacle"') || text.includes('"Circa"') || text.includes('"BetOnline"') || text.includes('"Kalshi"');
-      });
-      const hasScreenConsensus = rows.some(row => {
-        const text = JSON.stringify(row || '');
-        return text.includes('"consensus"') || text.includes('"ev"') || text.includes('"value"');
-      });
-
-      if (hasScreenBooks || hasScreenConsensus) {
-        // /screen has real data -- use existing ranking
-        return buildRankedScreenResponseShared({
-          client,
-          payloads,
-          args,
-          league: 'Tennis',
-          focusBook: preferredBook,
-          rankRows: (hydratedRows, { debug } = {}) =>
-            rankTennisScreenRows(hydratedRows, {
-              limit: getLimit(args),
-              preferredBook,
-              includeAll: getIncludeAll(args),
-              maxAgeMs: getMaxAgeMs(args),
-              debug
-            })
-        });
-      }
-
-      // Phase 2: /screen returned only Polymarket odds -- fall back to +EV endpoint
-      let evResult;
-      try {
-        evResult = await client.querySportsbook({
-          leagues: ['Tennis'],
-          sportsbooks: ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle', 'Polymarket', 'Circa', 'BetOnline', 'Kalshi', 'NoVigApp'],
-          minOdds: -9999,
-          maxOdds: 9999,
-          minValue: 0,
-          maxHoursAway: 48,
-          isLive: Boolean(args.is_live)
-        });
-      } catch {
-        return {
-          ok: true,
-          result: [],
-          freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
-          warning: 'No tennis data available from either /screen or +EV endpoint'
-        };
-      }
-
-      const evCandidates = Array.isArray(evResult)
-        ? evResult.filter(row => String(row.league || '').toLowerCase() === 'tennis')
-        : [];
-
-      if (!evCandidates.length) {
-        return {
-          ok: true,
-          result: [],
-          freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
-          warning: '/screen returned only Polymarket odds and +EV endpoint has no tennis candidates today'
-        };
-      }
-
-      // Enrich +EV candidates with odds history and rank them
-      const ranked = await enrichTennisEvCandidates(evCandidates, client, {
-        preferredBook,
-        limit: getLimit(args),
-        lookbackHours: getLookbackHours(args)
-      });
-
-      return {
-        ok: true,
-        result: ranked,
-        freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
-        source: '+ev_enriched',
-        note: '/screen returned insufficient tennis data; results enriched from +EV endpoint with odds history'
-      };
-    },
-
-    async query_sharp_consensus_windows(args = {}) {
+    async consensus_windows(args = {}) {
       const league = String(args.league || 'Tennis').trim();
       const market = String(args.market || 'Moneyline').trim();
       const windows = Array.isArray(args.windows) && args.windows.length
@@ -625,21 +550,35 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const minConsensusWindows = Number(args.minConsensusWindows) || 0;
       const lookbackHours = Number(args.lookbackHours) || 48;
       const limit = Number(args.limit) || 100;
+      const requestedBooks = normalizeBookList(args.books);
+      const preset = getLeagueRankingPreset(league, market);
+      const focusBook = requestedBooks[0] || preset.preferredBooks[0];
 
-      // Fetch ranked screen data with wide lookback.
-      // Do NOT pass `books` here -- the backend only returns multi-book data
-      // for non-major leagues when the full book list is passed. Instead, pass
-      // `historySportsbooks` so the history enrichment targets the sharp books
-      // we need for consensus analysis.
-      const rankedResponse = await handlers.query_screen_odds_ranked({
-        league,
+      // Fetch ranked screen data with wide lookback, inline of the former query_screen_odds_ranked.
+      const payload = await client.queryScreenOddsBestComps({
         market,
-        historySportsbooks: sharpBooks,
-        includeAll: true,
-        limit,
-        lookbackHours,
-        debug: false,
+        league,
+        games: Array.isArray(args.games) ? args.games : [],
+        participants: Array.isArray(args.participants) ? args.participants : [],
+        books: requestedBooks,
         is_live: Boolean(args.is_live)
+      });
+      const rankedResponse = buildRankedScreenResponseShared({
+        client,
+        payloads: [payload],
+        args,
+        league,
+        focusBook,
+        rankRows: (hydratedRows, { debug: dbg } = {}) =>
+          rankLeagueScreenRows(hydratedRows, {
+            league,
+            market,
+            limit,
+            books: requestedBooks.length ? requestedBooks : undefined,
+            includeAll: true,
+            maxAgeMs: getMaxAgeMs(args),
+            debug: dbg
+          })
       });
 
       if (!rankedResponse?.ok || !Array.isArray(rankedResponse.result)) {
@@ -673,10 +612,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
-    async league_presets() {
-      return { ok: true, result: buildLeaguePresetSummary() };
-    },
-    async health_status() {
+    async health() {
       const result = await client.healthStatus();
       return { ok: true, result };
     }

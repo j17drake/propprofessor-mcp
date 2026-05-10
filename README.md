@@ -162,24 +162,22 @@ Try these in your MCP client:
 - `Find the best validated positive EV NBA plays available right now.`
 - `Show me the top NHL moneyline opportunities.`
 - `Check whether the PropProfessor MCP connection is healthy.`
-- `Rank today's tennis moneyline opportunities.`
+- `Show me sharp plays with supportive book movement on NoVigApp.`
 
-## Start Here Tools
+## Available MCP Tools
 
-If you want a short list of the most useful MCP tools first:
-
-- `query_validated_positive_ev_candidates`
-  Best default for ranked, validated candidate discovery.
-- `query_nba_screen`
-  Simple sport-specific ranked screen query.
-- `query_sport_screen`
-  Same idea, but works across leagues.
-- `health_status`
-  Good for connection troubleshooting.
+- `ev_discover` -- fast +EV candidate discovery from sportsbook endpoints
+- `ev_validate` -- +EV candidates ranked with sharp-movement and odds-history validation
+- `screen` -- ranked screen queries for any league (NBA, NFL, MLB, NHL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis). Use `league` to pick the sport.
+- `screen_raw` -- raw unranked screen payload for advanced use cases
+- `sharp_plays` -- multi-league scanner for plays with supportive sharp book movement
+- `ufc_card` -- UFC card shortlist with official plays, best looks, and passes
+- `consensus_windows` -- multi-window sharp book consensus movement analysis
+- `health` -- check auth freshness and endpoint connectivity
 
 ## CLI Commands
 
-The local CLI is mainly for setup checks and quick direct testing.
+The local CLI still supports per-league shorthand commands:
 
 - `pp-query doctor`
 - `pp-query health`
@@ -189,29 +187,7 @@ The local CLI is mainly for setup checks and quick direct testing.
 - `pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis --market Moneyline --limit 10`
 - `pp-query ufc-card --book NoVigApp --market Moneyline`
 - `pp-query list`
-
-## Full MCP Tool List
-
-- `query_positive_ev_candidates`
-- `query_validated_positive_ev_candidates`
-- `query_screen_odds`
-- `query_screen_odds_best_comps`
-- `query_screen_odds_ranked`
-- `query_sport_screen`
-- `query_nba_screen`
-- `query_wnba_screen`
-- `query_mlb_screen`
-- `query_nfl_screen`
-- `query_nhl_screen`
-- `query_ufc_screen`
-- `query_ufc_card`
-- `query_soccer_screen`
-- `query_ncaab_screen`
-- `query_ncaaf_screen`
-- `query_tennis_screen`
-- `query_sharp_plays`
-- `league_presets`
-- `health_status`
+- `pp-query presets`
 
 ## Troubleshooting
 

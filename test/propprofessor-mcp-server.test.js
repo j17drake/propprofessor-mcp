@@ -209,10 +209,7 @@ function waitForNdjsonMessage(proc, timeoutMs = 5000) {
 
 describe('propprofessor MCP server stdio contract', () => {
   // Direct smoke coverage checklist for public MCP tools:
-  // covered: query_positive_ev_candidates, query_validated_positive_ev_candidates, query_screen_odds, query_screen_odds_best_comps, query_screen_odds_ranked,
-  // query_sharp_plays, query_sport_screen, query_nba_screen, query_wnba_screen, query_mlb_screen,
-  // query_nfl_screen, query_nhl_screen, query_ufc_screen, query_soccer_screen, query_ncaab_screen,
-  // query_ncaaf_screen, query_tennis_screen, league_presets, health_status.
+  // covered: ev_discover, ev_validate, screen, screen_raw, sharp_plays, ufc_card, consensus_windows, health.
   it('responds to initialize and lists the expected tools', async () => {
     const proc = spawn(process.execPath, [serverPath], {
       stdio: ['pipe', 'pipe', 'pipe']
@@ -239,28 +236,14 @@ describe('propprofessor MCP server stdio contract', () => {
       assert.equal(toolsResponse.id, 2);
       const toolNames = toolsResponse.result.tools.map((tool) => tool.name).sort();
       assert.deepEqual(toolNames, [
-        'health_status',
-        'league_presets',
-        'query_mlb_screen',
-        'query_nba_screen',
-        'query_ncaab_screen',
-        'query_ncaaf_screen',
-        'query_nfl_screen',
-        'query_nhl_screen',
-        'query_positive_ev_candidates',
-        'query_screen_odds',
-        'query_screen_odds_best_comps',
-        'query_screen_odds_ranked',
-        'query_sharp_consensus_windows',
-        'query_sharp_plays',
-        'query_soccer_screen',
-        'query_sport_screen',
-        'query_tennis_screen',
-        'query_ufc_card',
-        'query_ufc_screen',
-        'query_validated_positive_ev_candidates',
-        'query_wnba_screen'
-
+        'consensus_windows',
+        'ev_discover',
+        'ev_validate',
+        'health',
+        'screen',
+        'screen_raw',
+        'sharp_plays',
+        'ufc_card'
       ]);
     } finally {
       proc.kill('SIGTERM');
@@ -304,11 +287,11 @@ describe('propprofessor MCP server stdio contract', () => {
   it('returns server not initialized for tools/call before initialize', async () => {
     const server = createMcpServer({
       handlers: {
-        query_screen_odds: async () => ({ ok: true })
+        screen_raw: async () => ({ ok: true })
       },
       toolDefinitions: [
         {
-          name: 'query_screen_odds',
+          name: 'screen_raw',
           inputSchema: { type: 'object', properties: {}, additionalProperties: false }
         }
       ]
@@ -318,7 +301,7 @@ describe('propprofessor MCP server stdio contract', () => {
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/call',
-      params: { name: 'query_screen_odds', arguments: {} }
+      params: { name: 'screen_raw', arguments: {} }
     });
 
     assert.equal(response.error.code, -32002);
@@ -416,7 +399,7 @@ describe('propprofessor MCP server stdio contract', () => {
       handlers,
       toolDefinitions: [
         {
-          name: 'query_validated_positive_ev_candidates',
+          name: 'ev_validate',
           inputSchema: { type: 'object', properties: {}, additionalProperties: true }
         }
       ]
@@ -432,7 +415,7 @@ describe('propprofessor MCP server stdio contract', () => {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'query_validated_positive_ev_candidates', arguments: {} }
+      params: { name: 'ev_validate', arguments: {} }
     });
 
     assert.equal(response.result.isError, true);
@@ -453,12 +436,12 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(messages, []);
   });
 
-  it('query_screen_odds returns the raw screen payload', async () => {
+  it('screen_raw returns the raw screen payload', async () => {
     const payload = { ok: true, rows: [{ id: 'raw-row' }] };
     const { client, calls } = createRankedScreenClientStub({ rawPayload: payload });
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_screen_odds({
+    const result = await handlers.screen_raw({
       league: 'NBA',
       market: 'Moneyline',
       books: ['Pinnacle'],
@@ -482,7 +465,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_positive_ev_candidates({
+    const result = await handlers.ev_discover({
       sportsbooks: ['Fliff', 'NoVigApp'],
       leagues: ['NBA', 'MLB'],
       marketTypes: ['Main Lines', 'Player Props'],
@@ -532,7 +515,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_positive_ev_candidates({
+    const result = await handlers.ev_discover({
       sportsbooks: ['Fliff'],
       leagues: ['NBA']
     });
@@ -546,7 +529,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_validated_positive_ev_candidates({
+    const result = await handlers.ev_validate({
       sportsbooks: ['Fliff'],
       leagues: ['NBA'],
       limit: 5,
@@ -564,46 +547,7 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.ok(Object.prototype.hasOwnProperty.call(result.result[0], 'rankingProvenance'));
   });
 
-  it('query_screen_odds_best_comps returns derived sharp-book metadata for NBA props', async () => {
-    const handlers = createMcpHandlers({
-      client: {
-        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
-        queryOddsHistory: async () => ({})
-      }
-    });
-
-    const result = await handlers.query_screen_odds_best_comps({ league: 'NBA', market: 'Player Points' });
-    assert.equal(result.ok, true);
-    assert.deepEqual(result.comparisonBooks, ['FanDuel', 'BookMaker', 'PropBuilder', 'NoVigApp', 'Pinnacle']);
-    assert.equal(result.sharpBookResearch.key, 'nba_props');
-  });
-
-  it('league presets expose sharpMainMarkets and sharpProps labels', async () => {
-    const handlers = createMcpHandlers({
-      client: {
-        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
-        queryOddsHistory: async () => ({})
-      }
-    });
-
-    const presets = await handlers.league_presets();
-    const nba = presets.result.find((entry) => entry.league === 'NBA');
-    const wnba = presets.result.find((entry) => entry.league === 'WNBA');
-    const nfl = presets.result.find((entry) => entry.league === 'NFL');
-    const mlb = presets.result.find((entry) => entry.league === 'MLB');
-
-    assert.ok(wnba);
-    assert.equal(wnba.displayName, 'WNBA');
-
-    assert.deepEqual(nba.sharpMainMarkets, ['Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
-    assert.deepEqual(nba.sharpProps, ['FanDuel', 'BookMaker', 'PropBuilder', 'NoVigApp', 'Pinnacle']);
-    assert.deepEqual(nfl.sharpMainMarkets, ['Circa', 'Pinnacle', 'BookMaker', 'NoVigApp', 'FanDuel']);
-    assert.deepEqual(nfl.sharpProps, ['Pinnacle', 'FanDuel', 'BookMaker', 'Circa', 'BetOnline']);
-    assert.deepEqual(mlb.sharpMainMarkets, ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings', 'BetMGM']);
-    assert.deepEqual(mlb.sharpProps, ['Circa', 'FanDuel', 'PropBuilder', 'Pinnacle', 'DraftKings', 'Bet365']);
-  });
-
-  it('query_ufc_card returns a first-class shortlist response and honors card filters', async () => {
+  it('ufc_card returns a first-class shortlist response and honors card filters', async () => {
     const now = new Date('2026-05-09T12:00:00Z');
     const futureEventDate = '2026-05-10';
     const rankedPayload = {
@@ -661,9 +605,9 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client, calls } = createRankedScreenClientStub({ rankedPayload });
     const handlers = createMcpHandlers({ client });
 
-    assert.equal(typeof handlers.query_ufc_card, 'function');
+    assert.equal(typeof handlers.ufc_card, 'function');
 
-    const result = await handlers.query_ufc_card({
+    const result = await handlers.ufc_card({
       eventDate: futureEventDate,
       cardWindow: 'today',
       limit: 5,
@@ -691,11 +635,11 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.passes.length > 0 ? result.passes[0].shortlistCardWindow : 'eventDate', 'eventDate');
   });
 
-  it('query_ufc_card forwards book/targetBook into ranked scanning and normalizes markets arrays', async () => {
+  it('ufc_card forwards book/targetBook into ranked scanning and normalizes markets arrays', async () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const bookResult = await handlers.query_ufc_card({
+    const bookResult = await handlers.ufc_card({
       book: 'NoVigApp',
       markets: ['Moneyline', 'Total'],
       limit: 1,
@@ -705,7 +649,7 @@ describe('propprofessor MCP server stdio contract', () => {
       is_live: false
     });
 
-    const targetBookResult = await handlers.query_ufc_card({
+    const targetBookResult = await handlers.ufc_card({
       targetBook: 'DraftKings',
       markets: ['Total', 'Moneyline'],
       limit: 1,
@@ -727,111 +671,11 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, ['DraftKings']);
   });
 
-  for (const { toolName, league } of [
-    { toolName: 'query_nba_screen', league: 'NBA' },
-    { toolName: 'query_wnba_screen', league: 'WNBA' },
-    { toolName: 'query_mlb_screen', league: 'MLB' },
-    { toolName: 'query_nfl_screen', league: 'NFL' },
-    { toolName: 'query_nhl_screen', league: 'NHL' },
-    { toolName: 'query_ufc_screen', league: 'UFC' },
-    { toolName: 'query_ncaab_screen', league: 'NCAAB' },
-    { toolName: 'query_ncaaf_screen', league: 'NCAAF' }
-  ]) {
-    it(`${toolName} returns a structured ranked response`, async () => {
-      const { client, calls } = createRankedScreenClientStub();
-      const handlers = createMcpHandlers({ client });
-
-      const result = await handlers[toolName]({ market: 'Moneyline', books: ['Pinnacle'], includeAll: true });
-
-      assert.equal(calls.queryScreenOddsBestComps.length, 1);
-      assert.equal(calls.queryScreenOddsBestComps[0].league, league);
-      assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
-      assert.deepEqual(calls.queryScreenOddsBestComps[0].books, ['Pinnacle']);
-      assertBasicRankedResponse(result, league);
-    });
-  }
-
-  it('query_screen_odds_ranked returns a structured ranked response', async () => {
-    const rankedPayload = {
-      game_data: [
-        {
-          gameId: 'game-1',
-          league: 'NBA',
-          market: 'Moneyline',
-          updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
-          homeTeam: 'Lakers',
-          awayTeam: 'Warriors',
-          selections: {
-            a: {
-              selection1: 'Lakers',
-              participant1: 'Lakers',
-              selection1Id: 'Moneyline:Lakers',
-              selection2: 'Warriors',
-              participant2: 'Warriors',
-              selection2Id: 'Moneyline:Warriors',
-              odds: {
-                NoVigApp: { odds1: -118, odds2: 104 },
-                Polymarket: { odds1: -125, odds2: 110 }
-              }
-            }
-          },
-          defaultKey: 'a'
-        }
-      ]
-    };
-    const { client, calls } = createRankedScreenClientStub({ rankedPayload });
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.query_screen_odds_ranked({
-      league: 'NBA',
-      market: 'Moneyline',
-      includeAll: true,
-      books: ['NoVigApp']
-    });
-
-    assert.equal(calls.queryScreenOddsBestComps.length, 1);
-    assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
-    assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
-    assertBasicRankedResponse(result, 'NBA');
-    assert.equal(result.freshness.newestAgeMs !== null, true);
-    assert.equal(result.resultMeta.focusBook, 'NoVigApp');
-    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['NoVigApp']);
-    assert.equal(result.resultMeta.debugEnabled, true);
-    assert.equal(result.result[0].movementMode, 'same_book');
-    assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
-    assert.equal(result.result[0].freshnessSource, 'updatedAt');
-    assert.equal(result.result[0].freshnessFallbackUsed, false);
-    assert.equal(result.result[0].rankingProvenance.focusBook, 'NoVigApp');
-    assert.equal(result.result[0].rankingProvenance.lineHistorySource, 'odds_history');
-    assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
-    assert.equal(typeof result.result[0].movementDebug, 'object');
-    assert.equal(Array.isArray(result.result[0].filteredLineHistory), true);
-  });
-
-  it('query_screen_odds_ranked can disable verbose debug payloads', async () => {
-    const { client } = createRankedScreenClientStub();
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.query_screen_odds_ranked({
-      league: 'NBA',
-      market: 'Moneyline',
-      includeAll: true,
-      books: ['NoVigApp'],
-      debug: false
-    });
-
-    assert.equal(result.resultMeta.debugEnabled, false);
-    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'movementDebug'), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'filteredLineHistory'), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(result.result[0], 'droppedHistoryReasons'), false);
-    assert.ok(result.result[0].rankingProvenance);
-  });
-
   it('query_sharp_plays returns only non-target sharp-supported bet candidates by default', async () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_sharp_plays({
+    const result = await handlers.sharp_plays({
       book: 'NoVigApp',
       leagues: ['NBA'],
       markets: ['Moneyline'],
@@ -955,7 +799,7 @@ describe('propprofessor MCP server stdio contract', () => {
       }
     });
 
-    const result = await handlers.query_sharp_plays({
+    const result = await handlers.sharp_plays({
       book: 'NoVigApp',
       leagues: ['NBA'],
       markets: ['Moneyline'],
@@ -991,7 +835,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client } = createRankedScreenClientStub({ rankedPayload: { game_data: [] } });
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_sharp_plays({
+    const result = await handlers.sharp_plays({
       book: 'NoVigApp',
       leagues: ['NBA'],
       markets: ['Moneyline'],
@@ -1018,7 +862,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_sharp_plays({
+    const result = await handlers.sharp_plays({
       targetBooks: ['Fliff', 'NoVig'],
       leagues: ['NBA'],
       markets: ['Moneyline'],
@@ -1072,7 +916,7 @@ describe('propprofessor MCP server stdio contract', () => {
       }
     });
 
-    const result = await handlers.query_sharp_plays({
+    const result = await handlers.sharp_plays({
       book: 'NoVigApp',
       leagues: ['UFC'],
       markets: ['Moneyline'],
@@ -1090,18 +934,18 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.ufcShortlist.bestLooks[0].participant, 'Costa');
   });
 
-  it('query_sport_screen routes non-tennis leagues through the ranked league flow', async () => {
+  it('screen routes non-tennis leagues through the ranked league flow', async () => {
     const { client, calls } = createRankedScreenClientStub();
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_sport_screen({ league: 'WNBA', market: 'Moneyline', includeAll: true });
+    const result = await handlers.screen({ league: 'WNBA', market: 'Moneyline', includeAll: true });
 
     assert.equal(calls.queryScreenOddsBestComps.length, 1);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'WNBA');
     assertBasicRankedResponse(result, 'WNBA');
   });
 
-  it('query_sport_screen routes tennis through the tennis-specific query path', async () => {
+  it('screen routes tennis through the tennis-specific query path', async () => {
     const tennisPayload = {
       ok: true,
       game_data: [
@@ -1133,7 +977,7 @@ describe('propprofessor MCP server stdio contract', () => {
     const { client, calls } = createRankedScreenClientStub({ rawPayload: tennisPayload });
     const handlers = createMcpHandlers({ client });
 
-    const result = await handlers.query_sport_screen({
+    const result = await handlers.screen({
       league: 'Tennis',
       market: 'Moneyline',
       book: 'Pinnacle',
@@ -1148,107 +992,6 @@ describe('propprofessor MCP server stdio contract', () => {
     assertBasicRankedResponse(result, 'Tennis');
   });
 
-  it('query_tennis_screen uses Tennis queries and carries the preferred book into the request set', async () => {
-    const tennisPayload = {
-      ok: true,
-      game_data: [
-        {
-          gameId: 'tennis-game-1',
-          league: 'Tennis',
-          market: 'Moneyline',
-          updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
-          homeTeam: 'Player A',
-          awayTeam: 'Player B',
-          selections: {
-            a: {
-              selection1: 'Player A',
-              participant1: 'Player A',
-              selection1Id: 'Moneyline:Player_A',
-              selection2: 'Player B',
-              participant2: 'Player B',
-              selection2Id: 'Moneyline:Player_B',
-              odds: {
-                Pinnacle: { odds1: -130, odds2: 110 },
-                Circa: { odds1: -125, odds2: 105 }
-              }
-            }
-          },
-          defaultKey: 'a'
-        }
-      ]
-    };
-    const { client, calls } = createRankedScreenClientStub({ rawPayload: tennisPayload });
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.query_tennis_screen({ market: 'Moneyline', book: 'Pinnacle', includeAll: true });
-
-    assert.ok(calls.queryScreenOdds.length >= 1);
-    for (const call of calls.queryScreenOdds) {
-      assert.equal(call.league, 'Tennis');
-      assert.ok(call.books.includes('Pinnacle'));
-    }
-    assertBasicRankedResponse(result, 'Tennis');
-  });
-
-  it('health_status returns the client health payload', async () => {
-    const healthPayload = {
-      ok: true,
-      endpoints: { screen: 'ok' },
-      freshness: {
-        screen: {
-          rowCount: 2,
-          newestAgeMs: 1500,
-          oldestAgeMs: 4200,
-          staleCount: 0,
-          stale: false,
-          freshnessFallbackUsed: false,
-          timestampSources: { updatedAt: 2 }
-        }
-      }
-    };
-    const { client, calls } = createRankedScreenClientStub({ healthPayload });
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.health_status();
-
-    assert.equal(calls.healthStatus, 1);
-    assert.equal(result.ok, true);
-    assert.equal(result.result.freshness.screen.newestAgeMs, 1500);
-    assert.deepEqual(result.result.freshness.screen.timestampSources, { updatedAt: 2 });
-  });
-
-  it('query_screen_odds_best_comps returns derived sharp-book metadata for MLB props', async () => {
-    const handlers = createMcpHandlers({
-      client: {
-        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
-        queryOddsHistory: async () => ({})
-      }
-    });
-
-    const result = await handlers.query_screen_odds_best_comps({ league: 'MLB', market: 'Player Strikeouts' });
-    assert.equal(result.ok, true);
-    assert.deepEqual(result.comparisonBooks, ['Circa', 'FanDuel', 'PropBuilder', 'Pinnacle', 'DraftKings', 'Bet365']);
-    assert.equal(result.sharpBookResearch.key, 'mlb_props');
-  });
-
-  it('query_soccer_screen sends the backend-supported Soccer league casing', async () => {
-    const calls = [];
-    const handlers = createMcpHandlers({
-      client: {
-        queryScreenOddsBestComps: async (filters) => {
-          calls.push(filters);
-          return { game_data: [] };
-        },
-        queryOddsHistory: async () => ({})
-      }
-    });
-
-    const result = await handlers.query_soccer_screen({ market: 'Moneyline', books: ['NoVigApp'], includeAll: true });
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].league, 'Soccer');
-    assert.equal(calls[0].market, 'Moneyline');
-    assert.equal(result.ok, true);
-  });
 });
 
 describe('validated candidate concurrency helpers', () => {
@@ -1311,7 +1054,7 @@ describe('validated candidate concurrency helpers', () => {
       }
     });
 
-    const result = await handlers.query_validated_positive_ev_candidates({
+    const result = await handlers.ev_validate({
       sportsbooks: ['Fliff'],
       leagues: ['NBA'],
       debug: false
@@ -1365,7 +1108,7 @@ describe('validated candidate concurrency helpers', () => {
       }
     });
 
-    const result = await handlers.query_validated_positive_ev_candidates({
+    const result = await handlers.ev_validate({
       sportsbooks: ['Fliff'],
       leagues: ['NBA'],
       debug: false
