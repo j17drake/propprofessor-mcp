@@ -24,10 +24,11 @@ If you use ChatGPT, see the ChatGPT note below first. ChatGPT currently does not
 
 ## Quick Start
 
-1. Install the project
-2. Run `pp-query install-auth --source /path/to/auth.json`
-3. Run `pp-query doctor`
-4. Add `pp-mcp` to your MCP client
+1. Make sure you have a paid PropProfessor account at propprofessor.com
+2. Install the project
+3. Run `pp-query install-auth --source /path/to/auth.json`
+4. Run `pp-query doctor`
+5. Add `pp-mcp` to your MCP client
 
 ## What It Does
 
@@ -43,7 +44,7 @@ You do not need to understand the internal tool names to get started.
 ## What You Need
 
 - Node.js 18 or newer
-- A PropProfessor account
+- A paid PropProfessor account at propprofessor.com
 - A saved logged-in browser session for PropProfessor
 
 ## Install
@@ -61,6 +62,8 @@ After `npm link`, these commands are available on your PATH:
 - `pp-query`
 
 ## Set Up Auth
+
+Before exporting auth, sign in to your paid PropProfessor account in the browser you are exporting from.
 
 Easiest option:
 

@@ -2,6 +2,8 @@
 
 This project uses a saved logged-in PropProfessor browser session to fetch short-lived access tokens.
 
+You need a paid PropProfessor account at propprofessor.com before this auth flow will be useful.
+
 ## Recommended Location
 
 Easiest option:
@@ -42,7 +44,7 @@ The important part is that it includes PropProfessor cookies.
 
 ## If You Need A Fresh Session
 
-1. Log in to PropProfessor in your browser.
+1. Log in to your paid PropProfessor account in your browser.
 2. Export the browser session or storage state.
 3. Run `pp-query install-auth --source /path/to/exported-auth.json`.
 
