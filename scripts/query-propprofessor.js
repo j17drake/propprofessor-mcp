@@ -11,6 +11,7 @@ const {
 } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
+const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
 const {
   rankTennisScreenRows,
   rankLeagueScreenRows,
@@ -565,6 +566,10 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
         }
       }
     });
+    // Correct tennis match times via SportScore before localizing
+    if (result?.result) {
+      result.result = await correctTennisTimes(result.result);
+    }
     const normalized = normalizeScreenRowTimes(result.result);
     result.result = normalized;
     result.count = normalized.length;

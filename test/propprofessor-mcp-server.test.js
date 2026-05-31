@@ -132,13 +132,20 @@ function waitForJsonRpcMessage(proc, timeoutMs = 5000) {
         headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
       }
       const contentLength = Number(headers['content-length'] || 0);
-      const bodyStart = headerEnd + separator.length;
       if (!Number.isFinite(contentLength) || contentLength <= 0) {
         throw new Error(`Invalid Content-Length header: ${headers['content-length'] || '<missing>'}`);
       }
-      if (buffer.length < bodyStart + contentLength) return null;
-      const body = buffer.slice(bodyStart, bodyStart + contentLength);
-      buffer = buffer.slice(bodyStart + contentLength);
+      // Content-Length is UTF-8 bytes, but buffer is a JS string (UTF-16).
+      // Multi-byte Unicode characters make byte count differ from char count.
+      // Convert to Buffer for accurate byte arithmetic.
+      const bodyStart = headerEnd + separator.length;
+      const bodySectionBytes = Buffer.from(buffer.slice(bodyStart), 'utf8');
+      if (bodySectionBytes.length < contentLength) return null;
+      const body = bodySectionBytes.slice(0, contentLength).toString('utf8');
+      // Consume the header + exact body bytes from the buffer.
+      // Encode full buffer to bytes, slice off consumed bytes, decode back.
+      const headerBytes = Buffer.byteLength(buffer.slice(0, bodyStart), 'utf8');
+      buffer = Buffer.from(buffer, 'utf8').slice(headerBytes + contentLength).toString('utf8');
       return JSON.parse(body);
     }
 
@@ -258,6 +265,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_nfl_screen',
         'query_nhl_screen',
         'query_positive_ev_candidates',
+        'query_recommended_bets',
         'query_screen_odds',
         'query_screen_odds_best_comps',
         'query_screen_odds_ranked',
@@ -265,6 +273,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_sharp_plays',
         'query_soccer_screen',
         'query_sport_screen',
+        'query_staking_plan',
         'query_tennis_screen',
         'query_ufc_card',
         'query_ufc_screen',

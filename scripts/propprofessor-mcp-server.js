@@ -34,7 +34,9 @@ const {
 } = require('../lib/propprofessor-mcp-stdio');
 const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
+const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
 const { analyzeMultiWindow, summarizeResults, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
+const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -504,6 +506,124 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         queryTennisScreen: (rankedArgs) => handlers.query_tennis_screen(rankedArgs)
       });
     },
+    async query_recommended_bets(args = {}) {
+      const leagues = Array.isArray(args.leagues) && args.leagues.length
+        ? args.leagues
+        : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
+      const market = args.market || 'Moneyline';
+      const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length
+        ? args.targetTiers
+        : ['TIER 1', 'TIER 2'];
+      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
+
+      const allRecommended = [];
+
+      for (const league of leagues) {
+        try {
+          const screenResult = await handlers.query_screen_odds_ranked({
+            league,
+            market,
+            books: args.books,
+            limit: limit * 2,
+            is_live: Boolean(args.is_live),
+            includeAll: false,
+            debug: false
+          });
+
+          const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
+          const recommended = rows
+            .filter((row) => {
+              const tier = getConfidenceTier(row);
+              return targetTiers.includes(tier);
+            })
+            .sort((a, b) => {
+              const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };
+              const tierDiff = (tierOrder[a.confidenceTier] ?? 9) - (tierOrder[b.confidenceTier] ?? 9);
+              if (tierDiff !== 0) return tierDiff;
+              return (Number(b.screenScore ?? 0) || 0) - (Number(a.screenScore ?? 0) || 0);
+            })
+            .slice(0, limit);
+
+          if (recommended.length) {
+            allRecommended.push({
+              league,
+              market,
+              count: recommended.length,
+              plays: recommended.map((row) => ({
+                game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
+                selection: row.selection || row.participant || null,
+                start: row.start || null,
+                odds: row.targetBookOdds ?? null,
+                edge: row.consensusEdge,
+                clv: row.clvProxyPct,
+                consensusBookCount: row.consensusBookCount,
+                executionQuality: row.executionQuality,
+                movementGrade: row.movementGrade,
+                riskScore: row.riskScore,
+                kaiCall: row.kaiCall,
+                confidenceTier: row.confidenceTier,
+                rationale: row.rationale || buildRationale(row),
+                screenScore: row.screenScore
+              }))
+            });
+          }
+        } catch (error) {
+          allRecommended.push({ league, market, count: 0, error: String(error.message || error) });
+        }
+      }
+
+      const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
+      return {
+        ok: true,
+        totalRecommended: total,
+        leagues: allRecommended.filter((l) => l.count > 0),
+        emptyLeagues: allRecommended.filter((l) => !l.count && !l.error).map((l) => l.league),
+        failedLeagues: allRecommended.filter((l) => l.error).map((l) => ({ league: l.league, error: l.error })),
+        summary: total
+          ? `Found ${total} recommended bet${total === 1 ? '' : 's'} across ${allRecommended.filter((l) => l.count > 0).length} league${allRecommended.filter((l) => l.count > 0).length === 1 ? '' : 's'}`
+          : 'No TIER 1 or TIER 2 plays found across requested leagues',
+        tierFilter: targetTiers
+      };
+    },
+    async query_staking_plan(args = {}) {
+      const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
+      const market = args.market || 'Moneyline';
+      const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length
+        ? args.targetTiers
+        : ['TIER 1', 'TIER 2'];
+      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
+
+      // Get recommended plays
+      const recResult = await handlers.query_recommended_bets({ leagues, market, targetTiers, limit, is_live: Boolean(args.is_live) });
+      if (!recResult.ok || !recResult.totalRecommended) {
+        return {
+          ok: true,
+          bankroll,
+          totalStake: 0,
+          playCount: 0,
+          stakes: [],
+          warnings: ['No recommended plays found for the given criteria'],
+          summary: 'No plays to stake'
+        };
+      }
+
+      // Flatten plays from all leagues
+      const allPlays = [];
+      for (const league of recResult.leagues || []) {
+        for (const play of league.plays || []) {
+          allPlays.push({ ...play, league: league.league });
+        }
+      }
+
+      const plan = suggestStakes({ bankroll, plays: allPlays });
+      return {
+        ...plan,
+        bankroll,
+        leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })),
+        totalRecommended: recResult.totalRecommended
+      };
+    },
     async find_best_price(args = {}) {
       const league = args.league || 'NBA';
       const market = args.market || 'Moneyline';
@@ -590,7 +710,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       if (hasScreenBooks || hasScreenConsensus) {
         // /screen has real data -- use existing ranking
-        return buildRankedScreenResponseShared({
+        const screenResult = await buildRankedScreenResponseShared({
           client,
           payloads,
           args,
@@ -605,6 +725,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               debug
             })
         });
+        // Correct tennis match times via SportScore
+        if (screenResult?.result) {
+          screenResult.result = await correctTennisTimes(screenResult.result);
+        }
+        return screenResult;
       }
 
       // Phase 2: /screen returned only Polymarket odds -- fall back to +EV endpoint
@@ -652,9 +777,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         lookbackHours: getLookbackHours(args)
       });
 
+      // Correct tennis match times via SportScore
+      const correctedRanked = await correctTennisTimes(ranked);
+
       return {
         ok: true,
-        result: ranked,
+        result: correctedRanked,
         league: 'Tennis',
         freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
         source: '+ev_enriched',
