@@ -1,6 +1,7 @@
-auth.json
-node_modules
-npm-debug.log*
 .DS_Store
 .env
 .hermes/
+auth.json
+node_modules
+npm-debug.log*
+ranked-screen-rows.json
