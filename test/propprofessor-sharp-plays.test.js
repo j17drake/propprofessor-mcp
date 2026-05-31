@@ -367,6 +367,85 @@ describe('sharp play target book helpers', () => {
     assert.equal(summary.topNearMisses[0].movementSourceBook, null);
   });
 
+  it('dodgers regression: independent Pinnacle movement is not labeled as target-book-only', () => {
+    const row = {
+      gameId: 'mlb-dodgers-reg',
+      scanLeague: 'MLB',
+      scanMarket: 'Moneyline',
+      market: 'Moneyline',
+      pick: 'Los Angeles Dodgers',
+      odds: -167,
+      currentOdds: -167,
+      targetBookOdds: -167,
+      bestAvailableOdds: -171,
+      consensusBookCount: 2,
+      marketBookCount: 2,
+      supportBookCount: 2,
+      executionQuality: 'playable',
+      lineHistoryUsable: true,
+      movementMode: 'same_book',
+      movementSourceBook: 'Pinnacle',
+      movementLabel: 'supportive',
+      movementQualityScore: 1,
+      consensusEdge: 1.6,
+      gatePassed: true,
+      targetBook: 'NoVigApp',
+      executionBook: 'NoVigApp'
+    };
+
+    const summary = summarizeSharpPlayRows([row], {
+      targetBook: 'NoVigApp',
+      minConsensusBookCount: 2,
+      strict: true,
+      limit: 10
+    });
+
+    assert.equal(summary.filteredRows.length, 1);
+    assert.equal(summary.filteredRows[0].verdict, 'Bet candidate');
+    assert.equal(summary.classificationSummary.passReasonCounts.movement_source_is_target_book, undefined);
+    assert.deepEqual(summary.topNearMisses, []);
+  });
+
+  it('avalanche regression: insufficient history reports history failures, not target-book-only movement', () => {
+    const summary = summarizeSharpPlayRows([
+      {
+        gameId: 'nhl-avalanche-reg',
+        scanLeague: 'NHL',
+        scanMarket: 'Moneyline',
+        market: 'Moneyline',
+        pick: 'Colorado Avalanche',
+        odds: -118,
+        currentOdds: -118,
+        targetBookOdds: -118,
+        bestAvailableOdds: -120,
+        consensusBookCount: 2,
+        marketBookCount: 2,
+        supportBookCount: 2,
+        executionQuality: 'playable',
+        lineHistoryUsable: false,
+        movementMode: null,
+        movementSourceBook: null,
+        movementLabel: 'insufficient_history',
+        movementQualityScore: 0,
+        consensusEdge: 1.1,
+        gatePassed: true,
+        targetBook: 'NoVigApp',
+        executionBook: 'NoVigApp'
+      }
+    ], {
+      targetBook: 'NoVigApp',
+      minConsensusBookCount: 2,
+      strict: true,
+      limit: 10
+    });
+
+    assert.deepEqual(summary.filteredRows, []);
+    assert.equal(summary.classificationSummary.passReasonCounts.no_usable_line_history, 1);
+    assert.equal(summary.classificationSummary.passReasonCounts.missing_movement_source_book, 1);
+    assert.equal(summary.classificationSummary.passReasonCounts.movement_source_is_target_book, undefined);
+    assert.equal(summary.topNearMisses[0].movementSourceBook, null);
+  });
+
   it('builds a UFC shortlist with lean fallback rows when strict sharp support is thin', () => {
     const shortlist = buildUfcShortlist([
       {

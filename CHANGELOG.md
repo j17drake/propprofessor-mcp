@@ -9,6 +9,9 @@
 
 ## 1.0.6
 
+- Restored a raw `query_fantasy_picks` MCP tool for the live `/fantasy` optimizer / DFS board so fantasy availability no longer has to be inferred from `/screen`
+- Reintroduced `queryFantasyPicks()` on the API client, posting directly to `https://slipgen.propprofessor.com/fantasy-picks` with the fantasy page referer
+- Added regression coverage for the restored fantasy API helper and MCP tool-list / handler surface
 - Added a reusable `sharp-plays-service` package export so PP-MCP business logic can be shared without importing the MCP script entrypoint
 - Fixed `superjson` loading in the CommonJS API client by using a cached dynamic import, restoring Node 18 compatibility for TRPC hide-row serialization
 - Added CI and local verification coverage across Node 18 and Node 20, including lint and Prettier checks
