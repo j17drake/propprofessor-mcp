@@ -41,6 +41,15 @@ const SERVER_VERSION = require('../package.json').version;
 const PROTOCOL_VERSION = '2024-11-05';
 const VALIDATED_EV_CONCURRENCY = 6;
 
+// Strip undefined values so they don't override API client defaults via spread
+function defined(obj) {
+  const result = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) result[k] = v;
+  }
+  return result;
+}
+
 // ALL_SCREEN_BOOKS is imported from propprofessor-sharp-books.js
 
 async function mapWithConcurrency(items, worker, { concurrency = VALIDATED_EV_CONCURRENCY } = {}) {
@@ -378,7 +387,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         error.status = 400;
         throw error;
       }
-      const payload = await client.querySportsbook({
+      const payload = await client.querySportsbook(defined({
         isLive: args.isLive,
         showBreakOnly: args.showBreakOnly,
         showTimeoutOnly: args.showTimeoutOnly,
@@ -399,7 +408,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         minLiquidity: args.minLiquidity,
         maxLiquidity: args.maxLiquidity,
         weightSettings: args.weightSettings && typeof args.weightSettings === 'object' ? args.weightSettings : undefined
-      });
+      }));
       const rows = Array.isArray(payload) ? payload : [];
       return {
         ok: true,

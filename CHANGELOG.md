@@ -2,10 +2,61 @@
 
 ## 1.0.7
 
-- Consolidated MCP tools from 21 to 8: `ev_discover`, `ev_validate`, `screen`, `screen_raw`, `sharp_plays`, `ufc_card`, `consensus_windows`, `health`
-- Removed 13 redundant tools (now CLI-only): all 9 per-league screens, `query_screen_odds_best_comps`, `query_screen_odds_ranked`, `league_presets`
-- The `screen` tool now accepts a `league` param for any supported sport
-- Per-league shorthand commands still available via CLI: `pp-query nba`, `pp-query tennis`, etc.
+### Screen API migration
+- Migrated screen endpoint from `screen.propprofessor.com/api/retrieve-data-new` → `backend.propprofessor.com/screen`
+- Now passes the full `ALL_SCREEN_BOOKS` list (36 books) by default, fixing non-major sports (Tennis, Soccer, etc.) returning only Polymarket data
+- Added book name canonicalization via `canonicalizeScreenBookName()` with alias support (e.g. "rebet" → "Rebet", "propbuilder" → "Prop Builder")
+
+### New analysis modules
+- `propprofessor-steam-move.js` — Steam move detection integrated into screen ranking (exposes `steamMove`, `steamBooks`, `steamDirection` per row)
+- `propprofessor-sharp-consensus.js` — Multi-window sharp consensus analysis across 1h/2h/6h/12h/24h/48h windows
+- `propprofessor-best-price.js` — Line shopping: finds best price across all books for a given play
+
+### New MCP tools (6)
+- `query_sharp_consensus_windows` — Detect sustained sharp book consensus movement across time windows
+- `query_all_slates` — Query 7+ leagues at once with consolidated ranked output
+- `find_best_price` — Compare odds across all books for line shopping
+- `get_hidden_bets` / `hide_bet` / `unhide_bet` / `clear_hidden_bets` — Fantasy bet hide/unhide CRUD
+- `query_fantasy_picks` — Restored tool hitting `slipgen.propprofessor.com/fantasy-picks`
+- `query_screen_odds_best_comps` / `query_screen_odds_ranked` — Explicit MCP tools for the screen ranking pipeline
+
+### Sharp plays upgrades
+- Steam bonus (+15pts) added to sharp play scoring
+- Consensus-only fallback for execution books (Fliff, etc.) that can't validate independent sharp movement
+- `requireIndependentSharpMovement` flag for flexible movement verification
+- `lineHistoryUsable` surfaced in near-miss previews
+- Removed `book: executionBook` override that was clobbering the actual book name in `sharp-plays-service`
+
+### Screen ranking improvements
+- `buildDegradedDataWarnings()` — Data quality transparency: warns when line history, consensus, or freshness is missing
+- `recentWindowHours` now configurable via args (was hardcoded 6h)
+- `getResolvedScreenSelection()` now matches by `selectionId` or exact `line+odds`, not just `defaultKey` (fixes prop selection mismatches)
+- Steam move detection integrated into ranking pipeline
+
+### Tennis two-phase fallback
+- Phase 1: `/screen` with full book list (fixes Polymarket-only results)
+- Phase 2: When `/screen` has insufficient data, falls back to +EV endpoint with odds history enrichment via `enrichTennisEvCandidates()`
+
+### Handler renaming for consistency
+All MCP tool handlers prefixed with `query_` for consistency:
+- `ev_discover` → `query_positive_ev_candidates` (with mandatory `leagues` validation)
+- `ev_validate` → `query_validated_positive_ev_candidates`
+- `screen` → `query_screen_odds`
+- `screen_raw` → N/A (removed as redundant)
+- `sharp_plays` → `query_sharp_plays`
+- `consensus_windows` → `query_sharp_consensus_windows`
+- `ufc_card` → `query_ufc_card`
+- `health` → `health_status`
+- New per-league tools: `query_nba_screen`, `query_mlb_screen`, `query_nfl_screen`, `query_nhl_screen`, `query_ufc_screen`, `query_soccer_screen`, `query_ncaab_screen`, `query_ncaaf_screen`, `query_wnba_screen`, `query_sport_screen`
+- CLI `ufc-card` command updated to call `query_ufc_card`
+
+### Test coverage (+500 lines)
+- Steam move detection and best-price analysis tests
+- Prop selection resolution with multi-line alternates (Hartenstein O7.5 vs O8.5)
+- Execution field preservation for selection2 rows (Spurs +5.5)
+- `recentWindowHours` threading into movement summaries
+- Book name canonicalization (ReBet aliases)
+- 373 total tests, all passing
 
 ## 1.0.6
 

@@ -516,12 +516,7 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls.querySportsbook.length, 1);
     assert.deepEqual(calls.querySportsbook[0], {
       isLive: false,
-      showBreakOnly: undefined,
-      showTimeoutOnly: undefined,
-      showPeriodEndOnly: undefined,
-      timeAvailable: undefined,
       userState: 'tx',
-      hideNCAAPlayerProps: undefined,
       sportsbooks: ['Fliff', 'NoVigApp'],
       leagues: ['NBA', 'MLB'],
       minOdds: -120,
@@ -533,8 +528,7 @@ describe('propprofessor MCP server stdio contract', () => {
       minHoursAway: 0,
       maxHoursAway: 24,
       minLiquidity: 10,
-      maxLiquidity: 1000,
-      weightSettings: undefined
+      maxLiquidity: 1000
     });
     assert.equal(result.ok, true);
     assert.equal(result.count, 1);
