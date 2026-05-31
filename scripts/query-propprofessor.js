@@ -404,7 +404,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     payload = await client.querySportsbook();
   } else if (command === 'ufc-card') {
     const handlers = createMcpHandlers({ client });
-    const result = await handlers.ufc_card({
+    const result = await handlers.query_ufc_card({
       book: opts.book || opts.targetBook,
       targetBook: opts.targetBook || opts.book,
       markets: getMultiValueOption(opts.markets || opts.market),

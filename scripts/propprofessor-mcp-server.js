@@ -614,6 +614,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         return {
           ok: true,
           result: [],
+          league: 'Tennis',
+          resultMeta: { debugEnabled: false, source: 'fallback_empty' },
           freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
           warning: 'No tennis data available from either /screen or +EV endpoint'
         };
@@ -627,6 +629,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         return {
           ok: true,
           result: [],
+          league: 'Tennis',
+          resultMeta: { debugEnabled: false, source: 'fallback_empty' },
           freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
           warning: '/screen returned only Polymarket odds and +EV endpoint has no tennis candidates today'
         };
@@ -642,6 +646,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return {
         ok: true,
         result: ranked,
+        league: 'Tennis',
         freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
         source: '+ev_enriched',
         note: '/screen returned insufficient tennis data; results enriched from +EV endpoint with odds history'

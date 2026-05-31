@@ -239,7 +239,7 @@ describe('createPropProfessorClient', () => {
 
     try {
       const rows = await client.queryScreenOdds({ market: 'Moneyline', league: 'NBA', books: ['FanDuel'] });
-      assert.equal(fetchCalls[0].url, 'https://screen.propprofessor.com/api/retrieve-data-new');
+      assert.equal(fetchCalls[0].url, 'https://backend.propprofessor.com/screen');
       assert.equal(JSON.parse(fetchCalls[0].options.body).books[0], 'FanDuel');
       assert.equal(JSON.parse(fetchCalls[0].options.body).market, 'Moneyline');
       assert.equal(rows[0].id, 'row-1');
