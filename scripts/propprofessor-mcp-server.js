@@ -38,6 +38,7 @@ const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
 const { analyzeMultiWindow, summarizeResults, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
 const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
 const { getClvHistory } = require('../lib/propprofessor-clv-history');
+const { getPlayerContext } = require('../lib/propprofessor-player-context');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -628,10 +629,22 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async query_clv_history(args = {}) {
       const days = Number.isFinite(Number(args.days)) ? Number(args.days) : 30;
       const groupBy = typeof args.groupBy === 'string' ? args.groupBy : 'week';
-      const path = typeof args.path === 'string' && args.path.length
+      const path = args.path && typeof args.path === 'string' && args.path.length > 0
         ? args.path
         : (process.env.BET_LOG_PATH || undefined);
       return getClvHistory({ days, groupBy, path });
+    },
+    async query_player_context(args = {}) {
+      const player = typeof args.player === 'string' ? args.player.trim() : '';
+      if (!player) {
+        return { ok: false, error: 'player argument is required' };
+      }
+      return getPlayerContext({
+        player,
+        sport: typeof args.sport === 'string' && args.sport.length > 0 ? args.sport : null,
+        gameTime: typeof args.gameTime === 'string' && args.gameTime.length > 0 ? args.gameTime : null,
+        maxAgeMinutes: Number.isFinite(Number(args.maxAgeMinutes)) ? Number(args.maxAgeMinutes) : 60,
+      });
     },
     async find_best_price(args = {}) {
       const league = args.league || 'NBA';

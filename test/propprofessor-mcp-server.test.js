@@ -265,6 +265,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'query_ncaaf_screen',
         'query_nfl_screen',
         'query_nhl_screen',
+        'query_player_context',
         'query_positive_ev_candidates',
         'query_recommended_bets',
         'query_screen_odds',
