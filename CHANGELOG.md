@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Steam detection tightened
+- **Strict steam rule (Phase 1 of sharp-signal-tuning plan):** 5-minute window + 3+ sharp books (industry standard for genuine cross-book coordination). Was 1-hour window + 2+ books.
+- New fields on every ranked screen row: `steamMoveLegacy`, `steamBooksLegacy`, `steamDirectionLegacy`, `steamBookCountLegacy` — keeps the old rule available for A/B comparison and rolling back if hit rates degrade.
+- `steamMove` (the boolean driving `movementGrade`, risk score, +EV bonuses, and the +15 sharp-plays score bonus) now means **strict** steam only. Downstream scoring is unchanged — only the trigger condition is tighter.
+- New test file: `test/propprofessor-steam-move-strict.test.js` (8 tests covering strict-only triggers, mixed directions, non-sharp book filtering, and side-by-side comparison).
+
 ## 1.0.7
 
 ### Screen API migration
