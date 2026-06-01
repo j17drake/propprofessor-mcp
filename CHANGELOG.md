@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### `query_clv_history` MCP tool (Phase 7 of sharp-signal-tuning plan)
+- New tool: reads a CSV bet log (default `~/Documents/bet-log.csv`, overridable via `path` arg or `BET_LOG_PATH` env var) and computes your actual CLV track record.
+- Returns: `avgClv` (decimal-odds-ratio formula), `clvStddev`, `winRate`, `totalProfit`, `totalStake`, `roi`, and per-group breakdown (by `week`, `sport`, `tier`, or `book`).
+- CSV format: `date,league,market,selection,book,odds_taken,closing_odds,outcome,stake,tier` (header row required). `outcome` is `win`/`loss`/`push`.
+- CLV formula: `(decimal_odds_taken / decimal_odds_close - 1) × 100` — works for both favorites and underdogs, positive when you beat the close.
+- New file: `lib/propprofessor-clv-history.js` with `getClvHistory`, `readBetLog`, `computeClvPercent`, `computeProfit`, `americanToDecimal`, `groupBets`, `parseCsvLine`.
+- Tests: 35 new in `test/propprofessor-clv-history.test.js` covering CSV parsing (including quoted fields with commas), CLV math (favorites, underdogs, negative cases, zero, non-finite), bet log validation (missing columns, invalid outcome, non-numeric odds), grouping by week/sport/tier/book, and the full `getClvHistory` flow.
+
 ### CLV multiplier in `query_staking_plan` (Phase 6 of sharp-signal-tuning plan)
 - Stake sizing now applies a CLV multiplier in addition to the tier base and edge multiplier.
 - Multiplier buckets: `clv >= 5%` → 1.5x, `2-5%` → 1.0x, `0.5-2%` → 0.75x, `< 0.5%` → 0.5x, missing/null → 0.5x.

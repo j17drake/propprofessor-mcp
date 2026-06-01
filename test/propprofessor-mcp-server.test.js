@@ -258,6 +258,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'hide_bet',
         'league_presets',
         'query_all_slates',
+        'query_clv_history',
         'query_mlb_screen',
         'query_nba_screen',
         'query_ncaab_screen',

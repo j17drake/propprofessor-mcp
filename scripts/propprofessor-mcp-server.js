@@ -37,6 +37,7 @@ const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
 const { analyzeMultiWindow, summarizeResults, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
 const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
+const { getClvHistory } = require('../lib/propprofessor-clv-history');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -623,6 +624,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })),
         totalRecommended: recResult.totalRecommended
       };
+    },
+    async query_clv_history(args = {}) {
+      const days = Number.isFinite(Number(args.days)) ? Number(args.days) : 30;
+      const groupBy = typeof args.groupBy === 'string' ? args.groupBy : 'week';
+      const path = typeof args.path === 'string' && args.path.length
+        ? args.path
+        : (process.env.BET_LOG_PATH || undefined);
+      return getClvHistory({ days, groupBy, path });
     },
     async find_best_price(args = {}) {
       const league = args.league || 'NBA';
