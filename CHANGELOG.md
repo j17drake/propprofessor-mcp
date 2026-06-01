@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### CLV multiplier in `query_staking_plan` (Phase 6 of sharp-signal-tuning plan)
+- Stake sizing now applies a CLV multiplier in addition to the tier base and edge multiplier.
+- Multiplier buckets: `clv >= 5%` → 1.5x, `2-5%` → 1.0x, `0.5-2%` → 0.75x, `< 0.5%` → 0.5x, missing/null → 0.5x.
+- Formula: `stakePct = basePct × edgeMultiplier × clvMultiplier`, capped at 5% per play.
+- New fields on each stake row: `clvPct`, `clvBucket`, `clvFactor`, `edgeFactor`, `basePct` so the breakdown is visible.
+- `null`/`undefined` CLV is treated as "no data" (0.5x penalty) — not the same as CLV of 0.
+- Tests: 16 new in `test/propprofessor-staking-clv.test.js`.
+
 ### Multi-window consensus score (Phase 2 of sharp-signal-tuning plan)
 - New per-row field `multiWindowScore: 0.0-1.0` on every ranked screen row: fraction of [1h, 2h, 6h, 12h, 24h, 48h] time windows where all configured sharp books (Pinnacle, BetOnline, BookMaker) moved in the same direction.
 - Companion fields: `consensusWindowCount`, `totalConsensusWindows`, `consensusWindows: string[]` (e.g. `["6h", "12h", "24h", "48h"]`), `multiWindowInsufficientData: bool`.
