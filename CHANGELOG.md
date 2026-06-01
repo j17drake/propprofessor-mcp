@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Multi-window consensus score (Phase 2 of sharp-signal-tuning plan)
+- New per-row field `multiWindowScore: 0.0-1.0` on every ranked screen row: fraction of [1h, 2h, 6h, 12h, 24h, 48h] time windows where all configured sharp books (Pinnacle, BetOnline, BookMaker) moved in the same direction.
+- Companion fields: `consensusWindowCount`, `totalConsensusWindows`, `consensusWindows: string[]` (e.g. `["6h", "12h", "24h", "48h"]`), `multiWindowInsufficientData: bool`.
+- **Movement grade:** `multiWindowScore >= 0.66` (>= 4 of 6 windows) is now required for GREEN eligibility. If `multiWindowInsufficientData` is true (no line history), the requirement is skipped — never punish absence of data.
+- **Risk score:** `multiWindowScore >= 0.66` → -1, `<= 0.33` → +1, mid-range (0.34-0.65) → 0. Mid-range also demotes the grade (which has its own score effect).
+- New function `computeMultiWindowScore(row, options)` in `lib/propprofessor-sharp-consensus.js` is callable independently and is also called by `rankScreenRows()`.
+- New test file: `test/propprofessor-multi-window-score.test.js` (15 tests covering the function + risk grade integration).
+
 ### Steam detection tightened
 - **Strict steam rule (Phase 1 of sharp-signal-tuning plan):** 5-minute window + 3+ sharp books (industry standard for genuine cross-book coordination). Was 1-hour window + 2+ books.
 - New fields on every ranked screen row: `steamMoveLegacy`, `steamBooksLegacy`, `steamDirectionLegacy`, `steamBookCountLegacy` — keeps the old rule available for A/B comparison and rolling back if hit rates degrade.
