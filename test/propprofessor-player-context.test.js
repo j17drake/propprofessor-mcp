@@ -92,7 +92,8 @@ function mockExecFileSuccess() {
       cb = opts;
       opts = {};
     }
-    cb(null, { stdout: JSON.stringify(TWEET_FIXTURE), stderr: '' });
+    // Match Node's real execFile signature: (err, stdout, stderr)
+    cb(null, JSON.stringify(TWEET_FIXTURE), '');
   };
 }
 
