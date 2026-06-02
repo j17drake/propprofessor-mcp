@@ -50,7 +50,7 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
     assert.equal(result.result.endpoints?.screen, 'ok');
   });
 
-  it('query_screen_odds returns rows for NBA Moneyline', async () => {
+  it('screen_raw returns rows for NBA Moneyline', async () => {
     const payload = await client.queryScreenOdds({ league: LEAGUE, market: MARKET, books: ['NoVigApp', 'Pinnacle'] });
     assert.ok(payload);
     const rows = extractScreenRows(payload);
@@ -60,8 +60,8 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
     assert.ok(row.odds || row.currentOdds, 'Row has odds');
   });
 
-  it('query_screen_odds_ranked returns ranked rows with consensus metadata', async () => {
-    const result = await handlers.query_screen_odds_ranked({
+  it('screen_ranked returns ranked rows with consensus metadata', async () => {
+    const result = await handlers.screen_ranked({
       league: LEAGUE,
       market: MARKET,
       books: ['NoVigApp'],
@@ -82,15 +82,15 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
     assert.ok(row.participant, 'Row has a participant');
   });
 
-  it('query_positive_ev_candidates requires leagues param', async () => {
+  it('ev_candidates requires leagues param', async () => {
     await assert.rejects(
-      () => handlers.query_positive_ev_candidates({}),
+      () => handlers.ev_candidates({}),
       (err) => err.code === 'MISSING_LEAGUES'
     );
   });
 
-  it('query_positive_ev_candidates returns +EV candidates for NBA', async () => {
-    const result = await handlers.query_positive_ev_candidates({
+  it('ev_candidates returns +EV candidates for NBA', async () => {
+    const result = await handlers.ev_candidates({
       leagues: ['NBA'],
       limit: 5,
       minValue: 0
@@ -104,8 +104,8 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
     }
   });
 
-  it('query_sharp_plays returns results for NBA', async () => {
-    const result = await handlers.query_sharp_plays({
+  it('sharp_plays returns results for NBA', async () => {
+    const result = await handlers.sharp_plays({
       leagues: [LEAGUE],
       markets: [MARKET],
       limit: 5,
@@ -155,7 +155,8 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
   });
 
   it('tennis screen does not crash (may be empty on quiet days)', async () => {
-    const result = await handlers.query_tennis_screen({
+    const result = await handlers.screen({
+      league: 'Tennis',
       market: 'Moneyline',
       book: 'Pinnacle',
       limit: 5,
@@ -169,7 +170,7 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
   });
 
   it('all_slates returns consolidated results', async () => {
-    const result = await handlers.query_all_slates({
+    const result = await handlers.all_slates({
       leagues: [LEAGUE],
       market: MARKET,
       limit: 3,

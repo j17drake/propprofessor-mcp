@@ -630,7 +630,7 @@ describe('createPropProfessorClient', () => {
     }
   });
 
-  it('query_nba_screen expands nested /screen rows before ranking', async () => {
+  it('screen (NBA) expands nested /screen rows before ranking', async () => {
     const calls = [];
     const handlers = createMcpHandlers({
       client: {
@@ -680,7 +680,7 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_nba_screen({ market: 'Point Spread', books: ['NoVigApp'] });
+    const result = await handlers.screen({ league: 'NBA', market: 'Point Spread', books: ['NoVigApp'] });
     assert.equal(result.ok, true);
     assert.equal(result.result.length >= 1, true);
     assert.equal(result.result[0].book, 'NoVigApp');
@@ -697,7 +697,7 @@ describe('createPropProfessorClient', () => {
     assert.deepEqual(calls[0].books, ['NoVigApp']);
   });
 
-  it('query_screen_odds_ranked uses the shared ranked screen flow with hydration and freshness', async () => {
+  it('screen_ranked uses the shared ranked screen flow with hydration and freshness', async () => {
     const screenCalls = [];
     const historyCalls = [];
     const handlers = createMcpHandlers({
@@ -751,7 +751,7 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_screen_odds_ranked({
+    const result = await handlers.screen_ranked({
       league: 'NBA',
       market: 'Moneyline',
       books: ['NoVigApp'],
@@ -792,7 +792,7 @@ describe('createPropProfessorClient', () => {
     assert.deepEqual(historyCalls[0].sportsbooks, ['NoVigApp']);
   });
 
-  it('query_screen_odds_ranked canonicalizes ReBet aliases for screen filtering and history hydration', async () => {
+  it('screen_ranked canonicalizes ReBet aliases for screen filtering and history hydration', async () => {
     const screenCalls = [];
     const historyCalls = [];
     const handlers = createMcpHandlers({
@@ -844,7 +844,7 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_screen_odds_ranked({
+    const result = await handlers.screen_ranked({
       league: 'MLB',
       market: 'Moneyline',
       books: ['ReBet'],
@@ -860,7 +860,7 @@ describe('createPropProfessorClient', () => {
     assert.deepEqual(historyCalls[0].sportsbooks, ['Rebet']);
   });
 
-  it('query_screen_odds_ranked omits verbose movement debug when disabled', async () => {
+  it('screen_ranked omits verbose movement debug when disabled', async () => {
     const handlers = createMcpHandlers({
       client: {
         queryScreenOddsBestComps: async () => ({
@@ -900,7 +900,7 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_screen_odds_ranked({
+    const result = await handlers.screen_ranked({
       league: 'NBA',
       market: 'Moneyline',
       books: ['NoVigApp'],
@@ -914,7 +914,7 @@ describe('createPropProfessorClient', () => {
     assert.ok(result.result[0].rankingProvenance);
   });
 
-  it('query_sport_screen reuses the ranked league flow for non-tennis leagues', async () => {
+  it('screen reuses the ranked league flow for non-tennis leagues', async () => {
     const screenCalls = [];
     const historyCalls = [];
     const handlers = createMcpHandlers({
@@ -963,7 +963,7 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_sport_screen({
+    const result = await handlers.screen({
       league: 'nba',
       market: 'Moneyline',
       books: ['NoVigApp'],
@@ -983,7 +983,7 @@ describe('createPropProfessorClient', () => {
     assert.equal(historyCalls.length >= 1, true);
   });
 
-  it('query_tennis_screen hydrates missing line history through the shared ranked flow', async () => {
+  it('screen (Tennis) hydrates missing line history through the shared ranked flow', async () => {
     const screenCalls = [];
     const historyCalls = [];
     const handlers = createMcpHandlers({
@@ -1042,7 +1042,8 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_tennis_screen({
+    const result = await handlers.screen({
+      league: 'Tennis',
       market: 'Moneyline',
       book: 'Fliff',
       limit: 5,
@@ -1098,7 +1099,7 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.query_tennis_screen({ market: 'Moneyline', limit: 5 });
+    const result = await handlers.screen({ league: 'Tennis', market: 'Moneyline', limit: 5 });
     assert.equal(result.result[0].hasConsensus, true);
     assert.equal(result.result[0].hasLineMovement, true);
     assert.equal(typeof result.result[0].rankingReason, 'string');

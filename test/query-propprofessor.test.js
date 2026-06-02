@@ -201,7 +201,7 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(payload.league, 'WNBA');
   });
 
-  it('routes ufc-card through query_ufc_card with UFC card flags', async () => {
+  it('routes ufc-card through ufc_card with UFC card flags', async () => {
     const { logger, lines } = createLogger();
     const calls = [];
 

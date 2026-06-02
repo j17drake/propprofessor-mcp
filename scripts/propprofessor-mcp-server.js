@@ -321,6 +321,103 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     });
   }
 
+  // Internal tennis screen handler (not exposed as MCP tool — use screen(league="Tennis"))
+  async function runTennisScreen(args = {}) {
+    const preferredBook = String(args.book || 'Pinnacle').trim() || 'Pinnacle';
+    const requestedBooks = normalizeBookList(args.books);
+    const marketQuery = normalizeTennisMarketQuery(args.market || 'Moneyline');
+    const queryFn =
+      typeof client.queryScreenOdds === 'function'
+        ? client.queryScreenOdds.bind(client)
+        : client.queryScreenOddsBestComps.bind(client);
+
+    const payloads = [];
+    for (const market of marketQuery) {
+      const payload = await queryFn({
+        market,
+        league: 'Tennis',
+        books: requestedBooks.length ? requestedBooks : ALL_SCREEN_BOOKS,
+        is_live: Boolean(args.is_live)
+      });
+      payloads.push(payload);
+    }
+
+    const rows = payloads.flatMap(payload => extractScreenRows(payload));
+
+    const hasScreenBooks = rows.some(row => {
+      const text = JSON.stringify(row || '');
+      return text.includes('"Pinnacle"') || text.includes('"Circa"') || text.includes('"BetOnline"') || text.includes('"Kalshi"');
+    });
+    const hasScreenConsensus = rows.some(row => {
+      const text = JSON.stringify(row || '');
+      return text.includes('"consensus"') || text.includes('"ev"') || text.includes('"value"');
+    });
+
+    if (hasScreenBooks || hasScreenConsensus) {
+      const screenResult = await buildRankedScreenResponseShared({
+        client,
+        payloads,
+        args,
+        league: 'Tennis',
+        focusBook: preferredBook,
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankTennisScreenRows(hydratedRows, {
+            limit: getLimit(args),
+            preferredBook,
+            includeAll: getIncludeAll(args),
+            maxAgeMs: getMaxAgeMs(args),
+            debug
+          })
+      });
+      if (screenResult?.result) {
+        screenResult.result = await correctTennisTimes(screenResult.result);
+      }
+      return screenResult;
+    }
+
+    // Phase 2: fallback to +EV endpoint
+    let evResult;
+    try {
+      evResult = await client.querySportsbook({
+        leagues: ['Tennis'],
+        sportsbooks: ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle', 'Polymarket', 'Circa', 'BetOnline', 'Kalshi', 'NoVigApp'],
+        minOdds: -9999,
+        maxOdds: 9999,
+        minValue: 0,
+        maxHoursAway: 48,
+        isLive: Boolean(args.is_live)
+      });
+    } catch {
+      return {
+        ok: true, result: [], league: 'Tennis',
+        resultMeta: { debugEnabled: false, source: 'fallback_empty' },
+        freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
+        warning: 'No tennis data available from either /screen or +EV endpoint'
+      };
+    }
+
+    const evCandidates = Array.isArray(evResult) ? evResult.filter(row => String(row.league || '').toLowerCase() === 'tennis') : [];
+    if (!evCandidates.length) {
+      return {
+        ok: true, result: [], league: 'Tennis',
+        resultMeta: { debugEnabled: false, source: 'fallback_empty' },
+        freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
+        warning: '/screen returned only Polymarket odds and +EV endpoint has no tennis candidates today'
+      };
+    }
+
+    const ranked = await enrichTennisEvCandidates(evCandidates, client, {
+      preferredBook, limit: getLimit(args), lookbackHours: getLookbackHours(args)
+    });
+    const correctedRanked = await correctTennisTimes(ranked);
+    return {
+      ok: true, result: correctedRanked, league: 'Tennis',
+      freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
+      source: '+ev_enriched',
+      note: '/screen returned insufficient tennis data; results enriched from +EV endpoint with odds history'
+    };
+  }
+
   async function runSportScreen(args = {}) {
     const requestedLeague = String(args.league || '').trim();
     if (!requestedLeague) {
@@ -328,7 +425,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     }
     const presetLeague = getLeagueRankingPreset(requestedLeague).league;
     return presetLeague === 'TENNIS'
-      ? handlers.query_tennis_screen(args)
+      ? runTennisScreen(args)
       : runLeagueScreen(args, presetLeague || requestedLeague);
   }
 
@@ -375,14 +472,38 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
     };
   }
+
+  // ===== CONSOLIDATED HANDLER MAP =====
+  // 31 old tools → 20 new tools:
+  //   ev_candidates          ← query_positive_ev_candidates + query_validated_positive_ev_candidates
+  //   screen_raw             ← query_screen_odds + query_screen_odds_best_comps
+  //   screen_ranked          ← query_screen_odds_ranked
+  //   screen                 ← query_sport_screen + query_nba_screen + query_wnba_screen + query_mlb_screen
+  //                              + query_nfl_screen + query_nhl_screen + query_ufc_screen + query_soccer_screen
+  //                              + query_ncaab_screen + query_ncaaf_screen + query_tennis_screen
+  //   sharp_plays            ← query_sharp_plays
+  //   sharp_consensus        ← query_sharp_consensus_windows
+  //   all_slates             ← query_all_slates
+  //   ufc_card               ← query_ufc_card (absorbs query_ufc_screen)
+  //   recommended_bets       ← query_recommended_bets
+  //   staking_plan           ← query_staking_plan
+  //   clv_history            ← query_clv_history
+  //   player_context         ← query_player_context
+  //   league_presets         ← league_presets (unchanged)
+  //   health_status          ← health_status (unchanged)
+  //   get_hidden_bets        ← get_hidden_bets (unchanged)
+  //   hide_bet               ← hide_bet (unchanged)
+  //   unhide_bet             ← unhide_bet (unchanged)
+  //   clear_hidden_bets      ← clear_hidden_bets (unchanged)
+  //   find_best_price        ← find_best_price (unchanged)
   const handlers = {
-    async query_positive_ev_candidates(args = {}) {
+    async ev_candidates(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length
         ? args.leagues
         : undefined;
       if (!leagues) {
         const error = new Error(
-          'The leagues parameter is required on query_positive_ev_candidates. ' +
+          'The leagues parameter is required on ev_candidates. ' +
           'Pass one or more league names, e.g. leagues: ["NBA", "MLB", "Tennis"]. ' +
           'An empty array or omitted leagues will cause the backend to return HTTP 400.'
         );
@@ -414,101 +535,73 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         weightSettings: args.weightSettings && typeof args.weightSettings === 'object' ? args.weightSettings : undefined
       }));
       const rows = Array.isArray(payload) ? payload : [];
-      return {
-        ok: true,
-        count: rows.length,
-        result: rows,
+      const baseResult = {
+        ok: true, count: rows.length, result: rows,
         notes: {
-          workflow:
-            'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
+          workflow: 'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
           minValueBehavior: args.minValue === undefined ? 'unset_here_use_frontend_filter' : 'explicit_request_override'
         }
       };
+      if (args.validated) {
+        return validatePositiveEvCandidates({ client, candidates: rows, args });
+      }
+      return baseResult;
     },
 
-    async query_validated_positive_ev_candidates(args = {}) {
-      const discovery = await handlers.query_positive_ev_candidates(args);
-      return validatePositiveEvCandidates({
-        client,
-        candidates: discovery.result,
-        args
-      });
-    },
-
-    async query_screen_odds(args = {}) {
-      const payload = await client.queryScreenOdds({
+    async screen_raw(args = {}) {
+      const useBestComps = Boolean(args.bestComps);
+      const queryFn = useBestComps ? client.queryScreenOddsBestComps.bind(client) : client.queryScreenOdds.bind(client);
+      const payload = await queryFn({
         market: args.market || 'Moneyline',
         league: args.league || 'NBA',
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : [],
+        books: Array.isArray(args.books) ? args.books : (useBestComps ? undefined : []),
         is_live: Boolean(args.is_live)
       });
-      return { ok: true, result: payload };
+      const result = { ok: true, result: payload };
+      if (useBestComps) {
+        result.comparisonBooks = getSharpBookComparisonSet({ league: args.league || 'NBA', market: args.market, requestedBooks: Array.isArray(args.books) ? args.books : undefined });
+        result.sharpBookResearch = getSharpBookContext({ league: args.league || 'NBA', market: args.market });
+      }
+      return result;
     },
 
-    async query_screen_odds_best_comps(args = {}) {
-      const payload = await client.queryScreenOddsBestComps({
-        market: args.market,
-        league: args.league,
-        games: Array.isArray(args.games) ? args.games : [],
-        participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : undefined,
-        is_live: Boolean(args.is_live)
-      });
-      return {
-        ok: true,
-        result: payload,
-        comparisonBooks: getSharpBookComparisonSet({
-          league: args.league || 'NBA',
-          market: args.market,
-          requestedBooks: Array.isArray(args.books) ? args.books : undefined
-        }),
-        sharpBookResearch: getSharpBookContext({ league: args.league || 'NBA', market: args.market })
-      };
-    },
-    async query_screen_odds_ranked(args = {}) {
+    async screen_ranked(args = {}) {
       const requestedBooks = normalizeBookList(args.books);
       const league = args.league || 'NBA';
       const market = args.market || 'Moneyline';
       const preset = getLeagueRankingPreset(league, market);
       const focusBook = requestedBooks[0] || preset.preferredBooks[0];
       const payload = await client.queryScreenOddsBestComps({
-        market,
-        league,
+        market, league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
         books: requestedBooks,
         is_live: Boolean(args.is_live)
       });
       return buildRankedScreenResponseShared({
-        client,
-        payloads: [payload],
-        args,
-        league,
-        focusBook,
-        rankRows: (hydratedRows, { debug } = {}) =>
-          rankLeagueScreenRows(hydratedRows, {
-            league,
-            market,
-            limit: getLimit(args),
-            books: requestedBooks.length ? requestedBooks : undefined,
-            includeAll: getIncludeAll(args),
-            maxAgeMs: getMaxAgeMs(args),
-            debug
-          })
+        client, payloads: [payload], args, league, focusBook,
+        rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
+          league, market, limit: getLimit(args),
+          books: requestedBooks.length ? requestedBooks : undefined,
+          includeAll: getIncludeAll(args), maxAgeMs: getMaxAgeMs(args), debug
+        })
       });
     },
-    async query_sport_screen(args = {}) {
+
+    async screen(args = {}) {
       return runSportScreen(args);
     },
-    async query_sharp_plays(args = {}) {
+
+    async sharp_plays(args = {}) {
       return runSharpPlays(args, {
         queryLeagueScreen: runLeagueScreen,
-        queryTennisScreen: (rankedArgs) => handlers.query_tennis_screen(rankedArgs)
+        queryTennisScreen: (rankedArgs) => runTennisScreen(rankedArgs)
       });
     },
-    async query_recommended_bets(args = {}) {
+
+    async recommended_bets(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length
         ? args.leagues
         : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
@@ -519,25 +612,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
 
       const allRecommended = [];
-
       for (const league of leagues) {
         try {
-          const screenResult = await handlers.query_screen_odds_ranked({
-            league,
-            market,
-            books: args.books,
-            limit: limit * 2,
-            is_live: Boolean(args.is_live),
-            includeAll: false,
-            debug: false
+          const screenResult = await handlers.screen_ranked({
+            league, market, books: args.books, limit: limit * 2,
+            is_live: Boolean(args.is_live), includeAll: false, debug: false
           });
-
           const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
           const recommended = rows
-            .filter((row) => {
-              const tier = getConfidenceTier(row);
-              return targetTiers.includes(tier);
-            })
+            .filter((row) => targetTiers.includes(getConfidenceTier(row)))
             .sort((a, b) => {
               const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };
               const tierDiff = (tierOrder[a.confidenceTier] ?? 9) - (tierOrder[b.confidenceTier] ?? 9);
@@ -545,25 +628,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               return (Number(b.screenScore ?? 0) || 0) - (Number(a.screenScore ?? 0) || 0);
             })
             .slice(0, limit);
-
           if (recommended.length) {
             allRecommended.push({
-              league,
-              market,
-              count: recommended.length,
+              league, market, count: recommended.length,
               plays: recommended.map((row) => ({
                 game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                 selection: row.selection || row.participant || null,
                 start: row.start || null,
                 odds: row.targetBookOdds ?? null,
-                edge: row.consensusEdge,
-                clv: row.clvProxyPct,
+                edge: row.consensusEdge, clv: row.clvProxyPct,
                 consensusBookCount: row.consensusBookCount,
                 executionQuality: row.executionQuality,
-                movementGrade: row.movementGrade,
-                riskScore: row.riskScore,
-                kaiCall: row.kaiCall,
-                confidenceTier: row.confidenceTier,
+                movementGrade: row.movementGrade, riskScore: row.riskScore,
+                kaiCall: row.kaiCall, confidenceTier: row.confidenceTier,
                 rationale: row.rationale || buildRationale(row),
                 screenScore: row.screenScore
               }))
@@ -573,11 +650,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           allRecommended.push({ league, market, count: 0, error: String(error.message || error) });
         }
       }
-
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
       return {
-        ok: true,
-        totalRecommended: total,
+        ok: true, totalRecommended: total,
         leagues: allRecommended.filter((l) => l.count > 0),
         emptyLeagues: allRecommended.filter((l) => !l.count && !l.error).map((l) => l.league),
         failedLeagues: allRecommended.filter((l) => l.error).map((l) => ({ league: l.league, error: l.error })),
@@ -587,58 +662,35 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         tierFilter: targetTiers
       };
     },
-    async query_staking_plan(args = {}) {
+
+    async staking_plan(args = {}) {
       const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
       const market = args.market || 'Moneyline';
-      const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length
-        ? args.targetTiers
-        : ['TIER 1', 'TIER 2'];
+      const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-
-      // Get recommended plays
-      const recResult = await handlers.query_recommended_bets({ leagues, market, targetTiers, limit, is_live: Boolean(args.is_live) });
+      const recResult = await handlers.recommended_bets({ leagues, market, targetTiers, limit, is_live: Boolean(args.is_live) });
       if (!recResult.ok || !recResult.totalRecommended) {
-        return {
-          ok: true,
-          bankroll,
-          totalStake: 0,
-          playCount: 0,
-          stakes: [],
-          warnings: ['No recommended plays found for the given criteria'],
-          summary: 'No plays to stake'
-        };
+        return { ok: true, bankroll, totalStake: 0, playCount: 0, stakes: [], warnings: ['No recommended plays found for the given criteria'], summary: 'No plays to stake' };
       }
-
-      // Flatten plays from all leagues
       const allPlays = [];
       for (const league of recResult.leagues || []) {
-        for (const play of league.plays || []) {
-          allPlays.push({ ...play, league: league.league });
-        }
+        for (const play of league.plays || []) { allPlays.push({ ...play, league: league.league }); }
       }
-
       const plan = suggestStakes({ bankroll, plays: allPlays });
-      return {
-        ...plan,
-        bankroll,
-        leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })),
-        totalRecommended: recResult.totalRecommended
-      };
+      return { ...plan, bankroll, leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })), totalRecommended: recResult.totalRecommended };
     },
-    async query_clv_history(args = {}) {
+
+    async clv_history(args = {}) {
       const days = Number.isFinite(Number(args.days)) ? Number(args.days) : 30;
       const groupBy = typeof args.groupBy === 'string' ? args.groupBy : 'week';
-      const path = args.path && typeof args.path === 'string' && args.path.length > 0
-        ? args.path
-        : (process.env.BET_LOG_PATH || undefined);
+      const path = args.path && typeof args.path === 'string' && args.path.length > 0 ? args.path : (process.env.BET_LOG_PATH || undefined);
       return getClvHistory({ days, groupBy, path });
     },
-    async query_player_context(args = {}) {
+
+    async player_context(args = {}) {
       const player = typeof args.player === 'string' ? args.player.trim() : '';
-      if (!player) {
-        return { ok: false, error: 'player argument is required' };
-      }
+      if (!player) { return { ok: false, error: 'player argument is required' }; }
       return getPlayerContext({
         player,
         sport: typeof args.sport === 'string' && args.sport.length > 0 ? args.sport : null,
@@ -647,243 +699,36 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         useXurl: args.useXurl === true,
       });
     },
-    async find_best_price(args = {}) {
-      const league = args.league || 'NBA';
-      const market = args.market || 'Moneyline';
-      const payload = await client.queryScreenOddsBestComps({
-        market,
-        league,
-        games: Array.isArray(args.games) ? args.games : [],
-        participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : undefined,
-        is_live: Boolean(args.is_live)
-      });
-      const rows = extractScreenRows(payload);
-      return findBestPrice(rows, {
-        game: args.game,
-        market,
-        selection: args.selection,
-        books: args.books
-      });
-    },
-    async query_nba_screen(args = {}) {
-      return runLeagueScreen(args, 'NBA');
-    },
-    async query_wnba_screen(args = {}) {
-      return runLeagueScreen(args, 'WNBA');
-    },
-    async query_mlb_screen(args = {}) {
-      return runLeagueScreen(args, 'MLB');
-    },
-    async query_nfl_screen(args = {}) {
-      return runLeagueScreen(args, 'NFL');
-    },
-    async query_nhl_screen(args = {}) {
-      return runLeagueScreen(args, 'NHL');
-    },
-    async query_ufc_screen(args = {}) {
-      return runLeagueScreen(args, 'UFC');
-    },
-    async query_ufc_card(args = {}) {
-      return runUfcCard(args);
-    },
-    async query_soccer_screen(args = {}) {
-      return runLeagueScreen(args, 'Soccer');
-    },
-    async query_ncaab_screen(args = {}) {
-      return runLeagueScreen(args, 'NCAAB');
-    },
-    async query_ncaaf_screen(args = {}) {
-      return runLeagueScreen(args, 'NCAAF');
-    },
-    async query_tennis_screen(args = {}) {
-      const preferredBook = String(args.book || 'Pinnacle').trim() || 'Pinnacle';
-      const requestedBooks = normalizeBookList(args.books);
-      const marketQuery = normalizeTennisMarketQuery(args.market || 'Moneyline');
-      const queryFn =
-        typeof client.queryScreenOdds === 'function'
-          ? client.queryScreenOdds.bind(client)
-          : client.queryScreenOddsBestComps.bind(client);
 
-      // Phase 1: Try /screen (existing behavior)
-      const payloads = [];
-      for (const market of marketQuery) {
-        const payload = await queryFn({
-          market,
-          league: 'Tennis',
-          books: requestedBooks.length
-            ? requestedBooks
-            : ALL_SCREEN_BOOKS,
-          is_live: Boolean(args.is_live)
-        });
-        payloads.push(payload);
-      }
-
-      const rows = payloads.flatMap(payload => extractScreenRows(payload));
-
-      // Check if /screen returned actionable data (not just Polymarket-only)
-      const hasScreenBooks = rows.some(row => {
-        const text = JSON.stringify(row || '');
-        return text.includes('"Pinnacle"') || text.includes('"Circa"') || text.includes('"BetOnline"') || text.includes('"Kalshi"');
-      });
-      const hasScreenConsensus = rows.some(row => {
-        const text = JSON.stringify(row || '');
-        return text.includes('"consensus"') || text.includes('"ev"') || text.includes('"value"');
-      });
-
-      if (hasScreenBooks || hasScreenConsensus) {
-        // /screen has real data -- use existing ranking
-        const screenResult = await buildRankedScreenResponseShared({
-          client,
-          payloads,
-          args,
-          league: 'Tennis',
-          focusBook: preferredBook,
-          rankRows: (hydratedRows, { debug } = {}) =>
-            rankTennisScreenRows(hydratedRows, {
-              limit: getLimit(args),
-              preferredBook,
-              includeAll: getIncludeAll(args),
-              maxAgeMs: getMaxAgeMs(args),
-              debug
-            })
-        });
-        // Correct tennis match times via SportScore
-        if (screenResult?.result) {
-          screenResult.result = await correctTennisTimes(screenResult.result);
-        }
-        return screenResult;
-      }
-
-      // Phase 2: /screen returned only Polymarket odds -- fall back to +EV endpoint
-      let evResult;
-      try {
-        evResult = await client.querySportsbook({
-          leagues: ['Tennis'],
-          sportsbooks: ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle', 'Polymarket', 'Circa', 'BetOnline', 'Kalshi', 'NoVigApp'],
-          minOdds: -9999,
-          maxOdds: 9999,
-          minValue: 0,
-          maxHoursAway: 48,
-          isLive: Boolean(args.is_live)
-        });
-      } catch {
-        return {
-          ok: true,
-          result: [],
-          league: 'Tennis',
-          resultMeta: { debugEnabled: false, source: 'fallback_empty' },
-          freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
-          warning: 'No tennis data available from either /screen or +EV endpoint'
-        };
-      }
-
-      const evCandidates = Array.isArray(evResult)
-        ? evResult.filter(row => String(row.league || '').toLowerCase() === 'tennis')
-        : [];
-
-      if (!evCandidates.length) {
-        return {
-          ok: true,
-          result: [],
-          league: 'Tennis',
-          resultMeta: { debugEnabled: false, source: 'fallback_empty' },
-          freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
-          warning: '/screen returned only Polymarket odds and +EV endpoint has no tennis candidates today'
-        };
-      }
-
-      // Enrich +EV candidates with odds history and rank them
-      const ranked = await enrichTennisEvCandidates(evCandidates, client, {
-        preferredBook,
-        limit: getLimit(args),
-        lookbackHours: getLookbackHours(args)
-      });
-
-      // Correct tennis match times via SportScore
-      const correctedRanked = await correctTennisTimes(ranked);
-
-      return {
-        ok: true,
-        result: correctedRanked,
-        league: 'Tennis',
-        freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
-        source: '+ev_enriched',
-        note: '/screen returned insufficient tennis data; results enriched from +EV endpoint with odds history'
-      };
-    },
-
-    async query_sharp_consensus_windows(args = {}) {
+    async sharp_consensus(args = {}) {
       const league = String(args.league || 'Tennis').trim();
       const market = String(args.market || 'Moneyline').trim();
-      const windows = Array.isArray(args.windows) && args.windows.length
-        ? args.windows.map(Number).filter(Boolean).sort((a, b) => a - b)
-        : DEFAULT_WINDOWS;
-      const sharpBooks = Array.isArray(args.sharpBooks) && args.sharpBooks.length
-        ? args.sharpBooks.map((b) => String(b).trim()).filter(Boolean)
-        : DEFAULT_SHARP_BOOKS;
+      const windows = Array.isArray(args.windows) && args.windows.length ? args.windows.map(Number).filter(Boolean).sort((a, b) => a - b) : DEFAULT_WINDOWS;
+      const sharpBooks = Array.isArray(args.sharpBooks) && args.sharpBooks.length ? args.sharpBooks.map((b) => String(b).trim()).filter(Boolean) : DEFAULT_SHARP_BOOKS;
       const minConsensusWindows = Number(args.minConsensusWindows) || 0;
       const lookbackHours = Number(args.lookbackHours) || 48;
       const limit = Number(args.limit) || 100;
-
-      // Fetch ranked screen data with wide lookback.
-      // Do NOT pass `books` here -- the backend only returns multi-book data
-      // for non-major leagues when the full book list is passed. Instead, pass
-      // `historySportsbooks` so the history enrichment targets the sharp books
-      // we need for consensus analysis.
-      const rankedResponse = await handlers.query_screen_odds_ranked({
-        league,
-        market,
-        historySportsbooks: sharpBooks,
-        includeAll: true,
-        limit,
-        lookbackHours,
-        debug: false,
-        is_live: Boolean(args.is_live)
+      const rankedResponse = await handlers.screen_ranked({
+        league, market, historySportsbooks: sharpBooks, includeAll: true, limit, lookbackHours, debug: false, is_live: Boolean(args.is_live)
       });
-
       if (!rankedResponse?.ok || !Array.isArray(rankedResponse.result)) {
         return { ok: false, error: 'Failed to fetch ranked screen data' };
       }
-
       const rows = rankedResponse.result;
-      const analysis = analyzeMultiWindow(rows, {
-        windows,
-        sharpBooks,
-        minConsensusWindows,
-        nowMs: Date.now()
-      });
+      const analysis = analyzeMultiWindow(rows, { windows, sharpBooks, minConsensusWindows, nowMs: Date.now() });
       const analysisResults = analysis.results || [];
-
       const summary = summarizeResults(analysisResults);
-
       return {
-        ok: true,
-        count: analysisResults.length,
-        summary,
-        result: analysisResults,
-        resultMeta: {
-          league,
-          market,
-          windows,
-          sharpBooks,
-          lookbackHours,
-          totalRowsScanned: rows.length,
-          minConsensusWindows,
-          rowsSkippedNoHistory: analysis.skippedNoHistory || 0,
-          rowsSkippedInsufficientBooks: analysis.skippedInsufficientBooks || 0
-        }
+        ok: true, count: analysisResults.length, summary, result: analysisResults,
+        resultMeta: { league, market, windows, sharpBooks, lookbackHours, totalRowsScanned: rows.length, minConsensusWindows, rowsSkippedNoHistory: analysis.skippedNoHistory || 0, rowsSkippedInsufficientBooks: analysis.skippedInsufficientBooks || 0 }
       };
     },
 
-    async query_all_slates(args = {}) {
+    async all_slates(args = {}) {
       const DEFAULT_LEAGUES = ['NBA', 'MLB', 'NHL', 'TENNIS', 'WNBA', 'Soccer', 'UFC'];
-      const leagues = Array.isArray(args.leagues) && args.leagues.length
-        ? args.leagues.map((l) => String(l).trim()).filter(Boolean)
-        : DEFAULT_LEAGUES;
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues.map((l) => String(l).trim()).filter(Boolean) : DEFAULT_LEAGUES;
       const market = args.market || 'Moneyline';
       const limit = getLimit({ limit: args.limit || 15 });
-
       const results = {};
       const leagueMeta = {};
       let totalPlays = 0;
@@ -891,43 +736,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       for (const league of leagues) {
         try {
-          if (league.toUpperCase() === 'TENNIS') {
-            const tennisResult = await handlers.query_tennis_screen({
-              market,
-              limit,
-              includeAll: args.includeAll,
-              lookbackHours: args.lookbackHours,
-              is_live: Boolean(args.is_live)
-            });
+          const leagueKey = league.toUpperCase();
+          if (leagueKey === 'TENNIS') {
+            const tennisResult = await runTennisScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live) });
             results[league] = tennisResult.result || [];
-            leagueMeta[league] = {
-              rowCount: results[league].length,
-              source: tennisResult.source || 'screen',
-              ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {})
-            };
-            totalPlays += results[league].length;
-          } else if (league.toUpperCase() === 'UFC') {
-            const ufcResult = await runLeagueScreen(
-              { market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live) },
-              'UFC'
-            );
-            results[league] = ufcResult.result || [];
-            leagueMeta[league] = {
-              rowCount: results[league].length,
-              source: 'screen'
-            };
+            leagueMeta[league] = { rowCount: results[league].length, source: tennisResult.source || 'screen', ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {}) };
             totalPlays += results[league].length;
           } else {
-            const leagueResult = await runLeagueScreen(
-              { market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live) },
-              league
-            );
+            const leagueResult = await runLeagueScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live) }, league);
             results[league] = leagueResult.result || [];
-            leagueMeta[league] = {
-              rowCount: results[league].length,
-              source: 'screen',
-              ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {})
-            };
+            leagueMeta[league] = { rowCount: results[league].length, source: 'screen', ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {}) };
             totalPlays += results[league].length;
           }
         } catch (error) {
@@ -937,32 +755,32 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
-      // Build a consolidated ranked list across all leagues
       const allRows = [];
       for (const [league, rows] of Object.entries(results)) {
-        for (const row of rows) {
-          allRows.push({ ...row, _league: league });
-        }
+        for (const row of rows) { allRows.push({ ...row, _league: league }); }
       }
-      // Sort by screen score descending across all leagues
       allRows.sort((a, b) => Number(b.screenScore || 0) - Number(a.screenScore || 0));
 
       return {
-        ok: true,
-        totalPlays,
-        leaguesQueried: leagues,
-        leagueMeta,
+        ok: true, totalPlays, leaguesQueried: leagues, leagueMeta,
         consolidated: allRows.slice(0, limit * leagues.length),
         ...(errors.length > 0 ? { errors } : {})
       };
     },
+
+    async ufc_card(args = {}) {
+      return runUfcCard(args);
+    },
+
     async league_presets() {
       return { ok: true, result: buildLeaguePresetSummary() };
     },
+
     async health_status() {
       const result = await client.healthStatus();
       return { ok: true, result };
     },
+
     async get_hidden_bets() {
       const result = await client.getHiddenBets();
       return { ok: true, result };
@@ -992,6 +810,20 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async clear_hidden_bets() {
       const result = await client.clearHiddenBets();
       return { ok: true, result };
+    },
+
+    async find_best_price(args = {}) {
+      const league = args.league || 'NBA';
+      const market = args.market || 'Moneyline';
+      const payload = await client.queryScreenOddsBestComps({
+        market, league,
+        games: Array.isArray(args.games) ? args.games : [],
+        participants: Array.isArray(args.participants) ? args.participants : [],
+        books: Array.isArray(args.books) ? args.books : undefined,
+        is_live: Boolean(args.is_live)
+      });
+      const rows = extractScreenRows(payload);
+      return findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });
     }
   };
 
