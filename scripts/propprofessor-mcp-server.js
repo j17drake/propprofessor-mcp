@@ -644,6 +644,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         sport: typeof args.sport === 'string' && args.sport.length > 0 ? args.sport : null,
         gameTime: typeof args.gameTime === 'string' && args.gameTime.length > 0 ? args.gameTime : null,
         maxAgeMinutes: Number.isFinite(Number(args.maxAgeMinutes)) ? Number(args.maxAgeMinutes) : 60,
+        useXurl: args.useXurl === true,
       });
     },
     async find_best_price(args = {}) {
