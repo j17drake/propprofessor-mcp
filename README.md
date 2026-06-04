@@ -168,34 +168,37 @@ If your client is not listed, start with the generic local MCP config.
 
 Try these in your MCP client:
 
-- `Find the best validated positive EV NBA plays available right now.`
-- `Show me the top NHL moneyline opportunities.`
-- `Check whether the PropProfessor MCP connection is healthy.`
-- `Show me sharp plays with supportive book movement on NoVigApp.`
+- `Find the top NBA moneyline plays on screen right now.`
+- `Show me the top NHL opportunities with Tier 1 or Tier 2 confidence.`
 - `Scan all leagues and show me the top plays across NBA, MLB, and NHL.`
-- `Find the best price for Lakers vs Celtics moneyline across all books.`
 - `What does the UFC card look like this weekend?`
 - `Show me sharp consensus movement on NFL spreads over the past 6 hours.`
+- `Find the best price for Lakers vs Celtics moneyline across all books.`
+- `Check whether the PropProfessor MCP connection is healthy.`
+- `Show me sharp plays with supportive book movement on NoVigApp.`
 
 ## Available MCP Tools
 
 All tool names use the `query_` prefix for consistency:
 
-- `query_positive_ev_candidates` — fast +EV candidate discovery from sportsbook endpoints (requires `leagues` param)
-- `query_validated_positive_ev_candidates` — +EV candidates ranked with sharp-movement and odds-history validation
-- `query_screen_odds` — raw unranked screen payload for advanced use cases
-- `query_screen_odds_best_comps` — screen query using sharper default comparison book sets per league
+**Primary: `/screen`-based, actual playable lines**
 - `query_screen_odds_ranked` — ranked screen query with consensus, movement, and freshness metadata
-- `query_sharp_plays` — multi-league scanner for plays with supportive sharp book movement
-- `query_sport_screen` — ranked screen for any league (NBA, NFL, MLB, NHL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis). Use `league` to pick the sport.
+- `query_sport_screen` — ranked screen for any league (NBA, NFL, MLB, NHL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis)
 - `query_nba_screen`, `query_nfl_screen`, `query_mlb_screen`, `query_nhl_screen`, `query_ufc_screen`, `query_soccer_screen`, `query_ncaab_screen`, `query_ncaaf_screen`, `query_wnba_screen` — per-league ranked screen shortcuts
-- `query_tennis_screen` — tennis-specific screen with two-phase fallback (auto-enriches from +EV when /screen returns insufficient data)
-- `query_ufc_card` — UFC card shortlist with official plays, best looks, and passes
+- `query_tennis_screen` — tennis-specific screen with two-phase fallback
 - `query_all_slates` — query multiple active leagues at once with consolidated ranked output
-- `query_sharp_consensus_windows` — multi-window sharp book consensus movement analysis across 1h/2h/6h/12h/24h/48h windows
+- `query_ufc_card` — UFC card shortlist with official plays, best looks, and passes
 - `find_best_price` — line shopping: show every book's odds sorted best to worst with spread from best price
-- `query_fantasy_picks` — fantasy picks availability from the live `/fantasy` optimizer
-- `get_hidden_bets`, `hide_bet`, `unhide_bet`, `clear_hidden_bets` — fantasy bet hide/unhide CRUD
+- `query_sharp_plays` — multi-league scanner for plays with supportive sharp movement
+- `query_sharp_consensus_windows` — multi-window sharp book consensus movement
+- `query_fantasy_picks` / `get_hidden_bets` / `hide_bet` / `unhide_bet` / `clear_hidden_bets` — fantasy optimizer tools
+
+**Secondary: research/override**
+- `ev_candidates` — fast +EV candidate discovery from sportsbook endpoints (requires `leagues`). Use this when `/screen` is thin; validate finalists on `/screen`
+- `query_screen_odds` — raw unranked screen payload for advanced analysis only
+- `query_screen_odds_best_comps` — screen query with sharper default comparison book sets
+
+**Meta**
 - `league_presets` — show the current sport-specific ranking presets
 - `health_status` — check auth freshness and endpoint connectivity
 

@@ -3,7 +3,6 @@
 const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
-const path = require('path');
 
 // Use a temp watchlist for deterministic tests
 const TMP_WATCHLIST = '/tmp/test-watchlist-' + Date.now() + '.md';

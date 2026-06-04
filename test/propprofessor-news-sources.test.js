@@ -72,7 +72,6 @@ const ESPN_FIXTURE = `<html><body>
 </body></html>`;
 
 let originalExecFile = null;
-let originalFetch = null;
 
 function mockCurlSuccess(stdout) {
   cp.execFile = (file, args, opts, cb) => {

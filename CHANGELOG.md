@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.8
+
+### Compact mode for screen/recommended/all_slates/staking_plan
+- New `compact=true` param on `screen_ranked`, `screen`, `recommended_bets`, `all_slates`, and `staking_plan` tools. Strips each row to ~25 essential fields (no lineHistory, scoreBreakdown, full odds maps). Reduces response size by ~90%.
+- When `compact=true`, history hydration (N+1 API calls to odds history endpoint) is skipped entirely, making compact queries 10-50x faster.
+- `resultMeta.compact` flag indicates whether the response was compacted.
+
+### `fields` param for selective field return
+- New `fields: string[]` param on all screen/recommended/all_slates/staking_plan tools. Overrides `compact` when both are set.
+- Example: `fields: ["game","selection","odds","edge","tier","kai"]` returns only those fields per row.
+- `resultMeta.fields` lists the fields that were returned.
+
+### `include` param for top-level metadata filtering
+- New `include: string[]` param on all screen/recommended/all_slates/staking_plan tools.
+- Values: `"freshness"`, `"warnings"`, `"resultMeta"`, `"league"`. Example: `include: ["resultMeta"]` returns only `ok`, `result`, and `resultMeta`.
+
+### Response caching
+- In-memory LRU cache with TTL (default 60s, configurable via `PROPPROFESSOR_CACHE_TTL_MS`).
+- Max entries: 50, configurable via `PROPPROFESSOR_CACHE_MAX`.
+- Cache hits reported via `resultMeta.cached: true`.
+- Only caches full responses (not compact/fields-filtered).
+
+### `get_play_details` MCP tool
+- New tool: `get_play_details(league, game_ids)` — returns full rows (with line history, consensus, movement debug) for specific game IDs.
+- Designed for the workflow: compact list → drill into selected plays.
+
+### Lint cleanup
+- Fixed 22 pre-existing lint errors across lib and test files (unused imports, duplicate keys, redundant Boolean casts).
+
 ## Unreleased
 
 ### `query_clv_history` MCP tool (Phase 7 of sharp-signal-tuning plan)

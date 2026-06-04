@@ -3,7 +3,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { suggestStakes, getConfidenceTier, calculateRiskScore } = require('../lib/propprofessor-risk-score');
+const { suggestStakes } = require('../lib/propprofessor-risk-score');
 
 /**
  * Build a play object that should land in a specific tier with a specific edge.

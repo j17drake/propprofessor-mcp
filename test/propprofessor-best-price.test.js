@@ -5,7 +5,6 @@ const assert = require('node:assert/strict');
 
 const {
   findBestPrice,
-  extractAllBookOddsFromPayload,
   matchPlay,
   collectBookOddsFromRow,
   isBetterOdds,
