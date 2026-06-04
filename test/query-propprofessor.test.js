@@ -123,7 +123,9 @@ describe('query-propprofessor CLI parsing', () => {
       'list',
       'health',
       'doctor',
-      'install-auth'
+      'install-auth',
+      'stats',
+      'calibration'
     ]);
   });
 
@@ -466,5 +468,113 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(report.command, 'install-auth');
     assert.equal(report.ok, true);
     assert.match(report.nextStep, /pp-query doctor/);
+  });
+
+  it('accepts --group-by and --since flags', () => {
+    const parsed = parseArgs(['node', 'query', 'stats', '--group-by', 'league,book', '--since', '2026-01-01']);
+    assert.equal(parsed.command, 'stats');
+    assert.equal(parsed.opts.groupBy, 'league,book');
+    assert.equal(parsed.opts.since, '2026-01-01');
+  });
+
+  it('accepts --days flag', () => {
+    const parsed = parseArgs(['node', 'query', 'calibration', '--days', '30']);
+    assert.equal(parsed.command, 'calibration');
+    assert.equal(parsed.opts.days, '30');
+  });
+
+  it('smoke-runs the stats command with no events', async () => {
+    const { logger, lines } = createLogger();
+    await main({
+      argv: ['node', 'query', 'stats', '--group-by', 'league'],
+      client: {},
+      logger
+    });
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'stats');
+    assert.equal(payload.total, 0);
+    assert.ok(Array.isArray(payload.groups.league));
+    assert.ok(payload.generatedAt);
+  });
+
+  it('smoke-runs the calibration command with no outcomes', async () => {
+    const { logger, lines } = createLogger();
+    await main({
+      argv: ['node', 'query', 'calibration', '--days', '30'],
+      client: {},
+      logger
+    });
+    const payload = JSON.parse(lines[0]);
+    assert.equal(payload.command, 'calibration');
+    assert.equal(payload.totalOutcomes, 0);
+    assert.ok(Array.isArray(payload.byTier));
+    assert.ok(Array.isArray(payload.byLeague));
+    assert.ok(payload.generatedAt);
+  });
+
+  it('stats returns grouped results from seeded memory events', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-cli-stats-'));
+    const memoryFile = path.join(tempDir, 'events.jsonl');
+    const events = [
+      { ts: '2026-06-01T00:00:00Z', type: 'outcome', source: 'manual', league: 'NBA', tier: 'TIER 1', outcome: 'win', profit: 50 },
+      { ts: '2026-06-02T00:00:00Z', type: 'outcome', source: 'manual', league: 'NBA', tier: 'TIER 2', outcome: 'loss', profit: -25 },
+      { ts: '2026-06-03T00:00:00Z', type: 'outcome', source: 'manual', league: 'MLB', tier: 'TIER 1', outcome: 'win', profit: 30 }
+    ];
+    fs.writeFileSync(memoryFile, events.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+
+    const origDir = process.env.PROPPROFESSOR_MEMORY_DIR;
+    process.env.PROPPROFESSOR_MEMORY_DIR = tempDir;
+    try {
+      const { logger, lines } = createLogger();
+      await main({
+        argv: ['node', 'query', 'stats', '--group-by', 'league,tier'],
+        client: {},
+        logger
+      });
+      const payload = JSON.parse(lines[0]);
+      assert.equal(payload.command, 'stats');
+      assert.equal(payload.total, 3);
+      assert.ok(payload.groups.league.some(g => g.key === 'NBA' && g.count === 2));
+      assert.ok(payload.groups.league.some(g => g.key === 'MLB' && g.count === 1));
+      assert.ok(payload.groups.tier.some(g => g.key === 'TIER 1' && g.wins === 2));
+    } finally {
+      if (origDir === undefined) delete process.env.PROPPROFESSOR_MEMORY_DIR;
+      else process.env.PROPPROFESSOR_MEMORY_DIR = origDir;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('calibration returns hit-rate and roi from seeded outcomes', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-cli-cal-'));
+    const memoryFile = path.join(tempDir, 'events.jsonl');
+    const events = [
+      { ts: '2026-06-01T00:00:00Z', type: 'outcome', source: 'manual', league: 'NBA', tier: 'TIER 1', outcome: 'win', profit: 50 },
+      { ts: '2026-06-02T00:00:00Z', type: 'outcome', source: 'manual', league: 'NBA', tier: 'TIER 1', outcome: 'loss', profit: -25 },
+      { ts: '2026-06-03T00:00:00Z', type: 'outcome', source: 'manual', league: 'NBA', tier: 'TIER 1', outcome: 'win', profit: 40 }
+    ];
+    fs.writeFileSync(memoryFile, events.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+
+    const origDir = process.env.PROPPROFESSOR_MEMORY_DIR;
+    process.env.PROPPROFESSOR_MEMORY_DIR = tempDir;
+    try {
+      const { logger, lines } = createLogger();
+      await main({
+        argv: ['node', 'query', 'calibration'],
+        client: {},
+        logger
+      });
+      const payload = JSON.parse(lines[0]);
+      assert.equal(payload.command, 'calibration');
+      assert.equal(payload.totalOutcomes, 3);
+      const t1 = payload.byTier.find(t => t.key === 'TIER 1');
+      assert.equal(t1.count, 3);
+      assert.equal(t1.wins, 2);
+      assert.equal(t1.losses, 1);
+      assert.equal(t1.hitRate, +(2 / 3 * 100).toFixed(1));
+    } finally {
+      if (origDir === undefined) delete process.env.PROPPROFESSOR_MEMORY_DIR;
+      else process.env.PROPPROFESSOR_MEMORY_DIR = origDir;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
