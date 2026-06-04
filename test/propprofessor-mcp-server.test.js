@@ -251,7 +251,6 @@ describe('propprofessor MCP server stdio contract', () => {
       assert.deepEqual(toolNames, [
         'all_slates',
         'clear_hidden_bets',
-        'clv_history',
         'ev_candidates',
         'find_best_price',
         'get_hidden_bets',
@@ -260,10 +259,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'hide_bet',
         'league_presets',
         'player_context',
-        'query_bet_stats',
         'recommended_bets',
-        'record_feedback',
-        'record_outcome',
         'screen',
         'screen_ranked',
         'screen_raw',

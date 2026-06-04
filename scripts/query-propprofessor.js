@@ -21,8 +21,6 @@ const {
 } = require('../lib/propprofessor-screen-utils');
 const { buildRankedScreenResponse, getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
 const { createMcpHandlers } = require('./propprofessor-mcp-server');
-const { createMemoryLib } = require('../lib/propprofessor-memory');
-const { buildStats } = require('../lib/propprofessor-stats');
 
 const LEAGUE_ALIASES = {
   sport: null,
@@ -62,9 +60,7 @@ function getCommandInventory() {
     { command: 'list', description: 'Show the command inventory' },
     { command: 'health', description: 'Check auth and endpoint health' },
     { command: 'doctor', description: 'Run first-time setup checks and explain next steps' },
-    { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' },
-    { command: 'stats', description: 'Show aggregated bet stats from the local event log' },
-    { command: 'calibration', description: 'Show tier/league calibration from recorded outcomes' }
+    { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' }
   ];
 }
 
@@ -87,8 +83,6 @@ function buildHelpText() {
     '  pp-query ufc --market Moneyline',
     '  pp-query ufc-card --book NoVigApp --market Moneyline',
     '  pp-query tennis --market Moneyline --limit 10',
-    '  pp-query stats --group-by league,book,tier',
-    '  pp-query calibration --days 30',
     '',
     'Useful flags:',
     '  --league NBA',
@@ -496,49 +490,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       sourceFile: opts.source,
       destinationFile: opts.destination || DEFAULT_USER_AUTH_FILE
     });
-    emitJson(logger, buildInstallAuthReport(installResult));
-    return;
-  } else if (command === 'stats') {
-    const memory = createMemoryLib();
-    const stats = buildStats(memory);
-    const since = opts.since || (opts.days ? new Date(Date.now() - Number(opts.days) * 86400000).toISOString() : undefined);
-    const groupFields = opts.groupBy ? String(opts.groupBy).split(',').map(s => s.trim()).filter(Boolean) : ['league'];
-    const summary = stats.summarize(since, groupFields);
-    emitJson(logger, { command, ...summary, generatedAt: new Date().toISOString() });
-    return;
-  } else if (command === 'calibration') {
-    const memory = createMemoryLib();
-    const stats = buildStats(memory);
-    const since = opts.since || (opts.days ? new Date(Date.now() - Number(opts.days) * 86400000).toISOString() : undefined);
-    const outcomeEvents = memory.query({ since, limit: 50000, type: 'outcome' });
-    const tierMap = new Map();
-    const leagueMap = new Map();
-    for (const ev of outcomeEvents) {
-      const tier = ev.tier || ev.confidenceTier || 'unknown';
-      const league = ev.league || 'unknown';
-      for (const [key, map] of [[tier, tierMap], [league, leagueMap]]) {
-        const bucket = map.get(key) || { count: 0, profit: 0, wins: 0, losses: 0, pushes: 0 };
-        bucket.count += 1;
-        bucket.profit += Number(ev.profit) || 0;
-        if (ev.outcome === 'win') bucket.wins += 1;
-        else if (ev.outcome === 'loss') bucket.losses += 1;
-        else if (ev.outcome === 'push') bucket.pushes += 1;
-        map.set(key, bucket);
-      }
-    }
-    const calibrate = (map) => Array.from(map.entries()).map(([key, v]) => ({
-      key, ...v,
-      hitRate: v.count ? +((v.wins / v.count) * 100).toFixed(1) : 0,
-      roi: v.count ? +(v.profit / v.count).toFixed(4) : 0
-    })).sort((a, b) => b.count - a.count);
-    emitJson(logger, {
-      command,
-      since: since || 'all',
-      totalOutcomes: outcomeEvents.length,
-      byTier: calibrate(tierMap),
-      byLeague: calibrate(leagueMap),
-      generatedAt: new Date().toISOString()
-    });
+    emitJson(logger, buildInstallAuthReport(installResult))
     return;
   } else {
     throw new Error(`Unknown command: ${command}`);

@@ -35,9 +35,7 @@ const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
 const { analyzeMultiWindow, summarizeResults, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
 const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
-const { getClvHistory } = require('../lib/propprofessor-clv-history');
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
-const { createMemoryLib } = require('../lib/propprofessor-memory');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -288,12 +286,7 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
 }
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
-  const memory = createMemoryLib();
-  const { buildStats } = require('../lib/propprofessor-stats');
-  const { buildAdaptiveFilter } = require('../lib/propprofessor-adaptive-filter');
   const { TtlCache, getCacheTtlMs, getCacheMaxEntries } = require('../lib/mcp-runtime-config');
-  const stats = buildStats(memory);
-  const adaptiveFilter = buildAdaptiveFilter({ minSample: 20 });
 
   // Shared response cache — keyed by query params, TTL-based expiration
   const responseCache = new TtlCache({
@@ -652,9 +645,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         ? args.targetTiers
         : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-      adaptiveFilter: if (typeof args.adaptiveFilter !== 'undefined' && !args.adaptiveFilter) {
-        break adaptiveFilter;
-      }
       const allRecommended = [];
       for (const league of leagues) {
         try {
@@ -667,10 +657,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           });
           const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
           let eligible = rows.filter((row) => targetTiers.includes(getConfidenceTier(row)));
-          if (args.adaptiveFilter !== false) {
-            const filtered = adaptiveFilter.apply(eligible, { groupBy: 'league', since: null });
-            eligible = filtered.filter((row) => !row.suppressed);
-          }
           const recommended = eligible
             .sort((a, b) => {
               const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };
@@ -693,10 +679,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 movementGrade: row.movementGrade, riskScore: row.riskScore,
                 kaiCall: row.kaiCall, confidenceTier: row.confidenceTier,
                 rationale: row.rationale || buildRationale(row),
-                screenScore: row.screenScore,
-                adaptiveConfidence: row.adaptiveConfidence || null,
-                suppressed: Boolean(row.suppressed),
-                suppressedBy: row.suppressedBy || null
+                screenScore: row.screenScore
               }))
             });
           }
@@ -713,17 +696,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         summary: total
           ? `Found ${total} recommended bet${total === 1 ? '' : 's'} across ${allRecommended.filter((l) => l.count > 0).length} league${allRecommended.filter((l) => l.count > 0).length === 1 ? '' : 's'}`
           : 'No TIER 1 or TIER 2 plays found across requested leagues',
-        filter: { adaptiveFilter: args.adaptiveFilter !== false },
         tierFilter: targetTiers
-      };
-    },
-
-    async query_bet_stats(args = {}) {
-      const since = typeof args.since === 'string' && args.since.trim() ? args.since.trim() : null;
-      const groupBy = typeof args.groupBy === 'string' && args.groupBy.trim() ? args.groupBy.trim().split(',').map((v) => v.trim()).filter(Boolean) : ['league', 'market', 'tier'];
-      return {
-        ok: true,
-        result: stats.summarize(since, groupBy)
       };
     },
 
@@ -743,13 +716,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       const plan = suggestStakes({ bankroll, plays: allPlays });
       return { ...plan, bankroll, leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })), totalRecommended: recResult.totalRecommended };
-    },
-
-    async clv_history(args = {}) {
-      const days = Number.isFinite(Number(args.days)) ? Number(args.days) : 30;
-      const groupBy = typeof args.groupBy === 'string' ? args.groupBy : 'week';
-      const path = args.path && typeof args.path === 'string' && args.path.length > 0 ? args.path : (process.env.BET_LOG_PATH || undefined);
-      return getClvHistory({ days, groupBy, path });
     },
 
     async player_context(args = {}) {
@@ -928,53 +894,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
       const rows = extractScreenRows(payload);
       return findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });
-    },
-
-    async record_outcome(args = {}) {
-      const betId = typeof args.betId === 'string' ? args.betId.trim() : '';
-      const outcome = typeof args.outcome === 'string' ? args.outcome.trim() : '';
-      const profit = Number(args.profit);
-      if (!betId || !outcome || !Number.isFinite(profit)) {
-        const err = new Error('betId, outcome, and profit are required');
-        err.code = 'MISSING_REQUIRED';
-        err.category = 'validation';
-        err.status = 400;
-        throw err;
-      }
-      const event = {
-        type: 'outcome',
-        betId,
-        outcome,
-        profit,
-        source: typeof args.source === 'string' ? args.source.trim() : undefined,
-        league: typeof args.league === 'string' ? args.league.trim() : undefined,
-        market: typeof args.market === 'string' ? args.market.trim() : undefined,
-        notes: typeof args.notes === 'string' ? args.notes.trim() : undefined
-      };
-      memory.append(event);
-      return { ok: true, recorded: event };
-    },
-
-    async record_feedback(args = {}) {
-      const betId = typeof args.betId === 'string' ? args.betId.trim() : '';
-      const skipReason = typeof args.skipReason === 'string' ? args.skipReason.trim() : '';
-      if (!betId || !skipReason) {
-        const err = new Error('betId and skipReason are required');
-        err.code = 'MISSING_REQUIRED';
-        err.category = 'validation';
-        err.status = 400;
-        throw err;
-      }
-      const event = {
-        type: 'feedback',
-        betId,
-        skipReason,
-        source: typeof args.source === 'string' ? args.source.trim() : undefined,
-        league: typeof args.league === 'string' ? args.league.trim() : undefined,
-        notes: typeof args.notes === 'string' ? args.notes.trim() : undefined
-      };
-      memory.append(event);
-      return { ok: true, recorded: event };
     }
   };
 
