@@ -1,59 +1,23 @@
 # PropProfessor MCP
 
-Use PropProfessor from AI clients that support MCP.
+Lean, fast odds analysis engine for AI agents. 19 tools, 487 tests, all performance features active.
 
-This project gives you:
+## What Changed (v1.0.8)
 
-- `pp-mcp`, the MCP server for AI agents
-- `pp-query`, the local CLI for setup checks and direct testing
-- `sharp-plays-service`, the reusable package export for shared sharp-play orchestration
-
-Works best with local MCP clients like Claude Desktop, Cursor, and Cline.
-
-If you use ChatGPT, see the ChatGPT note below first. ChatGPT currently does not use this project the same way local `stdio` MCP clients do.
-
-## Choose Your Client
-
-| Client                   | Status            | Best path                                               |
-| ------------------------ | ----------------- | ------------------------------------------------------- |
-| Claude Desktop           | Best support      | Use the local `pp-mcp` server directly                  |
-| Cursor                   | Best support      | Use `.cursor/mcp.json` with `pp-mcp` or `node`          |
-| Cline                    | Supported         | Use `cline_mcp_settings.json` with `pp-mcp` or `node`   |
-| ChatGPT                  | Alternative setup | Not a direct local `stdio` MCP path for this repo today |
-| Generic local MCP client | Supported         | Use the generic `pp-mcp` config in `CONFIG.md`          |
+- **Removed**: Self-improvement layer (memory, stats, adaptive filter, CLV history, Kelly staking)
+- **Removed**: 4 MCP tools (`query_bet_stats`, `clv_history`, `record_outcome`, `record_feedback`)
+- **Removed**: CLI commands `pp-query stats`, `pp-query calibration`
+- **Retained**: Core odds analysis — screening, sharp movement, line shopping, player context, betting tools, UFC
+- **Performance**: `compact: true` (90% smaller, 10-50x faster), `fields`/`include` params, TTL caching (60s), caveman-shrink token compression (~46%)
 
 ## Quick Start
 
-1. Make sure you have a paid PropProfessor account at propprofessor.com
-2. Install the project
-3. Run `pp-query install-auth --source /path/to/auth.json`
-4. Run `pp-query doctor`
-5. Add `pp-mcp` to your MCP client
+### Prerequisites
+- Node.js 18+
+- Paid PropProfessor account at propprofessor.com
+- Logged-in browser session exported as `auth.json`
 
-## What It Does
-
-This MCP lets an AI agent query PropProfessor data for things like:
-
-- validated positive EV candidates
-- ranked sport screens per league (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF)
-- multi-league consolidated slates
-- sharp plays with supportive book movement
-- multi-window sharp consensus analysis
-- steam move detection
-- UFC card shortlists
-- line shopping across all books
-- fantasy picks availability and management
-- basic health checks
-
-You do not need to understand the internal tool names to get started.
-
-## What You Need
-
-- Node.js 18 or newer
-- A paid PropProfessor account at propprofessor.com
-- A saved logged-in browser session for PropProfessor
-
-## Install
+### Install
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
@@ -62,202 +26,160 @@ npm install
 npm link
 ```
 
-After `npm link`, these commands are available on your PATH:
+Commands available after `npm link`:
+- `pp-mcp` — MCP server for AI agents
+- `pp-query` — local CLI for setup/debugging
 
-- `pp-mcp`
-- `pp-query`
-
-## Set Up Auth
-
-Before exporting auth, sign in to your paid PropProfessor account in the browser you are exporting from.
-
-Easiest option:
+### Auth Setup
 
 ```bash
 pp-query install-auth --source /path/to/auth.json
 ```
 
-That copies your saved PropProfessor browser session into the default location:
-
-```bash
-~/.propprofessor/auth.json
-```
-
-This is the default location the project now checks first.
-
 Auth lookup order:
+1. `AUTH_FILE` env var
+2. `~/.propprofessor/auth.json` (default)
+3. `./auth.json` in repo
 
-1. `AUTH_FILE`
-2. `~/.propprofessor/auth.json`
-3. `auth.json` in this repo
-
-If you want to use a different location, set `AUTH_FILE`.
-
-More detail: [AUTH.md](./AUTH.md)
-
-If you do not already have an `auth.json`, see the export guide in [AUTH.md](./AUTH.md#how-to-export-authjson).
-
-## Verify It Works
-
-Run:
+### Verify
 
 ```bash
-pp-query doctor
+pp-query doctor    # checks Node, auth, endpoint connectivity
+pp-query health    # quick health check
 ```
 
-That command checks:
+## MCP Client Setup
 
-- your Node version
-- whether an auth file was found
-- which auth path is being used
-- whether PropProfessor responds
+### Hermes Agent (Recommended)
 
-You can also run:
+Add to `~/.hermes/config.yaml`:
 
-```bash
-pp-query health
+```yaml
+mcp_servers:
+  propprofessor:
+    args:
+    - node
+    - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
+    command: caveman-shrink
+    enabled: true
+    env:
+      AUTH_FILE: /path/to/.propprofessor/auth.json
+      PROPPROFESSOR_MCP_NDJSON: 'true'
 ```
 
-## Client Setup
+Then reload: `hermes mcp reload` → `hermes mcp test propprofessor`
 
-### Claude Desktop
+**Requirements**: `npm install -g caveman-shrink` (installs globally)
 
-Claude Desktop is one of the best ways to use this project.
+### Claude Desktop / Cursor / Cline
 
-Use the Claude Desktop setup in [CONFIG.md](./CONFIG.md#claude-desktop), then try:
+Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/propprofessor-mcp-server.js` with `PROPPROFESSOR_MCP_NDJSON=true` and `AUTH_FILE` set.
 
-`Check whether the PropProfessor MCP connection is healthy.`
+### Generic stdio Client
 
-### Cursor
+```json
+{
+  "mcpServers": {
+    "propprofessor": {
+      "command": "node",
+      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
+      "env": {
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json",
+        "PROPPROFESSOR_MCP_NDJSON": "true"
+      }
+    }
+  }
+}
+```
 
-Cursor supports local `stdio` MCP servers directly.
+## Available MCP Tools (19)
 
-Use the Cursor setup in [CONFIG.md](./CONFIG.md#cursor), then try:
+### Screening & Ranking
+- `screen_ranked` — **Primary**. Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`.
+- `screen` — League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis).
+- `screen_raw` — Raw odds payload. `bestComps: true` for sharper comparison books.
+- `all_slates` — Consolidated ranked list across multiple leagues.
 
-`Check whether the PropProfessor MCP connection is healthy.`
+### Sharp Movement
+- `sharp_plays` — Target-book plays (Fliff, NoVigApp) with supportive non-target sharp movement.
+- `sharp_consensus` — Multi-window (1h–48h) sharp book consensus analysis.
 
-### Cline
+### Line Shopping
+- `find_best_price` — Every book's odds sorted best→worst with spread from best price.
 
-Cline supports local MCP servers through its MCP settings file.
+### Player Context
+- `player_context` — News, tweets, riskFlag for a player. X + Google News RSS + ESPN fallback. Source authority scoring via watchlist.
 
-Use the Cline setup in [CONFIG.md](./CONFIG.md#cline), then try:
+### Betting
+- `recommended_bets` — TIER 1/2 plays across leagues with movementGrade, riskScore, kaiCall, rationale.
+- `staking_plan` — Fractional Kelly stakes (TIER 1=2%, TIER 2=1% of bankroll).
+- `ev_candidates` — Fast +EV discovery (secondary; validate on `/screen`).
 
-`Check whether the PropProfessor MCP connection is healthy.`
+### UFC
+- `ufc_card` — First-class shortlist with official plays, best looks, passes.
 
-### ChatGPT
+### Bet Management
+- `hide_bet`, `unhide_bet`, `get_hidden_bets`, `clear_hidden_bets` — Fantasy optimizer tools.
 
-ChatGPT supports MCP in a different way from local `stdio` MCP clients.
+### Meta
+- `health_status` — Auth freshness, endpoint connectivity.
+- `league_presets` — Sport-specific ranking presets.
+- `get_play_details` — Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query.
 
-This repo is currently designed for local `stdio` MCP clients such as Claude Desktop, Cursor, and Cline. ChatGPT's MCP support is oriented around remote MCP servers and ChatGPT apps, not launching this local `pp-mcp` process directly.
+## Performance Flags (All Tools)
 
-If ChatGPT support is important to you, the recommended future direction is exposing this server as a remote MCP endpoint.
-
-See [CONFIG.md](./CONFIG.md#chatgpt) for the short explanation.
-
-### Generic Local MCP Client
-
-If your client can launch a local `stdio` MCP server, use the generic setup in [CONFIG.md](./CONFIG.md#generic-local-mcp).
-
-## Add It To Your MCP Client
-
-If your client supports local `stdio` MCP servers, use the client-specific setup in [CONFIG.md](./CONFIG.md).
-
-If your client is not listed, start with the generic local MCP config.
-
-## Example Prompts
-
-Try these in your MCP client:
-
-- `Find the top NBA moneyline plays on screen right now.`
-- `Show me the top NHL opportunities with Tier 1 or Tier 2 confidence.`
-- `Scan all leagues and show me the top plays across NBA, MLB, and NHL.`
-- `What does the UFC card look like this weekend?`
-- `Show me sharp consensus movement on NFL spreads over the past 6 hours.`
-- `Find the best price for Lakers vs Celtics moneyline across all books.`
-- `Check whether the PropProfessor MCP connection is healthy.`
-- `Show me sharp plays with supportive book movement on NoVigApp.`
-
-## Available MCP Tools
-
-All tool names use the `query_` prefix for consistency:
-
-**Primary: `/screen`-based, actual playable lines**
-- `query_screen_odds_ranked` — ranked screen query with consensus, movement, and freshness metadata
-- `query_sport_screen` — ranked screen for any league (NBA, NFL, MLB, NHL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis)
-- `query_nba_screen`, `query_nfl_screen`, `query_mlb_screen`, `query_nhl_screen`, `query_ufc_screen`, `query_soccer_screen`, `query_ncaab_screen`, `query_ncaaf_screen`, `query_wnba_screen` — per-league ranked screen shortcuts
-- `query_tennis_screen` — tennis-specific screen with two-phase fallback
-- `query_all_slates` — query multiple active leagues at once with consolidated ranked output
-- `query_ufc_card` — UFC card shortlist with official plays, best looks, and passes
-- `find_best_price` — line shopping: show every book's odds sorted best to worst with spread from best price
-- `query_sharp_plays` — multi-league scanner for plays with supportive sharp movement
-- `query_sharp_consensus_windows` — multi-window sharp book consensus movement
-- `query_fantasy_picks` / `get_hidden_bets` / `hide_bet` / `unhide_bet` / `clear_hidden_bets` — fantasy optimizer tools
-
-**Secondary: research/override**
-- `ev_candidates` — fast +EV candidate discovery from sportsbook endpoints (requires `leagues`). Use this when `/screen` is thin; validate finalists on `/screen`
-- `query_screen_odds` — raw unranked screen payload for advanced analysis only
-- `query_screen_odds_best_comps` — screen query with sharper default comparison book sets
-
-**Meta**
-- `league_presets` — show the current sport-specific ranking presets
-- `health_status` — check auth freshness and endpoint connectivity
+| Flag | Effect |
+|------|--------|
+| `compact: true` | ~90% smaller response, 10-50x faster (skips line history hydration) |
+| `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`) |
+| `include: ["resultMeta"]` | Top-level section filtering |
 
 ## CLI Commands
 
-The local CLI still supports per-league shorthand commands:
+```bash
+pp-query doctor                        # full setup check
+pp-query health                        # quick health
+pp-query screen --league NBA           # ranked screen
+pp-query nba --market Moneyline        # league shorthand
+pp-query tennis --limit 10             # tennis
+pp-query sharp-plays --book Fliff      # sharp plays
+pp-query ufc-card --book NoVigApp      # UFC card
+pp-query all-slates                    # consolidated
+pp-query presets                       # ranking presets
+pp-query list                          # command inventory
+```
 
-- `pp-query doctor`
-- `pp-query health`
-- `pp-query screen --league NBA --market Moneyline`
-- `pp-query nba --market Moneyline`
-- `pp-query tennis --market Moneyline --limit 10`
-- `pp-query sharp-plays --book Fliff --leagues NBA,MLB,NHL,Tennis --market Moneyline --limit 10`
-- `pp-query ufc-card --book NoVigApp --market Moneyline`
-- `pp-query consensus-windows --league Tennis --market Moneyline`
-- `pp-query all-slates`
-- `pp-query list`
-- `pp-query presets`
+## Example Agent Prompts
+
+- `Find top NBA moneyline plays on screen right now (compact=true).`
+- `Show TIER 1/2 plays across NBA, MLB, NHL with player context for top 3.`
+- `Scan Fliff/NoVigApp sharp plays with supportive movement (includePasses=true).`
+- `What's the best price for Lakers moneyline across all books?`
+- `Get full line history for game ID 12345 on NBA screen.`
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_FILE` | `~/.propprofessor/auth.json` | Auth file path |
+| `PROPPROFESSOR_MCP_NDJSON` | (required) | Enable NDJSON framing |
+| `PROPPROFESSOR_CACHE_TTL_MS` | `60000` | Response cache TTL (ms) |
+| `PROPPROFESSOR_CACHE_MAX` | `50` | Max cache entries (LRU) |
+| `LOCAL_TIMEZONE` | `America/Chicago` | CLI display timezone |
 
 ## Troubleshooting
 
-If `pp-query doctor` says auth is missing:
-
-- make sure you saved your logged-in PropProfessor browser session
-- put it at `~/.propprofessor/auth.json`
-- or set `AUTH_FILE` to the correct path
-
-If `pp-query doctor` finds auth but the endpoint check fails:
-
-- your session may be stale
-- log in again and export a fresh session file
-
-If Claude Desktop, Cursor, or Cline cannot start the server:
-
-- run `pp-query doctor`
-- make sure `pp-mcp` is on your PATH
-- if needed, use the direct `node /path/to/.../propprofessor-mcp-server.js` setup
-
-If you use ChatGPT:
-
-- this repo is not currently a direct local `stdio` ChatGPT setup
-- the recommended future direction is exposing it as a remote MCP server
-- until then, Claude Desktop, Cursor, and Cline are the easiest ways to use it
-
-## Advanced Settings
-
-Environment variables:
-
-- `AUTH_FILE`, override the auth file path
-- `LOCAL_TIMEZONE`, local CLI display timezone, default `America/Chicago`
-- `PROPPROFESSOR_MCP_NDJSON`, set to `true` for NDJSON framing
-- `PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS`, default odds-history lookback window in hours, default `6`
-
-Per-request overrides:
-
-- MCP ranked tools accept `lookbackHours` and `debug`
-- local CLI helpers accept `--lookback-hours` or `--lookbackHours`
-- local CLI helpers also accept `--debug` or `--no-debug`
+| Issue | Fix |
+|-------|-----|
+| `pp-query doctor` auth missing | Export fresh session to `~/.propprofessor/auth.json` or set `AUTH_FILE` |
+| Endpoint check fails | Session stale — re-login and re-export |
+| MCP client won't start | Run `pp-query doctor`; ensure `caveman-shrink` on PATH if using Hermes config |
+| Large responses timeout | Use `compact: true` and/or `fields` param |
+| ChatGPT | Not supported for local stdio; use remote MCP endpoint |
 
 ## For Maintainers
 
-Release and live smoke workflow notes have been moved to [MAINTAINERS.md](./MAINTAINERS.md).
+- Tests: `npm test` (487 passing)
+- Live tests: require `~/.propprofessor/auth.json`
+- Release notes: `MAINTAINERS.md`
+- Tool definitions: `lib/propprofessor-tool-definitions.js`

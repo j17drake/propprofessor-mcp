@@ -1,8 +1,8 @@
 # PropProfessor MCP Config Guide
 
-This project works best with local MCP clients that support `stdio` servers directly.
+Works with local `stdio` MCP clients. Requires `PROPPROFESSOR_MCP_NDJSON=true` for AI agent compatibility.
 
-Before configuring any client, run:
+## Prerequisites
 
 ```bash
 cd /path/to/propprofessor-mcp
@@ -12,30 +12,59 @@ pp-query install-auth --source /path/to/auth.json
 pp-query doctor
 ```
 
-If `pp-query doctor` passes, continue with your client below.
+`pp-query doctor` must pass before configuring any client.
+
+## Required Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PROPPROFESSOR_MCP_NDJSON` | **Yes** | `true` — enables NDJSON framing for async tool calls |
+| `AUTH_FILE` | **Yes** | Path to auth file (e.g., `/path/to/.propprofessor/auth.json`) |
+| `PROPPROFESSOR_CACHE_TTL_MS` | No | Cache TTL ms (default 60000) |
+| `PROPPROFESSOR_CACHE_MAX` | No | Max cache entries (default 50) |
+
+---
+
+## Hermes Agent (Recommended)
+
+```yaml
+# ~/.hermes/config.yaml
+mcp_servers:
+  propprofessor:
+    args:
+    - node
+    - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
+    command: caveman-shrink
+    enabled: true
+    env:
+      AUTH_FILE: /path/to/.propprofessor/auth.json
+      PROPPROFESSOR_MCP_NDJSON: 'true'
+```
+
+**Requires**: `npm install -g caveman-shrink`
+
+Reload: `hermes mcp reload` → `hermes mcp test propprofessor`
+
+---
 
 ## Claude Desktop
 
-Claude Desktop has strong support for local MCP servers.
-
-Use this config shape in Claude Desktop:
-
 ```json
 {
   "mcpServers": {
     "propprofessor": {
-      "command": "pp-mcp",
-      "args": [],
+      "command": "caveman-shrink",
+      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
+        "PROPPROFESSOR_MCP_NDJSON": "true",
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
       }
     }
   }
 }
 ```
 
-If `pp-mcp` is not available on your PATH, use:
-
+**Or without caveman-shrink**:
 ```json
 {
   "mcpServers": {
@@ -43,83 +72,50 @@ If `pp-mcp` is not available on your PATH, use:
       "command": "node",
       "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
+        "PROPPROFESSOR_MCP_NDJSON": "true",
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
       }
     }
   }
 }
 ```
 
-First prompt to try:
+First prompt: `Check whether the PropProfessor MCP connection is healthy.`
 
-`Check whether the PropProfessor MCP connection is healthy.`
-
-If tools do not appear:
-
-- restart Claude Desktop
-- rerun `pp-query doctor`
-- switch to the direct `node` path if `pp-mcp` is not being found
+---
 
 ## Cursor
 
-Cursor supports local `stdio` MCP servers through `mcp.json`.
-
-Project config example:
-
+`.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
     "propprofessor": {
-      "command": "pp-mcp",
-      "args": [],
+      "command": "caveman-shrink",
+      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
+        "PROPPROFESSOR_MCP_NDJSON": "true",
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
       }
     }
   }
 }
 ```
 
-Direct path fallback:
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "node",
-      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
-      }
-    }
-  }
-}
-```
-
-First prompt to try:
-
-`Check whether the PropProfessor MCP connection is healthy.`
-
-If it does not work:
-
-- verify the correct `mcp.json` location
-- rerun `pp-query doctor`
-- use the direct `node` path if `pp-mcp` is not available
+---
 
 ## Cline
 
-Cline supports local MCP servers through `cline_mcp_settings.json`.
-
-Example:
-
+`cline_mcp_settings.json`:
 ```json
 {
   "mcpServers": {
     "propprofessor": {
-      "command": "pp-mcp",
-      "args": [],
+      "command": "caveman-shrink",
+      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
+        "PROPPROFESSOR_MCP_NDJSON": "true",
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
       },
       "disabled": false
     }
@@ -127,114 +123,46 @@ Example:
 }
 ```
 
-Direct path fallback:
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "node",
-      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
-      },
-      "disabled": false
-    }
-  }
-}
-```
-
-First prompt to try:
-
-`Check whether the PropProfessor MCP connection is healthy.`
-
-If it does not work:
-
-- verify the MCP settings file is the one Cline is actually using
-- rerun `pp-query doctor`
-- use the direct `node` path if needed
+---
 
 ## ChatGPT
 
-ChatGPT supports MCP differently from local `stdio` MCP clients.
+**Not supported** for local stdio. This repo is designed for local MCP clients (Hermes, Claude Desktop, Cursor, Cline). ChatGPT requires remote MCP endpoints. Use a local client instead.
 
-This repo is currently designed for local MCP clients that can launch `pp-mcp` directly. ChatGPT's MCP support is oriented around remote MCP servers and ChatGPT app-style integrations, not launching this local server process directly inside ChatGPT.
+---
 
-What this means:
-
-- there is no recommended local `pp-mcp` ChatGPT setup for this repo today
-- if ChatGPT support matters, the recommended future direction is exposing this server as a remote MCP endpoint
-
-Practical recommendation:
-
-- use Claude Desktop, Cursor, or Cline today if you want the fastest path
-- treat ChatGPT support as a future remote-deployment step, not a local setup step
-
-What a future ChatGPT-friendly path would look like:
-
-1. run this MCP server behind a remote transport that ChatGPT can reach
-2. secure it appropriately because it would no longer be local-only
-3. connect ChatGPT to that remote MCP endpoint instead of trying to launch `pp-mcp` locally
-
-If you mainly use ChatGPT today, this repo will be easier to use through Claude Desktop, Cursor, or Cline until a remote MCP path is added.
-
-## Generic Local MCP
-
-If your client supports local `stdio` MCP servers, start with this:
+## Generic Local MCP Client
 
 ```json
 {
   "mcpServers": {
     "propprofessor": {
-      "command": "pp-mcp",
-      "args": [],
+      "command": "caveman-shrink",
+      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
       "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
+        "PROPPROFESSOR_MCP_NDJSON": "true",
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
       }
     }
   }
 }
 ```
 
-Direct path fallback:
+---
 
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "node",
-      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS": "6"
-      }
-    }
-  }
-}
-```
+## Auth Lookup Order
 
-First prompt to try:
-
-`Check whether the PropProfessor MCP connection is healthy.`
-
-## Shared Notes
-
-Auth lookup order:
-
-1. `AUTH_FILE`
+1. `AUTH_FILE` env var
 2. `~/.propprofessor/auth.json`
-3. `auth.json` in the repo root
+3. `auth.json` in repo root
 
-Useful commands:
+---
 
-```bash
-pp-query doctor
-pp-query health
-pp-query screen --league NBA --market Moneyline
-pp-query tennis --market Moneyline --limit 10
-```
+## Debug Checklist
 
-If something fails:
-
-1. Run `pp-query doctor`
-2. Make sure your auth file exists at `~/.propprofessor/auth.json` or set `AUTH_FILE`
-3. If your client cannot find `pp-mcp`, use the direct `node` path setup
+1. `pp-query doctor` — passes?
+2. Auth file at `~/.propprofessor/auth.json` or `AUTH_FILE` set?
+3. `PROPPROFESSOR_MCP_NDJSON=true` in client env?
+4. `caveman-shrink` on PATH if using it?
+5. Client restarted after config change?
+6. Direct `node` path if `pp-mcp`/`caveman-shrink` not found?
