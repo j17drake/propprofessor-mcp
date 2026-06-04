@@ -166,3 +166,32 @@ First prompt: `Check whether the PropProfessor MCP connection is healthy.`
 4. `caveman-shrink` on PATH if using it?
 5. Client restarted after config change?
 6. Direct `node` path if `pp-mcp`/`caveman-shrink` not found?
+
+---
+
+## Book Configuration Reference
+
+The tools accept three book parameters per-request (not via env vars):
+
+| Param | Purpose | Example Tools |
+|-------|---------|---------------|
+| `targetBooks` / `book` | Your execution books (Fliff, NoVigApp, Rebet) | `sharp_plays`, `recommended_bets`, `screen`, `ufc_card` |
+| `sharpBooks` | Sharp comparison books for movement detection | `sharp_plays`, `sharp_consensus`, `screen_ranked` |
+| `books` | Display filter for line shopping / raw screen | `find_best_price`, `screen_raw`, `screen` |
+
+**Default sharp sets** (used when you don't pass `sharpBooks`):
+- NBA main: Circa, Pinnacle, BookMaker, BetOnline, DraftKings
+- NBA props: FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle
+- NFL main: Circa, Pinnacle, BookMaker, NoVigApp, FanDuel
+- MLB main: Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM
+- Others: Pinnacle, Polymarket, Kalshi, BetOnline, Circa
+
+**CLI shortcuts**:
+```bash
+pp-query sharp-plays --book Fliff          # single target
+pp-query sharp-plays --books Fliff,NoVigApp  # multiple
+pp-query sharp-plays --sharp-books Pinnacle,Circa
+pp-query screen --league NBA --books Pinnacle,FanDuel
+```
+
+For **persistent custom defaults**, edit `lib/propprofessor-sharp-books.js` constant arrays (`NBA_MAIN_MARKET_SHARP_BOOKS`, etc.).

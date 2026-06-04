@@ -134,6 +134,45 @@ Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/p
 | `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`) |
 | `include: ["resultMeta"]` | Top-level section filtering |
 
+---
+
+## Book Configuration
+
+The MCP uses three book categories. Configure per-request via tool params:
+
+### 1. **Target Execution Books** (your betting books)
+Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `screen`:
+```json
+{ "targetBooks": ["Fliff", "NoVigApp", "Rebet"] }
+```
+**CLI**: `--book Fliff` or `--target-book Fliff` (single) / `--books Fliff,NoVigApp`
+
+### 2. **Sharp Comparison Books** (movement detection)
+Books whose line movement signals sharp action. Pass to `sharp_plays`, `sharp_consensus`, `screen_ranked`:
+```json
+{ "sharpBooks": ["Pinnacle", "Circa", "BookMaker", "BetOnline"] }
+```
+
+### 3. **Display Books** (line shopping)
+Books to show in `find_best_price` or `screen_raw`. Defaults to all available:
+```json
+{ "books": ["Pinnacle", "FanDuel", "DraftKings", "NoVigApp"] }
+```
+
+### Default Sharp Sets (Per Sport/Market)
+Pre-configured in `lib/propprofessor-sharp-books.js` — used when you don't override:
+
+| Sport | Main Market | Props |
+|-------|-------------|-------|
+| **NBA** | Circa, Pinnacle, BookMaker, BetOnline, DraftKings | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle |
+| **NFL** | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel | Pinnacle, FanDuel, BookMaker, Circa, BetOnline |
+| **MLB** | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
+| **Others** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa | Same |
+
+**To override defaults**: Pass `books` or `sharpBooks` param to any tool. For persistent changes, edit `lib/propprofessor-sharp-books.js` constant arrays.
+
+---
+
 ## CLI Commands
 
 ```bash
