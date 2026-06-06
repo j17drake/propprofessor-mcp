@@ -40,17 +40,6 @@ function getActiveDefaultLeague() {
   return isBasketballSeason ? 'NBA' : 'MLB';
 }
 
-function getSeasonEligibleLeagues(leagues) {
-  const month = new Date().getMonth() + 1;
-  const isBasketballSeason = month >= 10 || month <= 4;
-  return (Array.isArray(leagues) ? leagues : [])
-    .map((league) => String(league || '').trim().toUpperCase())
-    .filter((league) => {
-      if (['NBA', 'WNBA', 'NCAAB'].includes(league)) return isBasketballSeason;
-      return true;
-    });
-}
-
 live('live API integration tests', { timeout: TIMEOUT }, () => {
   let client;
   let handlers;

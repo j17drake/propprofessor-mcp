@@ -74,16 +74,15 @@ const ESPN_FIXTURE = `<html><body>
 let originalExecFile = null;
 
 function mockCurlSuccess(stdout) {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') { cb = opts; opts = {}; }
-    // Match Node's real execFile signature: (err, stdout, stderr)
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     cb(null, stdout, '');
   };
 }
 
 function mockCurlFailure(message) {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') { cb = opts; opts = {}; }
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     cb(new Error(message));
   };
 }
@@ -111,8 +110,8 @@ function mockPlayerContextExecFile({
   xError = null,
   nitterError = null,
 } = {}) {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') { cb = opts; opts = {}; }
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     
     const argStr = Array.isArray(args) ? args.join(' ') : '';
     // Nitter RSS: curl to localhost:8080/search/rss (specific URL pattern)

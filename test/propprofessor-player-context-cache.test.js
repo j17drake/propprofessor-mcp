@@ -38,8 +38,8 @@ const TWEET_FIXTURE = {
 let originalExecFile = null;
 
 function mockExecSuccess() {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') { cb = opts; opts = {}; }
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     cb(null, JSON.stringify(TWEET_FIXTURE), '');
   };
 }

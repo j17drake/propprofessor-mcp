@@ -40,15 +40,15 @@ const XURL_AUTH_ERROR = {
 let originalExecFile = null;
 
 function mockExecResponse(stdout) {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') { cb = opts; opts = {}; }
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     cb(null, stdout, '');
   };
 }
 
 function mockExecError(message) {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') { cb = opts; opts = {}; }
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     cb(new Error(message));
   };
 }
@@ -174,8 +174,8 @@ describe('getPlayerContext with useXurl', () => {
     const X_FIXTURE = {
       data: { search_by_raw_query: { search_timeline: { timeline: { instructions: [] } } } }
     };
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
+    cp.execFile = (file, args, arg3, arg4) => {
+      const cb = typeof arg3 === 'function' ? arg3 : arg4;
       const isX = file === 'python3';
       const stdout = isX ? JSON.stringify(X_FIXTURE) : '';
       cb(null, stdout, '');
@@ -189,8 +189,8 @@ describe('getPlayerContext with useXurl', () => {
 
   it('useXurl=true bypasses the cache (always fresh)', async () => {
     // First call uses free path, populates cache
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
+    cp.execFile = (file, args, arg3, arg4) => {
+      const cb = typeof arg3 === 'function' ? arg3 : arg4;
       const isX = file === 'python3';
       const stdout = isX ? JSON.stringify({ data: { search_by_raw_query: { search_timeline: { timeline: { instructions: [] } } } } }) : '';
       cb(null, stdout, '');

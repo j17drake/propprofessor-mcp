@@ -87,23 +87,10 @@ function clearModuleCache() {
 let originalExecFile = null;
 
 function mockExecFileSuccess() {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') {
-      cb = opts;
-      opts = {};
-    }
+  cp.execFile = (file, args, arg3, arg4) => {
+    const cb = typeof arg3 === 'function' ? arg3 : arg4;
     // Match Node's real execFile signature: (err, stdout, stderr)
     cb(null, JSON.stringify(TWEET_FIXTURE), '');
-  };
-}
-
-function mockExecFileFailure() {
-  cp.execFile = (file, args, opts, cb) => {
-    if (typeof opts === 'function') {
-      cb = opts;
-      opts = {};
-    }
-    cb(new Error('X API unavailable'));
   };
 }
 
@@ -237,8 +224,8 @@ describe('getPlayerContext', () => {
   it('falls back to news when Nitter RSS and X both fail', async () => {
     // Fail both Nitter RSS (curl to localhost:8080) and X GraphQL (python3)
     cp.execFile = originalExecFile;
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
+    cp.execFile = (file, args, arg3, arg4) => {
+      const cb = typeof arg3 === 'function' ? arg3 : arg4;
       const argStr = Array.isArray(args) ? args.join(' ') : '';
       // Nitter RSS: curl to localhost:8080/search/rss
       const isNitterRss = argStr.includes('localhost:8080/search/rss');
