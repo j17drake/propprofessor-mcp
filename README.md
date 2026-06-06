@@ -8,7 +8,7 @@ Lean, fast odds analysis engine for AI agents. 19 tools, 487 tests, all performa
 - **Removed**: 4 MCP tools (`query_bet_stats`, `clv_history`, `record_outcome`, `record_feedback`)
 - **Removed**: CLI commands `pp-query stats`, `pp-query calibration`
 - **Retained**: Core odds analysis — screening, sharp movement, line shopping, player context, betting tools, UFC
-- **Performance**: `compact: true` (90% smaller, 10-50x faster), `fields`/`include` params, TTL caching (60s), caveman-shrink token compression (~46%)
+- **Performance**: `compact: true` (90% smaller), `skipHistory: true` (skips odds history hydration), `fields`/`include` params, TTL caching (60s), caveman-shrink token compression (~46%)
 
 ## Quick Start
 
@@ -99,7 +99,7 @@ Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/p
 ## Available MCP Tools (19)
 
 ### Screening & Ranking
-- `screen_ranked` — **Primary**. Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`.
+- `screen_ranked` — **Primary**. Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`, `skipHistory`.
 - `screen` — League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis).
 - `screen_raw` — Raw odds payload. `bestComps: true` for sharper comparison books.
 - `all_slates` — Consolidated ranked list across multiple leagues.
@@ -112,7 +112,7 @@ Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/p
 - `find_best_price` — Every book's odds sorted best→worst with spread from best price.
 
 ### Player Context
-- `player_context` — News, tweets, riskFlag for a player. X + Google News RSS + ESPN fallback. Source authority scoring via watchlist.
+- `player_context` — News, tweets, riskFlag for a player. Nitter RSS (local) → X → Google News RSS → ESPN fallback. Source authority scoring via watchlist.
 
 ### Betting
 - `recommended_bets` — TIER 1/2 plays across leagues with movementGrade, riskScore, kaiCall, rationale.
@@ -145,7 +145,8 @@ Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/p
 
 | Flag | Effect |
 |------|--------|
-| `compact: true` | ~90% smaller response, 10-50x faster (skips line history hydration) |
+| `compact: true` | ~90% smaller response (strips verbose payloads per row). Does NOT skip history hydration. |
+| `skipHistory: true` | Skips odds history hydration entirely. Use when you only need current odds/edges. |
 | `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`) |
 | `include: ["resultMeta"]` | Top-level section filtering |
 

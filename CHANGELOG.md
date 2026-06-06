@@ -31,35 +31,22 @@
 
 ## Unreleased
 
-### `query_clv_history` MCP tool (Phase 7 of sharp-signal-tuning plan)
-- New tool: reads a CSV bet log (default `~/Documents/bet-log.csv`, overridable via `path` arg or `BET_LOG_PATH` env var) and computes your actual CLV track record.
-- Returns: `avgClv` (decimal-odds-ratio formula), `clvStddev`, `winRate`, `totalProfit`, `totalStake`, `roi`, and per-group breakdown (by `week`, `sport`, `tier`, or `book`).
-- CSV format: `date,league,market,selection,book,odds_taken,closing_odds,outcome,stake,tier` (header row required). `outcome` is `win`/`loss`/`push`.
-- CLV formula: `(decimal_odds_taken / decimal_odds_close - 1) × 100` — works for both favorites and underdogs, positive when you beat the close.
-- New file: `lib/propprofessor-clv-history.js` with `getClvHistory`, `readBetLog`, `computeClvPercent`, `computeProfit`, `americanToDecimal`, `groupBets`, `parseCsvLine`.
-- Tests: 35 new in `test/propprofessor-clv-history.test.js` covering CSV parsing (including quoted fields with commas), CLV math (favorites, underdogs, negative cases, zero, non-finite), bet log validation (missing columns, invalid outcome, non-numeric odds), grouping by week/sport/tier/book, and the full `getClvHistory` flow.
+### Nitter RSS as primary tweet source in `player_context`
+- `player_context` now tries Nitter RSS first (fast, no auth, local instance via `NITTER_BASE` env var, default `http://localhost:8080`).
+- Fallback chain: Nitter RSS → X GraphQL (nitter-session-api) → Google News RSS → ESPN search.
+- New source labels: `nitter-rss`, `nitter-combined`, `news-fallback` (previously only `x-direct`, `combined`, `empty`).
+- New file: `searchNitterRSS()` in `lib/propprofessor-news-sources.js` with RSS parsing that handles both Google News and Nitter RSS formats (`<dc:creator>` for author).
+- Tests: updated `test/propprofessor-news-sources.test.js` and `test/propprofessor-player-context.test.js` with Nitter RSS fixtures and source label assertions.
 
-### CLV multiplier in `query_staking_plan` (Phase 6 of sharp-signal-tuning plan)
-- Stake sizing now applies a CLV multiplier in addition to the tier base and edge multiplier.
-- Multiplier buckets: `clv >= 5%` → 1.5x, `2-5%` → 1.0x, `0.5-2%` → 0.75x, `< 0.5%` → 0.5x, missing/null → 0.5x.
-- Formula: `stakePct = basePct × edgeMultiplier × clvMultiplier`, capped at 5% per play.
-- New fields on each stake row: `clvPct`, `clvBucket`, `clvFactor`, `edgeFactor`, `basePct` so the breakdown is visible.
-- `null`/`undefined` CLV is treated as "no data" (0.5x penalty) — not the same as CLV of 0.
-- Tests: 16 new in `test/propprofessor-staking-clv.test.js`.
+### `skipHistory` param on screen tools
+- New `skipHistory: boolean` param on `screen_ranked`, `recommended_bets`, `all_slates`, `staking_plan`, and `sharp_consensus` tools.
+- When `true`, skips odds history hydration entirely — useful when you only need current odds/edges and don't need movement data.
+- Propagated through all handler call chains: `recommended_bets` → `screen_ranked`, `staking_plan` → `recommended_bets`, `all_slates` → `runLeagueScreen`/`runTennisScreen`, `sharp_consensus` → `screen_ranked`.
+- `sharp_plays` already supported it via `...args` spread in `runSharpPlays` service.
+- `compact` description clarified: it only affects output formatting, not data hydration. Use `skipHistory` to skip hydration.
 
-### Multi-window consensus score (Phase 2 of sharp-signal-tuning plan)
-- New per-row field `multiWindowScore: 0.0-1.0` on every ranked screen row: fraction of [1h, 2h, 6h, 12h, 24h, 48h] time windows where all configured sharp books (Pinnacle, BetOnline, BookMaker) moved in the same direction.
-- Companion fields: `consensusWindowCount`, `totalConsensusWindows`, `consensusWindows: string[]` (e.g. `["6h", "12h", "24h", "48h"]`), `multiWindowInsufficientData: bool`.
-- **Movement grade:** `multiWindowScore >= 0.66` (>= 4 of 6 windows) is now required for GREEN eligibility. If `multiWindowInsufficientData` is true (no line history), the requirement is skipped — never punish absence of data.
-- **Risk score:** `multiWindowScore >= 0.66` → -1, `<= 0.33` → +1, mid-range (0.34-0.65) → 0. Mid-range also demotes the grade (which has its own score effect).
-- New function `computeMultiWindowScore(row, options)` in `lib/propprofessor-sharp-consensus.js` is callable independently and is also called by `rankScreenRows()`.
-- New test file: `test/propprofessor-multi-window-score.test.js` (15 tests covering the function + risk grade integration).
-
-### Steam detection tightened
-- **Strict steam rule (Phase 1 of sharp-signal-tuning plan):** 5-minute window + 3+ sharp books (industry standard for genuine cross-book coordination). Was 1-hour window + 2+ books.
-- New fields on every ranked screen row: `steamMoveLegacy`, `steamBooksLegacy`, `steamDirectionLegacy`, `steamBookCountLegacy` — keeps the old rule available for A/B comparison and rolling back if hit rates degrade.
-- `steamMove` (the boolean driving `movementGrade`, risk score, +EV bonuses, and the +15 sharp-plays score bonus) now means **strict** steam only. Downstream scoring is unchanged — only the trigger condition is tighter.
-- New test file: `test/propprofessor-steam-move-strict.test.js` (8 tests covering strict-only triggers, mixed directions, non-sharp book filtering, and side-by-side comparison).
+### Compact mode description fix
+- Clarified `compact` param description across all tools: "Does NOT affect history hydration — movement data is always fetched." Previously implied compact skipped history.
 
 ## 1.0.7
 

@@ -653,7 +653,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             is_live: Boolean(args.is_live), includeAll: false, debug: false,
             compact: Boolean(args.compact),
             fields: Array.isArray(args.fields) ? args.fields : undefined,
-            include: Array.isArray(args.include) ? args.include : undefined
+            include: Array.isArray(args.include) ? args.include : undefined,
+            skipHistory: args.skipHistory === true
           });
           const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
           let eligible = rows.filter((row) => targetTiers.includes(getConfidenceTier(row)));
@@ -724,7 +725,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const market = args.market || 'Moneyline';
       const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-      const recResult = await handlers.recommended_bets({ leagues, market, targetTiers, limit, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined });
+      const recResult = await handlers.recommended_bets({ leagues, market, targetTiers, limit, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true });
       if (!recResult.ok || !recResult.totalRecommended) {
         return { ok: true, bankroll, totalStake: 0, playCount: 0, stakes: [], warnings: ['No recommended plays found for the given criteria'], summary: 'No plays to stake' };
       }
@@ -757,7 +758,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const lookbackHours = Number(args.lookbackHours) || 48;
       const limit = Number(args.limit) || 100;
       const rankedResponse = await handlers.screen_ranked({
-        league, market, historySportsbooks: sharpBooks, includeAll: true, limit, lookbackHours, debug: false, is_live: Boolean(args.is_live)
+        league, market, historySportsbooks: sharpBooks, includeAll: true, limit, lookbackHours, debug: false, is_live: Boolean(args.is_live), skipHistory: args.skipHistory === true
       });
       if (!rankedResponse?.ok || !Array.isArray(rankedResponse.result)) {
         return { ok: false, error: 'Failed to fetch ranked screen data' };
@@ -786,12 +787,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         try {
           const leagueKey = league.toUpperCase();
           if (leagueKey === 'TENNIS') {
-            const tennisResult = await runTennisScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined });
+            const tennisResult = await runTennisScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true });
             results[league] = tennisResult.result || [];
             leagueMeta[league] = { rowCount: results[league].length, source: tennisResult.source || 'screen', ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {}) };
             totalPlays += results[league].length;
           } else {
-            const leagueResult = await runLeagueScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined }, league);
+            const leagueResult = await runLeagueScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true }, league);
             results[league] = leagueResult.result || [];
             leagueMeta[league] = { rowCount: results[league].length, source: 'screen', ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {}) };
             totalPlays += results[league].length;

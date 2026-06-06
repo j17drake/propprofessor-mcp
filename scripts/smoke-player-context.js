@@ -1,20 +1,22 @@
 'use strict';
 
 /**
- * Live smoke test for query_player_context. Hits real X (via nitter-session-api)
- * + real Google News RSS + real ESPN search. Run as a one-off before shipping
- * the skill update so we know the whole stack works end-to-end, not just in
- * unit tests with mocks.
+ * Live smoke test for query_player_context. Hits real Nitter RSS (local instance),
+ * X (via nitter-session-api), Google News RSS, and ESPN search. Run as a one-off
+ * before shipping the skill update so we know the whole stack works end-to-end,
+ * not just in unit tests with mocks.
  *
  * Usage:
  *   node scripts/smoke-player-context.js
  *   PLAYER="Luka Doncic" SPORT="NBA" node scripts/smoke-player-context.js
+ *   NITTER_BASE="http://localhost:8080" node scripts/smoke-player-context.js
  *
  * Exit 0 on success (got tweets or news), 1 on any failure.
  *
- * Skipped in CI: this test calls live external APIs and requires an active
- * X session cookie (~/.hermes/sessions.jsonl). Run manually before each
- * release of the player-context layer.
+ * Skipped in CI: this test calls live external APIs. Requires either a local
+ * Nitter instance (set NITTER_BASE) or an active X session cookie
+ * (~/.hermes/sessions.jsonl). Run manually before each release of the
+ * player-context layer.
  */
 
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
