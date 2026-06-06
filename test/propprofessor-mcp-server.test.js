@@ -977,16 +977,12 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(result.resultMeta.classificationSummary, {
       totalRowsClassified: 2,
       verdictCounts: { Pass: 2 },
-      passReasonCounts: {
-        consensus_book_count_below_1: 2,
-        movement_source_is_target_book: 2
-      }
+      passReasonCounts: {}
     });
     assert.ok(result.resultMeta.emptyState);
     assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
     assert.equal(result.resultMeta.emptyState.scannedRowCount, 2);
-    assert.equal(result.resultMeta.emptyState.failureBreakdown.consensus_book_count_below_1, 2);
-    assert.equal(result.resultMeta.emptyState.failureBreakdown.movement_source_is_target_book, 2);
+    assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, {});
     assert.equal(result.resultMeta.emptyState.topNearMisses.length, 2);
     assert.equal(result.resultMeta.emptyState.topNearMisses[0].movementSourceBook, 'NoVigApp');
     assert.equal(typeof result.resultMeta.emptyState.topNearMisses[0].marketBookCount, 'number');
