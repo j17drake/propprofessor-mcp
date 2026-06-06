@@ -842,7 +842,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         books: requestedBooks, is_live: false
       });
       const response = buildRankedScreenResponseShared({
-        client, payloads: [payload], args: { ...args, compact: false }, league, focusBook,
+        client, payloads: [payload], args: { ...args, compact: false, skipHistory: false }, league, focusBook,
         rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
           league, market, limit: gameIds.length * 4,
           books: requestedBooks.length ? requestedBooks : undefined,
