@@ -8,10 +8,9 @@ Thanks for your interest. This document covers how to set up locally, add tools,
 git clone https://github.com/j17drake/propprofessor-mcp.git
 cd propprofessor-mcp
 npm install
-npm link
 ```
 
-`npm link` makes `pp-mcp` and `pp-query` available globally for local testing.
+`pp-mcp` and `pp-query` are available as local scripts via `node scripts/propprofessor-mcp-server.js` and `node scripts/query-propprofessor.js`.
 
 ## Running Tests
 

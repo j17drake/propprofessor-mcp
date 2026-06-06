@@ -3,7 +3,7 @@
   "version": "1.0.8",
   "description": "Beginner-friendly PropProfessor MCP server and setup CLI for any MCP client",
   "type": "commonjs",
-  "private": false,
+  "private": true,
   "main": "scripts/propprofessor-mcp-server.js",
   "exports": {
     ".": "./scripts/propprofessor-mcp-server.js",
