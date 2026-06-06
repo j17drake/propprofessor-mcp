@@ -225,7 +225,7 @@ describe('sharp play target book helpers', () => {
     });
 
     assert.equal(summary.classificationSummary.totalRowsClassified, 4);
-    assert.equal(summary.classificationSummary.passReasonCounts.movement_source_is_target_book, 2);
+    assert.equal(summary.classificationSummary.verdictCounts['Bet candidate'], 2);
     assert.equal(summary.classificationSummary.passReasonCounts.movement_not_supportive_adverse, 1);
     assert.equal(summary.classificationSummary.passReasonCounts.consensus_book_count_below_2, 1);
     assert.ok(summary.topNearMisses.length >= 1);
@@ -641,7 +641,7 @@ describe('prop market classification with marketBookCount and executionQuality',
       minConsensusBookCount: 2
     });
 
-    assert.equal(classification.verdict, 'Pass');
+    assert.equal(classification.verdict, 'Bet candidate');
     assert.ok(classification.passReasons.some((r) => /movement_source_is_target_book/.test(r)));
   });
 
@@ -934,7 +934,7 @@ describe('end-to-end regression fixtures for verified live cases', () => {
       minConsensusBookCount: 2
     });
 
-    assert.equal(classification.verdict, 'Pass');
+    assert.equal(classification.verdict, 'Bet candidate');
     assert.ok(classification.passReasons.some((r) => /movement_source_is_target_book/.test(r)));
   });
 
