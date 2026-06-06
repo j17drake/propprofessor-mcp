@@ -1,21 +1,40 @@
 # PropProfessor MCP
 
-Lean, fast odds analysis engine for AI agents. 19 tools, 487 tests, all performance features active.
+<!-- Badges -->
+[![npm version](https://img.shields.io/npm/v/propprofessor-mcp?color=44cc11&label=npm)](https://www.npmjs.com/package/propprofessor-mcp)
+[![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
+[![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-489%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-## What Changed (v1.0.8)
+Lean, fast odds analysis engine for AI agents. **19 tools, 489 tests, all performance features active.**
 
-- **Removed**: Self-improvement layer (memory, stats, adaptive filter, CLV history, Kelly staking)
-- **Removed**: 4 MCP tools (`query_bet_stats`, `clv_history`, `record_outcome`, `record_feedback`)
-- **Removed**: CLI commands `pp-query stats`, `pp-query calibration`
-- **Retained**: Core odds analysis — screening, sharp movement, line shopping, player context, betting tools, UFC
-- **Performance**: `compact: true` (90% smaller), `skipHistory: true` (skips odds history hydration), `fields`/`include` params, TTL caching (60s), caveman-shrink token compression (~46%)
+Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection. Built for [Model Context Protocol](https://modelcontextprotocol.io) clients.
+
+---
+
+## What It Does
+
+```
+AI Agent → pp-mcp → PropProfessor API → Ranked plays with movement signals
+```
+
+1. **Screen** — Pull live odds across 36+ books, rank by sharp consensus + movement
+2. **Validate** — Detect steam moves (5-min/3-book), multi-window consensus, CLV proxy
+3. **Shop** — Line-shop across all books for best price
+4. **Context** — Player news, tweets, injury risk flags before you bet
+5. **Stake** — Fractional Kelly sizing with CLV-adjusted multipliers
+
+---
 
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
-- Paid PropProfessor account at propprofessor.com
-- Logged-in browser session exported as `auth.json`
+- Paid [PropProfessor](https://propprofessor.com) account
+- Logged-in browser session → export as `auth.json`
 
 ### Install
 
@@ -26,9 +45,12 @@ npm install
 npm link
 ```
 
-Commands available after `npm link`:
-- `pp-mcp` — MCP server for AI agents
-- `pp-query` — local CLI for setup/debugging
+After `npm link`, two commands are available:
+
+| Command | Purpose |
+|---------|---------|
+| `pp-mcp` | MCP server for AI agents (stdio transport) |
+| `pp-query` | Local CLI for setup, debugging, quick checks |
 
 ### Auth Setup
 
@@ -36,50 +58,38 @@ Commands available after `npm link`:
 pp-query install-auth --source /path/to/auth.json
 ```
 
-Auth lookup order:
-1. `AUTH_FILE` env var
-2. `~/.propprofessor/auth.json` (default)
-3. `./auth.json` in repo
+Auth lookup order: `AUTH_FILE` env var → `~/.propprofessor/auth.json` → `./auth.json`
 
 ### Verify
 
 ```bash
-pp-query doctor    # checks Node, auth, endpoint connectivity
-pp-query health    # quick health check
+pp-query doctor    # full setup check: Node, auth, endpoint
+pp-query health    # quick endpoint ping
 ```
+
+---
 
 ## MCP Client Setup
 
 ### Hermes Agent
 
-Example working Hermes config:
-
 ```yaml
 mcp_servers:
   propprofessor:
-    args:
-    - /Users/jamesdrake/Documents/workspace/propprofessor-mcp/scripts/propprofessor-mcp-server.js
     command: node
+    args:
+      - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
     enabled: true
     env:
-      AUTH_FILE: /Users/jamesdrake/.propprofessor/auth.json
+      AUTH_FILE: /path/to/.propprofessor/auth.json
       PROPPROFESSOR_MCP_NDJSON: 'true'
 ```
 
-If you want token compression for smaller Hermes context usage, optional:
-- install `caveman-shrink`
-- set `command: caveman-shrink`
-- use `args: ["node", "/Users/jamesdrake/Documents/workspace/propprofessor-mcp/scripts/propprofessor-mcp-server.js"]`
+Optional token compression for smaller context usage: install `caveman-shrink` globally, set `command: caveman-shrink`, and add `node` + server path to `args`.
 
-Reload Hermes after changing MCP config.
+### Claude Desktop / Cursor / Cline / Zed
 
-**Requirements**: `npm install -g caveman-shrink` (installs globally)
-
-### Claude Desktop / Cursor / Cline
-
-Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/propprofessor-mcp-server.js` with `PROPPROFESSOR_MCP_NDJSON=true` and `AUTH_FILE` set.
-
-### Generic stdio Client
+See [CONFIG.md](CONFIG.md) for client-specific configs. The server runs via:
 
 ```json
 {
@@ -96,96 +106,91 @@ Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/p
 }
 ```
 
+---
+
 ## Available MCP Tools (19)
 
 ### Screening & Ranking
-- `screen_ranked` — **Primary**. Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`, `skipHistory`.
-- `screen` — League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis).
-- `screen_raw` — Raw odds payload. `bestComps: true` for sharper comparison books.
-- `all_slates` — Consolidated ranked list across multiple leagues.
+
+| Tool | Description |
+|------|-------------|
+| `screen_ranked` | **Primary.** Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`, `skipHistory`. |
+| `screen` | League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis). |
+| `screen_raw` | Raw odds payload. `bestComps: true` for sharper comparison books. |
+| `all_slates` | Consolidated ranked list across multiple leagues. |
+| `get_play_details` | Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query. |
 
 ### Sharp Movement
-- `sharp_plays` — Target-book plays (Fliff, NoVigApp) with supportive non-target sharp movement.
-- `sharp_consensus` — Multi-window (1h–48h) sharp book consensus analysis.
+
+| Tool | Description |
+|------|-------------|
+| `sharp_plays` | Target-book plays (Fliff, NoVigApp) with supportive non-target sharp movement. |
+| `sharp_consensus` | Multi-window (1h–48h) sharp book consensus analysis. |
 
 ### Line Shopping
-- `find_best_price` — Every book's odds sorted best→worst with spread from best price.
+
+| Tool | Description |
+|------|-------------|
+| `find_best_price` | Every book's odds sorted best→worst with spread from best price. |
 
 ### Player Context
-- `player_context` — News, tweets, riskFlag for a player. Nitter RSS (local) → X → Google News RSS → ESPN fallback. Source authority scoring via watchlist.
+
+| Tool | Description |
+|------|-------------|
+| `player_context` | News, tweets, riskFlag for a player. Nitter RSS → X → Google News RSS → ESPN fallback. Source authority scoring. |
 
 ### Betting
-- `recommended_bets` — TIER 1/2 plays across leagues with movementGrade, riskScore, kaiCall, rationale.
-- `staking_plan` — Fractional Kelly stakes (TIER 1=2%, TIER 2=1% of bankroll).
-- `ev_candidates` — Fast +EV discovery (secondary; validate on `/screen`).
+
+| Tool | Description |
+|------|-------------|
+| `recommended_bets` | TIER 1/2 plays across leagues with movementGrade, riskScore, kaiCall, rationale. |
+| `staking_plan` | Fractional Kelly stakes (TIER 1=2%, TIER 2=1% of bankroll). |
+| `ev_candidates` | Fast +EV discovery (secondary; validate on `/screen`). |
 
 ### UFC
-- `ufc_card` — First-class shortlist with official plays, best looks, passes.
+
+| Tool | Description |
+|------|-------------|
+| `ufc_card` | First-class shortlist with official plays, best looks, passes. |
 
 ### Bet Management
-- `hide_bet`, `unhide_bet`, `get_hidden_bets`, `clear_hidden_bets` — Fantasy optimizer tools.
+
+| Tool | Description |
+|------|-------------|
+| `hide_bet` / `unhide_bet` | Toggle fantasy optimizer visibility per bet. |
+| `get_hidden_bets` / `clear_hidden_bets` | List or clear all hidden bets. |
 
 ### Meta
-- `health_status` — Auth freshness, endpoint connectivity.
-- `league_presets` — Sport-specific ranking presets.
-- `get_play_details` — Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query.
 
-## Verified Runtime Behavior (2026-06-06)
-
-| Tool | Status | Notes |
-|------|--------|-------|
-| `screen` / `screen_ranked` | Healthy | Primary discovery path |
-| `sharp_plays` | Healthy | Best for target-book value; returns `verdict`, `passReasons`, `movementGrade` |
-| `recommended_bets` | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. This is expected, not a bug. |
-| `ev_candidates` | Healthy | Fast +EV discovery; validate with `/screen` |
-
-`recommended_bets` is functional. A 0-result response simply means there are no qualifying plays.
-
-## Performance Flags (All Tools)
-
-| Flag | Effect |
-|------|--------|
-| `compact: true` | ~90% smaller response (strips verbose payloads per row). Does NOT skip history hydration. |
-| `skipHistory: true` | Skips odds history hydration entirely. Use when you only need current odds/edges. |
-| `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`) |
-| `include: ["resultMeta"]` | Top-level section filtering |
+| Tool | Description |
+|------|-------------|
+| `health_status` | Auth freshness, endpoint connectivity. |
+| `league_presets` | Sport-specific ranking presets. |
 
 ---
 
-## Book Configuration
+## Performance Flags
 
-The MCP uses three book categories. Configure per-request via tool params:
+All screen/recommended/staking tools support these params:
 
-### 1. **Target Execution Books** (your betting books)
-Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `screen`:
-```json
-{ "targetBooks": ["Fliff", "NoVigApp", "Rebet"] }
+| Flag | Effect |
+|------|--------|
+| `compact: true` | ~90% smaller response. Retains movement signals (steamMove, consensusEdge, movementLabel). Does NOT skip history hydration. |
+| `skipHistory: true` | Skips odds history hydration entirely. Use when you only need current odds/edges. |
+| `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`). |
+| `include: ["resultMeta"]` | Top-level section filtering. |
+
+---
+
+## Example Agent Prompts
+
 ```
-**CLI**: `--book Fliff` or `--target-book Fliff` (single) / `--books Fliff,NoVigApp`
-
-### 2. **Sharp Comparison Books** (movement detection)
-Books whose line movement signals sharp action. Pass to `sharp_plays`, `sharp_consensus`, `screen_ranked`:
-```json
-{ "sharpBooks": ["Pinnacle", "Circa", "BookMaker", "BetOnline"] }
+Find top NBA moneyline plays on screen right now (compact=true).
+Show TIER 1/2 plays across NBA, MLB, NHL with player context for top 3.
+Scan Fliff/NoVigApp sharp plays with supportive movement (includePasses=true).
+What's the best price for Lakers moneyline across all books?
+Get full line history for game ID 12345 on NBA screen.
 ```
-
-### 3. **Display Books** (line shopping)
-Books to show in `find_best_price` or `screen_raw`. Defaults to all available:
-```json
-{ "books": ["Pinnacle", "FanDuel", "DraftKings", "NoVigApp"] }
-```
-
-### Default Sharp Sets (Per Sport/Market)
-Pre-configured in `lib/propprofessor-sharp-books.js` — used when you don't override:
-
-| Sport | Main Market | Props |
-|-------|-------------|-------|
-| **NBA** | Circa, Pinnacle, BookMaker, BetOnline, DraftKings | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle |
-| **NFL** | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel | Pinnacle, FanDuel, BookMaker, Circa, BetOnline |
-| **MLB** | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
-| **Others** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa | Same |
-
-**To override defaults**: Pass `books` or `sharpBooks` param to any tool. For persistent changes, edit `lib/propprofessor-sharp-books.js` constant arrays.
 
 ---
 
@@ -204,13 +209,48 @@ pp-query presets                       # ranking presets
 pp-query list                          # command inventory
 ```
 
-## Example Agent Prompts
+---
 
-- `Find top NBA moneyline plays on screen right now (compact=true).`
-- `Show TIER 1/2 plays across NBA, MLB, NHL with player context for top 3.`
-- `Scan Fliff/NoVigApp sharp plays with supportive movement (includePasses=true).`
-- `What's the best price for Lakers moneyline across all books?`
-- `Get full line history for game ID 12345 on NBA screen.`
+## Book Configuration
+
+The MCP uses three book categories:
+
+### 1. Target Execution Books (your betting books)
+
+Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `screen`:
+
+```json
+{ "targetBooks": ["Fliff", "NoVigApp", "Rebet"] }
+```
+
+### 2. Sharp Comparison Books (movement detection)
+
+Books whose line movement signals sharp action. Pass to `sharp_plays`, `sharp_consensus`, `screen_ranked`:
+
+```json
+{ "sharpBooks": ["Pinnacle", "Circa", "BookMaker", "BetOnline"] }
+```
+
+### 3. Display Books (line shopping)
+
+Books to show in `find_best_price` or `screen_raw`:
+
+```json
+{ "books": ["Pinnacle", "FanDuel", "DraftKings", "NoVigApp"] }
+```
+
+### Default Sharp Sets (Per Sport/Market)
+
+Pre-configured in `lib/propprofessor-sharp-books.js`:
+
+| Sport | Main Market | Props |
+|-------|-------------|-------|
+| **NBA** | Circa, Pinnacle, BookMaker, BetOnline, DraftKings | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle |
+| **NFL** | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel | Pinnacle, FanDuel, BookMaker, Circa, BetOnline |
+| **MLB** | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
+| **Others** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa | Same |
+
+---
 
 ## Environment Variables
 
@@ -222,21 +262,42 @@ pp-query list                          # command inventory
 | `PROPPROFESSOR_CACHE_MAX` | `50` | Max cache entries (LRU) |
 | `LOCAL_TIMEZONE` | `America/Chicago` | CLI display timezone |
 
-## Known Issues
+---
 
-- Fliff may have reduced coverage/line history versus other books, which can lower `sharp_plays` validation confidence even when other edges are strong.
+## Known Issues
 
 | Issue | Fix |
 |-------|-----|
-| `pp-query doctor` auth missing | Export fresh session to `~/.propprofessor/auth.json` or set `AUTH_FILE` |
+| `pp-query doctor` auth missing | Export fresh session to `~/.propprofessor/auth.json` |
 | Endpoint check fails | Session stale — re-login and re-export |
 | MCP client won't start | Run `pp-query doctor`; ensure `caveman-shrink` on PATH if using Hermes config |
 | Large responses timeout | Use `compact: true` and/or `fields` param |
+| Fliff reduced coverage | May lower `sharp_plays` validation confidence even when other edges are strong |
 | ChatGPT | Not supported for local stdio; use remote MCP endpoint |
+
+---
+
+## Verified Runtime Behavior (2026-06-06)
+
+| Tool | Status | Notes |
+|------|--------|-------|
+| `screen` / `screen_ranked` | Healthy | Primary discovery path |
+| `sharp_plays` | Healthy | Best for target-book value; returns `verdict`, `passReasons`, `movementGrade` |
+| `recommended_bets` | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. Expected, not a bug. |
+| `ev_candidates` | Healthy | Fast +EV discovery; validate with `/screen` |
+
+---
 
 ## For Maintainers
 
-- Tests: `npm test` (487 passing)
-- Live tests: require `~/.propprofessor/auth.json`
-- Release notes: `MAINTAINERS.md`
-- Tool definitions: `lib/propprofessor-tool-definitions.js`
+- **Tests**: `npm test` (489 passing, includes live API integration tests)
+- **Live smoke**: `npm run smoke:live` (requires `auth.json`)
+- **Lint**: `npm run lint`
+- **Format**: `npm run format:check`
+- **Release**: Push a `v*` tag → GitHub Actions creates release automatically
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
+- **Tool definitions**: `lib/propprofessor-tool-definitions.js`
+
+## License
+
+[MIT](LICENSE)
