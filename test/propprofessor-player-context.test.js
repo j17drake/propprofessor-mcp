@@ -234,10 +234,23 @@ describe('getPlayerContext', () => {
     assert.equal(result.error, null);
   });
 
-  it('returns empty tweets and error when execFile rejects', async () => {
-    // Re-mock for failure
+  it('falls back to news when Nitter RSS and X both fail', async () => {
+    // Fail both Nitter RSS (curl to localhost:8080) and X GraphQL (python3)
     cp.execFile = originalExecFile;
-    mockExecFileFailure();
+    cp.execFile = (file, args, opts, cb) => {
+      if (typeof opts === 'function') { cb = opts; opts = {}; }
+      const argStr = Array.isArray(args) ? args.join(' ') : '';
+      // Nitter RSS: curl to localhost:8080/search/rss
+      const isNitterRss = argStr.includes('localhost:8080/search/rss');
+      // X GraphQL API: python3 with 'search' arg
+      const isXApi = file === 'python3' && argStr.includes('search');
+      
+      if (isNitterRss || isXApi) {
+        return cb(new Error('X API unavailable'));
+      }
+      // Allow news calls to succeed with empty
+      cb(null, '', '');
+    };
     clearModuleCache();
 
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
@@ -247,9 +260,11 @@ describe('getPlayerContext', () => {
     assert.equal(result.sport, 'NBA');
     assert.ok(Array.isArray(result.tweets));
     assert.equal(result.tweets.length, 0);
-    assert.ok(typeof result.error === 'string');
-    assert.equal(result.error, 'X API unavailable');
+    // With new priority chain, X errors are caught and we fall back to news
+    // Since news returns empty (mock returns ''), source becomes 'empty'
+    // but error is null because news fallback succeeded (just no results)
     assert.equal(result.source, 'empty');
+    assert.equal(result.error, null);
   });
 
   it('for Tennis, query is just player name; for other sports, query includes sport', async () => {

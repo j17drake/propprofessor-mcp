@@ -96,6 +96,55 @@ function clearModuleCache() {
   }
 }
 
+/**
+ * Mock factory for getPlayerContext execFile calls.
+ * Distinguishes between Nitter RSS (curl to localhost:8080/search/rss),
+ * Google News RSS (curl to news.google.com), ESPN (curl to espn.com),
+ * and X GraphQL API (python3 search).
+ */
+function mockPlayerContextExecFile({ 
+  nitterRssResponse = '', 
+  xResponse = X_EMPTY_FIXTURE, 
+  newsResponse = GOOGLE_NEWS_FIXTURE,
+  espnResponse = ESPN_FIXTURE,
+  newsError = null,
+  xError = null,
+  nitterError = null,
+} = {}) {
+  cp.execFile = (file, args, opts, cb) => {
+    if (typeof opts === 'function') { cb = opts; opts = {}; }
+    
+    const argStr = Array.isArray(args) ? args.join(' ') : '';
+    // Nitter RSS: curl to localhost:8080/search/rss (specific URL pattern)
+    const isNitterRss = argStr.includes('localhost:8080/search/rss');
+    // Google News: curl to news.google.com
+    const isGoogleNews = argStr.includes('news.google.com');
+    // ESPN: curl to espn.com
+    const isEspn = argStr.includes('espn.com');
+    // X GraphQL API: python3 with 'search' arg (x-api.py script)
+    const isXApi = file === 'python3' && argStr.includes('search');
+    
+    if (isNitterRss) {
+      if (nitterError) return cb(nitterError);
+      return cb(null, nitterRssResponse, '');
+    }
+    if (isGoogleNews) {
+      if (newsError) return cb(newsError);
+      return cb(null, newsResponse, '');
+    }
+    if (isEspn) {
+      return cb(null, espnResponse, '');
+    }
+    if (isXApi) {
+      if (xError) return cb(xError);
+      return cb(null, JSON.stringify(xResponse), '');
+    }
+    
+    // Default fallback
+    cb(new Error('Unexpected execFile call: ' + argStr));
+  };
+}
+
 before(() => {
   originalExecFile = cp.execFile;
 });
@@ -173,26 +222,59 @@ describe('getPlayerContext with news fallback', () => {
     clearModuleCache();
   });
 
-  it('returns source "x-direct" when X returns tweets', async () => {
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
-      const isX = args && args.includes('search') && file === 'python3';
-      const stdout = isX ? JSON.stringify(X_TWEET_FIXTURE) : '';
-      cb(null, stdout, '');
-    };
+  it('returns source "nitter-combined" when Nitter RSS returns tweets and news also returns data', async () => {
+    mockPlayerContextExecFile({
+      nitterRssResponse: GOOGLE_NEWS_FIXTURE, // reuse RSS fixture as Nitter RSS (same format)
+      xResponse: X_EMPTY_FIXTURE,
+    });
+    const { getPlayerContext } = require('../lib/propprofessor-player-context');
+    const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
+    assert.equal(result.source, 'nitter-combined');
+    assert.ok(result.tweets.length > 0);
+    assert.ok(result.news.length > 0);
+  });
+
+  it('returns source "nitter-rss" when Nitter RSS returns tweets but news is empty', async () => {
+    mockPlayerContextExecFile({
+      nitterRssResponse: GOOGLE_NEWS_FIXTURE,
+      xResponse: X_EMPTY_FIXTURE,
+      newsResponse: '', // empty news
+    });
+    const { getPlayerContext } = require('../lib/propprofessor-player-context');
+    const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
+    assert.equal(result.source, 'nitter-rss');
+    assert.ok(result.tweets.length > 0);
+  });
+
+  it('returns source "combined" when Nitter RSS empty, X returns tweets, and news returns data', async () => {
+    mockPlayerContextExecFile({
+      nitterRssResponse: '',
+      xResponse: X_TWEET_FIXTURE,
+    });
+    const { getPlayerContext } = require('../lib/propprofessor-player-context');
+    const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
+    assert.equal(result.source, 'combined');
+    assert.equal(result.tweets.length, 1);
+    assert.ok(result.news.length > 0);
+  });
+
+  it('returns source "x-direct" when Nitter RSS empty, X returns tweets, but news is empty', async () => {
+    mockPlayerContextExecFile({
+      nitterRssResponse: '',
+      xResponse: X_TWEET_FIXTURE,
+      newsResponse: '',
+    });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
     assert.equal(result.source, 'x-direct');
     assert.equal(result.tweets.length, 1);
   });
 
-  it('returns source "news-fallback" when X returns empty', async () => {
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
-      const isX = args && args.includes('search') && file === 'python3';
-      const stdout = isX ? JSON.stringify(X_EMPTY_FIXTURE) : GOOGLE_NEWS_FIXTURE;
-      cb(null, stdout, '');
-    };
+  it('returns source "news-fallback" when Nitter RSS and X both empty', async () => {
+    mockPlayerContextExecFile({
+      nitterRssResponse: '',
+      xResponse: X_EMPTY_FIXTURE,
+    });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
     assert.equal(result.source, 'news-fallback');
@@ -200,34 +282,17 @@ describe('getPlayerContext with news fallback', () => {
     assert.ok(result.news.length > 0, 'Expected news to be populated from fallback');
   });
 
-  it('returns source "empty" when both X and news fail', async () => {
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
-      const isX = args && args.includes('search') && file === 'python3';
-      if (isX) {
-        cb(null, JSON.stringify(X_EMPTY_FIXTURE), '');
-      } else {
-        cb(new Error('Network failure'));
-      }
-    };
+  it('returns source "empty" when Nitter RSS, X, and news all fail', async () => {
+    mockPlayerContextExecFile({
+      nitterRssResponse: '',
+      xResponse: X_EMPTY_FIXTURE,
+      newsError: new Error('Network failure'),
+      espnResponse: '', // also fail ESPN
+    });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
     assert.equal(result.source, 'empty');
     assert.equal(result.tweets.length, 0);
     assert.equal(result.news.length, 0);
-  });
-
-  it('returns source "combined" when both X and news return data', async () => {
-    cp.execFile = (file, args, opts, cb) => {
-      if (typeof opts === 'function') { cb = opts; opts = {}; }
-      const isX = args && args.includes('search') && file === 'python3';
-      const stdout = isX ? JSON.stringify(X_TWEET_FIXTURE) : GOOGLE_NEWS_FIXTURE;
-      cb(null, stdout, '');
-    };
-    const { getPlayerContext } = require('../lib/propprofessor-player-context');
-    const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
-    assert.equal(result.source, 'combined');
-    assert.equal(result.tweets.length, 1);
-    assert.ok(result.news.length > 0);
   });
 });
