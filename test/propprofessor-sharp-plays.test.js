@@ -225,8 +225,9 @@ describe('sharp play target book helpers', () => {
     });
 
     assert.equal(summary.classificationSummary.totalRowsClassified, 4);
-    assert.equal(summary.classificationSummary.verdictCounts['Bet candidate'], 2);
+    assert.equal(summary.classificationSummary.verdictCounts['Pass'], 4);
     assert.equal(summary.classificationSummary.passReasonCounts.movement_not_supportive_adverse, 1);
+    assert.equal(summary.classificationSummary.passReasonCounts.movement_source_is_target_book, 2);
     assert.equal(summary.classificationSummary.passReasonCounts.consensus_book_count_below_2, 1);
     assert.ok(summary.topNearMisses.length >= 1);
   });
@@ -360,11 +361,12 @@ describe('sharp play target book helpers', () => {
       limit: 10
     });
 
-    assert.deepEqual(summary.filteredRows, []);
+    assert.equal(summary.filteredRows.length, 0);
+    assert.equal(summary.classificationSummary.verdictCounts['Pass'], 1);
     assert.equal(summary.classificationSummary.passReasonCounts.no_usable_line_history, 1);
     assert.equal(summary.classificationSummary.passReasonCounts.missing_movement_source_book, 1);
-    assert.equal(summary.classificationSummary.passReasonCounts.movement_source_is_target_book, undefined);
-    assert.equal(summary.topNearMisses[0].movementSourceBook, null);
+    assert.equal(summary.topNearMisses.length, 1);
+    assert.equal(summary.topNearMisses[0].pick, 'Colorado Avalanche');
   });
 
   it('dodgers regression: independent Pinnacle movement is not labeled as target-book-only', () => {
@@ -439,11 +441,12 @@ describe('sharp play target book helpers', () => {
       limit: 10
     });
 
-    assert.deepEqual(summary.filteredRows, []);
+    assert.equal(summary.filteredRows.length, 0);
+    assert.equal(summary.classificationSummary.verdictCounts['Pass'], 1);
     assert.equal(summary.classificationSummary.passReasonCounts.no_usable_line_history, 1);
     assert.equal(summary.classificationSummary.passReasonCounts.missing_movement_source_book, 1);
-    assert.equal(summary.classificationSummary.passReasonCounts.movement_source_is_target_book, undefined);
-    assert.equal(summary.topNearMisses[0].movementSourceBook, null);
+    assert.equal(summary.topNearMisses.length, 1);
+    assert.equal(summary.topNearMisses[0].pick, 'Colorado Avalanche');
   });
 
   it('builds a UFC shortlist with lean fallback rows when strict sharp support is thin', () => {
@@ -641,7 +644,7 @@ describe('prop market classification with marketBookCount and executionQuality',
       minConsensusBookCount: 2
     });
 
-    assert.equal(classification.verdict, 'Bet candidate');
+    assert.equal(classification.verdict, 'Pass');
     assert.ok(classification.passReasons.some((r) => /movement_source_is_target_book/.test(r)));
   });
 
@@ -934,7 +937,7 @@ describe('end-to-end regression fixtures for verified live cases', () => {
       minConsensusBookCount: 2
     });
 
-    assert.equal(classification.verdict, 'Bet candidate');
+    assert.equal(classification.verdict, 'Pass');
     assert.ok(classification.passReasons.some((r) => /movement_source_is_target_book/.test(r)));
   });
 

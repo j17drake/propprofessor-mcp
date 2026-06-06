@@ -852,8 +852,8 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.targetBook, 'NoVigApp');
     assert.deepEqual(result.resultMeta.targetBooks, ['NoVigApp']);
     assert.equal(result.resultMeta.targetBookCount, 1);
-    assert.equal(result.resultMeta.scannedQueryCount, 1);
-    assert.equal(calls.queryScreenOddsBestComps.length, 1);
+    assert.equal(result.resultMeta.scannedQueryCount, 6);
+    assert.equal(calls.queryScreenOddsBestComps.length, 6);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.ok(Array.isArray(result.result));
     assert.equal(result.result.length, 2);
@@ -917,8 +917,8 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.targetBook, 'NoVigApp');
     assert.deepEqual(result.resultMeta.targetBooks, ['NoVigApp']);
     assert.equal(result.resultMeta.lookbackHoursUsed, 6);
-    assert.equal(result.resultMeta.scannedQueryCount, 1);
-    assert.equal(calls.queryScreenOddsBestComps.length, 1);
+    assert.equal(result.resultMeta.scannedQueryCount, 6);
+    assert.equal(calls.queryScreenOddsBestComps.length, 6);
   });
 
   it('sharp_plays adds empty-state diagnostics when strict filtering removes all rows', async () => {
@@ -977,12 +977,12 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(result.resultMeta.classificationSummary, {
       totalRowsClassified: 2,
       verdictCounts: { Pass: 2 },
-      passReasonCounts: {}
+      passReasonCounts: { consensus_book_count_below_1: 2, movement_source_is_target_book: 2 }
     });
     assert.ok(result.resultMeta.emptyState);
     assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
     assert.equal(result.resultMeta.emptyState.scannedRowCount, 2);
-    assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, {});
+    assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, { consensus_book_count_below_1: 2, movement_source_is_target_book: 2 });
     assert.equal(result.resultMeta.emptyState.topNearMisses.length, 2);
     assert.equal(result.resultMeta.emptyState.topNearMisses[0].movementSourceBook, 'NoVigApp');
     assert.equal(typeof result.resultMeta.emptyState.topNearMisses[0].marketBookCount, 'number');
@@ -1033,9 +1033,9 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.ok, true);
     assert.deepEqual(result.resultMeta.targetBooks, ['Fliff', 'NoVigApp']);
     assert.equal(result.resultMeta.targetBookCount, 2);
-    assert.equal(result.resultMeta.scannedQueryCount, 2);
-    assert.equal(calls.queryScreenOddsBestComps.length, 2);
-    assert.deepEqual(calls.queryScreenOddsBestComps.map((call) => call.books[0]), ['Fliff', 'NoVigApp']);
+    assert.equal(result.resultMeta.scannedQueryCount, 7);
+    assert.equal(calls.queryScreenOddsBestComps.length, 7);
+    assert.deepEqual(calls.queryScreenOddsBestComps.map((call) => call.books[0]), ['Fliff', 'NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
     assert.equal(result.result.length, 2);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);

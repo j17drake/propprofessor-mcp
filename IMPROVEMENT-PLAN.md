@@ -103,9 +103,13 @@ ESLint 10 has breaking config changes. Test before merging.
 
 ---
 
-## P4 — NoVigApp sharp validation gap (backend issue, not fixable in MCP)
+## P4 — NoVigApp sharp validation gap
 
-**Known issue:** NoVigApp's vig-removed lines never match other books' exact lines, so `consensusBookCount = 0` and `lineHistoryUsable = false` for every NoVigApp row. This is a data mismatch between NoVigApp's pricing model and the sharp book comparison logic. The MCP correctly reports what the backend returns — no code fix possible on this side.
+**Status: Fixed** via sharp book cross-reference (see Completed section below).
+
+Previously: NoVigApp's vig-removed lines never matched other books' exact lines, so `consensusBookCount = 0` and `lineHistoryUsable = false` for every NoVigApp row.
+
+Now: `runSharpPlays` queries each sharp book's screen independently and cross-references game+selection to find independent supportive movement. Rows are tagged with `sharpBookMovementConfirmed` when a sharp book confirms the play.
 
 ---
 
@@ -119,3 +123,7 @@ ESLint 10 has breaking config changes. Test before merging.
 - [x] Fliff data gap documented
 - [x] Nitter RSS player context priority
 - [x] Stale CHANGELOG cleanup
+- [x] **Sharp book cross-reference** — `runSharpPlays` queries each sharp book independently to confirm supportive movement on same game+selection. New row fields: `sharpBookMovementConfirmed`, `sharpBookMovementSource`, `sharpBookClv`.
+- [x] **Removed fallback paths** — `consensusEdgeOnlyOk`, `consensusOnlyOk`, `clvOnlyOk`, `consensusValidated` no longer produce `Bet candidate`. All Bet candidates now require actual sharp movement confirmation.
+- [x] **Code cleanup** — Removed unused variables (`hasConsensusEdge`, `clvValue`, `movementLabelOk`, `movementUnverifiable`). Simplified pass reason logic.
+- [x] **489/489 tests passing** with updated expectations.

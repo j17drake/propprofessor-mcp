@@ -31,6 +31,23 @@
 
 ## Unreleased
 
+### Sharp book cross-reference for `sharp_plays`
+- `sharp_plays` now cross-references each sharp book's screen individually to find independent supportive movement on the same game+selection. This satisfies the "movement from a non-target sharp book" requirement for books like NoVigApp whose vig-removed lines always show as self-sourced.
+- New row fields: `sharpBookMovementConfirmed`, `sharpBookMovementSource`, `sharpBookClv` — populated when a sharp book independently confirms the play.
+- `movementIsSharpSourced` now accepts `sharpBookMovementConfirmed` as an alternative to traditional independent sharp movement.
+- Misleading pass reasons (`no_usable_line_history`, `movement_source_is_target_book`, etc.) are suppressed when sharp book confirmation exists.
+
+### Removed fallback paths
+- Removed `consensusEdgeOnlyOk`, `consensusOnlyOk`, and `clvOnlyOk` as `Bet candidate` paths. These previously accepted rows based on consensus edge or CLV alone without actual sharp movement confirmation.
+- All `Bet candidates` now require either traditional `movementIsSharpSourced` (independent sharp book movement) or `sharpBookMovementConfirmed` (sharp book cross-reference).
+- Removed `consensusValidated` path (consensus edge without movement confirmation).
+- Removed unused variables: `hasConsensusEdge`, `clvValue`, `movementLabelOk`, `movementUnverifiable`.
+- Simplified pass reason logic — no longer conditional on fallback flags.
+
+### Test updates
+- Updated all test expectations to reflect stricter Bet candidate criteria.
+- 489/489 tests passing.
+
 ### Nitter RSS as primary tweet source in `player_context`
 - `player_context` now tries Nitter RSS first (fast, no auth, local instance via `NITTER_BASE` env var, default `http://localhost:8080`).
 - Fallback chain: Nitter RSS → X GraphQL (nitter-session-api) → Google News RSS → ESPN search.

@@ -124,7 +124,7 @@ See [CONFIG.md](CONFIG.md) for client-specific configs. The server runs via:
 
 | Tool | Description |
 |------|-------------|
-| `sharp_plays` | Target-book plays (Fliff, NoVigApp) with supportive non-target sharp movement. |
+| `sharp_plays` | Target-book plays with **independently confirmed** sharp movement. Cross-references Pinnacle, Circa, BookMaker, BetOnline to verify supportive movement on the same game+selection. Only returns `Bet candidate` when a non-target sharp book confirms the move. |
 | `sharp_consensus` | Multi-window (1h–48h) sharp book consensus analysis. |
 
 ### Line Shopping
@@ -272,7 +272,7 @@ Pre-configured in `lib/propprofessor-sharp-books.js`:
 | Endpoint check fails | Session stale — re-login and re-export |
 | MCP client won't start | Run `pp-query doctor`; ensure `caveman-shrink` on PATH if using Hermes config |
 | Large responses timeout | Use `compact: true` and/or `fields` param |
-| Fliff reduced coverage | May lower `sharp_plays` validation confidence even when other edges are strong |
+| No Bet candidates returned | Sharp book cross-reference requires overlap between target book and sharp book screens. Try different `sharpBooks` or check `emptyState.failureBreakdown` for reasons. |
 | ChatGPT | Not supported for local stdio; use remote MCP endpoint |
 
 ---
@@ -282,7 +282,7 @@ Pre-configured in `lib/propprofessor-sharp-books.js`:
 | Tool | Status | Notes |
 |------|--------|-------|
 | `screen` / `screen_ranked` | Healthy | Primary discovery path |
-| `sharp_plays` | Healthy | Best for target-book value; returns `verdict`, `passReasons`, `movementGrade` |
+| `sharp_plays` | Healthy | Sharp book cross-reference confirms NoVigApp/Fliff plays against Pinnacle, Circa, BookMaker, BetOnline. Only returns `Bet candidate` with independent sharp confirmation. |
 | `recommended_bets` | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. Expected, not a bug. |
 | `ev_candidates` | Healthy | Fast +EV discovery; validate with `/screen` |
 
