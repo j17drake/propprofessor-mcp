@@ -34,9 +34,27 @@ const LEAGUE = process.env.PP_TEST_LEAGUE || 'NBA';
 const MARKET = process.env.PP_TEST_MARKET || 'Moneyline';
 const TIMEOUT = 30_000;
 
+function getActiveDefaultLeague() {
+  const month = new Date().getMonth() + 1;
+  const isBasketballSeason = month >= 10 || month <= 4;
+  return isBasketballSeason ? 'NBA' : 'MLB';
+}
+
+function getSeasonEligibleLeagues(leagues) {
+  const month = new Date().getMonth() + 1;
+  const isBasketballSeason = month >= 10 || month <= 4;
+  return (Array.isArray(leagues) ? leagues : [])
+    .map((league) => String(league || '').trim().toUpperCase())
+    .filter((league) => {
+      if (['NBA', 'WNBA', 'NCAAB'].includes(league)) return isBasketballSeason;
+      return true;
+    });
+}
+
 live('live API integration tests', { timeout: TIMEOUT }, () => {
   let client;
   let handlers;
+  const effectiveLeague = getActiveDefaultLeague();
 
   before(() => {
     client = createPropProfessorClient();
@@ -50,11 +68,11 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
     assert.equal(result.result.endpoints?.screen, 'ok');
   });
 
-  it('screen_raw returns rows for NBA Moneyline', async () => {
-    const payload = await client.queryScreenOdds({ league: LEAGUE, market: MARKET, books: ['NoVigApp', 'Pinnacle'] });
+  it('screen_raw returns rows for default active league Moneyline', async () => {
+    const payload = await client.queryScreenOdds({ league: effectiveLeague, market: MARKET, books: ['NoVigApp', 'Pinnacle'] });
     assert.ok(payload);
     const rows = extractScreenRows(payload);
-    assert.ok(rows.length >= 1, `Expected at least 1 screen row for ${LEAGUE} ${MARKET}, got ${rows.length}`);
+    assert.ok(rows.length >= 1, `Expected at least 1 screen row for ${effectiveLeague} ${MARKET}, got ${rows.length}`);
     const row = rows[0];
     assert.ok(row.participant || row.selection, 'Row has a participant or selection');
     assert.ok(row.odds || row.currentOdds, 'Row has odds');

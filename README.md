@@ -50,24 +50,28 @@ pp-query health    # quick health check
 
 ## MCP Client Setup
 
-### Hermes Agent (Recommended)
+### Hermes Agent
 
-Add to `~/.hermes/config.yaml`:
+Example working Hermes config:
 
 ```yaml
 mcp_servers:
   propprofessor:
     args:
-    - node
-    - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
-    command: caveman-shrink
+    - /Users/jamesdrake/Documents/workspace/propprofessor-mcp/scripts/propprofessor-mcp-server.js
+    command: node
     enabled: true
     env:
-      AUTH_FILE: /path/to/.propprofessor/auth.json
+      AUTH_FILE: /Users/jamesdrake/.propprofessor/auth.json
       PROPPROFESSOR_MCP_NDJSON: 'true'
 ```
 
-Then reload: `hermes mcp reload` → `hermes mcp test propprofessor`
+If you want token compression for smaller Hermes context usage, optional:
+- install `caveman-shrink`
+- set `command: caveman-shrink`
+- use `args: ["node", "/Users/jamesdrake/Documents/workspace/propprofessor-mcp/scripts/propprofessor-mcp-server.js"]`
+
+Reload Hermes after changing MCP config.
 
 **Requirements**: `npm install -g caveman-shrink` (installs globally)
 
@@ -125,6 +129,17 @@ Use `CONFIG.md` for client-specific configs. The server runs via `node scripts/p
 - `health_status` — Auth freshness, endpoint connectivity.
 - `league_presets` — Sport-specific ranking presets.
 - `get_play_details` — Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query.
+
+## Verified Runtime Behavior (2026-06-06)
+
+| Tool | Status | Notes |
+|------|--------|-------|
+| `screen` / `screen_ranked` | Healthy | Primary discovery path |
+| `sharp_plays` | Healthy | Best for target-book value; returns `verdict`, `passReasons`, `movementGrade` |
+| `recommended_bets` | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. This is expected, not a bug. |
+| `ev_candidates` | Healthy | Fast +EV discovery; validate with `/screen` |
+
+`recommended_bets` is functional. A 0-result response simply means there are no qualifying plays.
 
 ## Performance Flags (All Tools)
 
@@ -206,7 +221,9 @@ pp-query list                          # command inventory
 | `PROPPROFESSOR_CACHE_MAX` | `50` | Max cache entries (LRU) |
 | `LOCAL_TIMEZONE` | `America/Chicago` | CLI display timezone |
 
-## Troubleshooting
+## Known Issues
+
+- Fliff may have reduced coverage/line history versus other books, which can lower `sharp_plays` validation confidence even when other edges are strong.
 
 | Issue | Fix |
 |-------|-----|

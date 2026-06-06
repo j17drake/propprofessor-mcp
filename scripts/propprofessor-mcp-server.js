@@ -688,6 +688,23 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
+      const fallback = { enabled: false };
+      if (total === 0) {
+        try {
+          const fb = await handlers.sharp_plays({
+            ...args,
+            strict: false,
+            includePasses: true,
+            limit: Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10
+          });
+          fallback.enabled = true;
+          fallback.result = fb;
+          fallback.summary = 'No recommended_bets found; appended sharp_plays fallback with strict=false and includePasses=true.';
+        } catch (error) {
+          fallback.enabled = true;
+          fallback.error = String(error.message || error);
+        }
+      }
       return {
         ok: true, totalRecommended: total,
         leagues: allRecommended.filter((l) => l.count > 0),
@@ -696,7 +713,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         summary: total
           ? `Found ${total} recommended bet${total === 1 ? '' : 's'} across ${allRecommended.filter((l) => l.count > 0).length} league${allRecommended.filter((l) => l.count > 0).length === 1 ? '' : 's'}`
           : 'No TIER 1 or TIER 2 plays found across requested leagues',
-        tierFilter: targetTiers
+        tierFilter: targetTiers,
+        ...(fallback.enabled ? { fallback } : {})
       };
     },
 
