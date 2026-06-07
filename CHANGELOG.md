@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1.0
+
+### Multi-market defaults for recommended_bets, staking_plan, sharp_plays
+- `recommended_bets` now defaults to scanning Moneyline + Spread + Total markets (was Moneyline only). Queries each market per league, deduplicates by gameId+selection (keeps higher screenScore), then applies tier filtering. Returns the best plays across all markets.
+- `staking_plan` inherits the same multi-market default via `recommended_bets`.
+- `sharp_plays` now defaults to scanning Moneyline + Spread + Total (was Moneyline only).
+- All three tools accept `markets: ["Spread"]` to override the default market list.
+- `market` param preserved for backwards compatibility (treated as single-market override).
+- Response includes `markets_queried: string[]` showing which markets were scanned.
+
+### Equalized market priority weights
+- Moneyline, spread, and total weights are now equal within each league's ranking preset. Previously spreads and totals had lower weights, requiring stronger signals to pass the same ranking gate.
+- Props retain higher weights (harder markets to find edges in).
+- Affected leagues: NBA, MLB, NFL, NHL, SOCCER, UFC, NCAAB, NCAAF, WNBA, and fallback.
+
+### markets_queried in resultMeta
+- All screen responses (`screen`, `screen_ranked`, `all_slates`, `ufc_card`) now include `resultMeta.markets_queried: string[]` indicating which markets were scanned.
+
+### Tool description updates
+- `recommended_bets`: documents multi-market default and `markets` param.
+- `staking_plan`: documents multi-market inheritance.
+- `sharp_plays`: documents multi-market default.
+- `all_slates`: documents `markets` param.
+- Added `markets` array property to `recommended_bets`, `staking_plan`, `all_slates`, and `sharp_plays` input schemas.
+
 ## 1.0.8
 
 ### Compact mode for screen/recommended/all_slates/staking_plan

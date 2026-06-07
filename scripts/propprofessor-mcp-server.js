@@ -761,7 +761,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length
         ? args.leagues
         : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
-      const market = args.market || 'Moneyline';
+      const markets = Array.isArray(args.markets) && args.markets.length
+        ? args.markets
+        : args.market
+          ? [args.market]
+          : ['Moneyline', 'Spread', 'Total'];
       const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length
         ? args.targetTiers
         : ['TIER 1', 'TIER 2'];
@@ -769,16 +773,31 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const allRecommended = [];
       for (const league of leagues) {
         try {
-          const screenResult = await handlers.screen_ranked({
-            league, market, books: args.books, limit: limit * 2,
-            is_live: Boolean(args.is_live), includeAll: false, debug: false,
-            compact: Boolean(args.compact),
-            fields: Array.isArray(args.fields) ? args.fields : undefined,
-            include: Array.isArray(args.include) ? args.include : undefined,
-            skipHistory: args.skipHistory === true
-          });
-          const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
-          let eligible = rows.filter((row) => targetTiers.includes(getConfidenceTier(row)));
+          // Query each market type, collect all rows
+          let allRows = [];
+          for (const market of markets) {
+            const screenResult = await handlers.screen_ranked({
+              league, market, books: args.books, limit: limit * 2,
+              is_live: Boolean(args.is_live), includeAll: false, debug: false,
+              compact: Boolean(args.compact),
+              fields: Array.isArray(args.fields) ? args.fields : undefined,
+              include: Array.isArray(args.include) ? args.include : undefined,
+              skipHistory: args.skipHistory === true
+            });
+            const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
+            allRows = allRows.concat(rows.map(r => ({ ...r, _market: market })));
+          }
+          // Deduplicate by gameId+selection (keep higher screenScore)
+          const seen = new Map();
+          for (const row of allRows) {
+            const key = `${row.gameId || ''}:${row.selection || ''}`;
+            const existing = seen.get(key);
+            if (!existing || (Number(row.screenScore ?? 0) > Number(existing.screenScore ?? 0))) {
+              seen.set(key, row);
+            }
+          }
+          const deduped = Array.from(seen.values());
+          let eligible = deduped.filter((row) => targetTiers.includes(getConfidenceTier(row)));
           const recommended = eligible
             .sort((a, b) => {
               const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };
@@ -789,10 +808,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             .slice(0, limit);
           if (recommended.length) {
             allRecommended.push({
-              league, market, count: recommended.length,
+              league, count: recommended.length,
+              markets_queried: markets,
               plays: recommended.map((row) => ({
                 game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                 selection: row.selection || row.participant || null,
+                market: row._market || row.market || null,
                 start: row.start || null,
                 odds: row.targetBookOdds ?? null,
                 edge: row.consensusEdge, clv: row.clvProxyPct,
@@ -806,7 +827,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             });
           }
         } catch (error) {
-          allRecommended.push({ league, market, count: 0, error: String(error.message || error) });
+          allRecommended.push({ league, count: 0, markets_queried: markets, error: String(error.message || error) });
         }
       }
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
@@ -829,6 +850,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       return {
         ok: true, totalRecommended: total,
+        markets_queried: markets,
         leagues: allRecommended.filter((l) => l.count > 0),
         emptyLeagues: allRecommended.filter((l) => !l.count && !l.error).map((l) => l.league),
         failedLeagues: allRecommended.filter((l) => l.error).map((l) => ({ league: l.league, error: l.error })),
@@ -843,10 +865,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async staking_plan(args = {}) {
       const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
-      const market = args.market || 'Moneyline';
+      const markets = Array.isArray(args.markets) && args.markets.length
+        ? args.markets
+        : args.market
+          ? [args.market]
+          : ['Moneyline', 'Spread', 'Total'];
       const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-      const recResult = await handlers.recommended_bets({ leagues, market, targetTiers, limit, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true });
+      const recResult = await handlers.recommended_bets({ leagues, markets, targetTiers, limit, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true });
       if (!recResult.ok || !recResult.totalRecommended) {
         return { ok: true, bankroll, totalStake: 0, playCount: 0, stakes: [], warnings: ['No recommended plays found for the given criteria'], summary: 'No plays to stake' };
       }
@@ -855,7 +881,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         for (const play of league.plays || []) { allPlays.push({ ...play, league: league.league }); }
       }
       const plan = suggestStakes({ bankroll, plays: allPlays });
-      return { ...plan, bankroll, leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })), totalRecommended: recResult.totalRecommended };
+      return { ...plan, bankroll, leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })), totalRecommended: recResult.totalRecommended, markets_queried: recResult.markets_queried };
     },
 
     async player_context(args = {}) {
