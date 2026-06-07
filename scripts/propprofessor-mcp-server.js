@@ -645,6 +645,117 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
     },
 
+    async novig_screen(args = {}) {
+      const leagues = Array.isArray(args.leagues) && args.leagues.length
+        ? args.leagues
+        : args.league ? [args.league]
+          : ['NBA', 'MLB', 'NHL', 'WNBA', 'UFC'];
+      const markets = Array.isArray(args.markets) && args.markets.length
+        ? args.markets
+        : args.market ? [args.market]
+          : ['Moneyline'];
+      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
+      const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 50;
+      const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
+      const includeResearch = args.includeResearch !== undefined ? Boolean(args.includeResearch) : true;
+      const debug = Boolean(args.debug);
+
+      const allCandidates = [];
+      const researchResults = [];
+
+      for (const league of leagues) {
+        for (const market of markets) {
+          try {
+            // Step 1: Run sharp_plays with NoVigApp as target, relaxed price requirements
+            const spResult = await handlers.sharp_plays({
+              targetBooks: ['NoVigApp'],
+              league,
+              market,
+              limit: scanLimit,
+              scanLimit,
+              lookbackHours,
+              is_live: Boolean(args.is_live),
+              strict: false,
+              includePasses: false,
+              debug
+            });
+
+            const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
+            if (!candidates.length) continue;
+
+            // Step 2: Run player context research on each candidate
+            if (includeResearch) {
+              for (const row of candidates) {
+                const player = row.selection || row.participant || row.pick;
+                if (!player) continue;
+                try {
+                  const ctxResult = await handlers.player_context({
+                    player,
+                    sport: league,
+                    gameTime: row.start || row.eventStart || null
+                  });
+                  if (ctxResult) {
+                    researchResults.push({
+                      player,
+                      game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
+                      riskFlag: ctxResult.riskFlag || 'unknown',
+                      riskSummary: ctxResult.summary || null,
+                      topTweet: Array.isArray(ctxResult.tweets) && ctxResult.tweets.length > 0
+                        ? ctxResult.tweets[0]?.text?.slice(0, 120) || null
+                        : null
+                    });
+                  }
+                } catch {
+                  // Player context failed — continue without it
+                  researchResults.push({ player, game: row.game, riskFlag: 'error', riskSummary: null });
+                }
+              }
+            }
+
+            allCandidates.push({
+              league,
+              market,
+              candidates: candidates.slice(0, limit).map((row) => ({
+                game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
+                selection: row.selection || row.participant || row.pick || null,
+                start: row.start || null,
+                odds: row.odds ?? row.currentOdds ?? null,
+                edge: row.consensusEdge ?? null,
+                clv: row.clvProxyPct ?? null,
+                consensusBookCount: row.consensusBookCount ?? 0,
+                executionQuality: row.executionQuality ?? 'unknown',
+                movementGrade: row.movementGrade ?? 'unknown',
+                movementLabel: row.movementLabel ?? null,
+                sharpBookMovementConfirmed: row.sharpBookMovementConfirmed || false,
+                sharpBookMovementSource: row.sharpBookMovementSource || null,
+                riskScore: row.riskScore ?? null,
+                kaiCall: row.kaiCall ?? 'PASS',
+                confidenceTier: row.confidenceTier ?? 'TIER 4',
+                rationale: row.rationale || null,
+                screenScore: row.screenScore ?? 0
+              }))
+            });
+          } catch (error) {
+            allCandidates.push({
+              league, market, candidates: [],
+              error: String(error.message || error)
+            });
+          }
+        }
+      }
+
+      return {
+        ok: true,
+        targetBook: 'NoVigApp',
+        leagues,
+        markets,
+        totalCandidates: allCandidates.reduce((sum, l) => sum + (l.candidates?.length || 0), 0),
+        results: allCandidates,
+        research: researchResults,
+        workflow: 'NoVigApp target book. Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.'
+      };
+    },
+
 
     async recommended_bets(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length

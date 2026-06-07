@@ -68,7 +68,7 @@ describe('external dashboard contract for runSharpPlays()', () => {
     assert.deepEqual(result.resultMeta.targetBooks, ['Fliff'], 'external dashboard contract: metadata.targetBooks should preserve the target book list');
     assert.equal(result.resultMeta.targetBookCount, 1, 'external dashboard contract: metadata.targetBookCount should match the number of target books');
     assert.equal(result.resultMeta.lookbackHoursUsed, 6, 'external dashboard contract: metadata.lookbackHoursUsed should reflect the requested lookback window');
-    assert.equal(result.resultMeta.scannedQueryCount, 6, 'external dashboard contract: metadata.scannedQueryCount includes sharp book cross-reference queries');
+    assert.equal(result.resultMeta.scannedQueryCount, 2, 'external dashboard contract: metadata.scannedQueryCount includes sharp book group query');
     assert.deepEqual(result.resultMeta.classificationSummary, {
       totalRowsClassified: 1,
       verdictCounts: { 'Bet candidate': 1 },
@@ -77,10 +77,10 @@ describe('external dashboard contract for runSharpPlays()', () => {
     assert.equal(result.resultMeta.emptyState, null, 'external dashboard contract: metadata.emptyState should be null when the result is non-empty');
     assert.equal(result.resultMeta.ufcShortlist, null, 'external dashboard contract: UFC shortlist metadata should be null when no UFC rows were scanned');
 
-    // 1 main query + 5 sharp book cross-reference queries (Pinnacle, Circa, BookMaker, BetOnline, DraftKings for NBA)
-    assert.equal(queryCalls.length, 6, 'external dashboard contract: runSharpPlays makes one main query plus sharp book cross-reference queries');
+    // 1 main query + 1 sharp book group query (all sharp books together)
+    assert.equal(queryCalls.length, 2, 'external dashboard contract: runSharpPlays makes one main query plus sharp book group query');
     assert.equal(queryCalls[0].rankedArgs.targetBook, 'Fliff', 'external dashboard contract: ranked query should target the execution book');
-    assert.equal(result.resultMeta.scannedQueryCount, 6, 'external dashboard contract: metadata.scannedQueryCount includes sharp book cross-reference queries');
+    assert.equal(result.resultMeta.scannedQueryCount, 2, 'external dashboard contract: metadata.scannedQueryCount includes sharp book group query');
     assert.equal(result.count, result.result.length, 'external dashboard contract: root.count should match result length');
     assert.equal(result.result.length, 1, 'external dashboard contract: fixture should produce one rendered play');
 

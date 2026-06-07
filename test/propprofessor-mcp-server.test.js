@@ -258,6 +258,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'health_status',
         'hide_bet',
         'league_presets',
+        'novig_screen',
         'player_context',
         'recommended_bets',
         'screen',
@@ -862,8 +863,9 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.targetBook, 'NoVigApp');
     assert.deepEqual(result.resultMeta.targetBooks, ['NoVigApp']);
     assert.equal(result.resultMeta.targetBookCount, 1);
-    assert.equal(result.resultMeta.scannedQueryCount, 6);
-    assert.equal(calls.queryScreenOddsBestComps.length, 6);
+    // 1 target book query + 1 sharp book group query (all sharp books together)
+    assert.equal(result.resultMeta.scannedQueryCount, 2);
+    assert.equal(calls.queryScreenOddsBestComps.length, 2);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.ok(Array.isArray(result.result));
     assert.equal(result.result.length, 2);
@@ -927,8 +929,8 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.targetBook, 'NoVigApp');
     assert.deepEqual(result.resultMeta.targetBooks, ['NoVigApp']);
     assert.equal(result.resultMeta.lookbackHoursUsed, 6);
-    assert.equal(result.resultMeta.scannedQueryCount, 6);
-    assert.equal(calls.queryScreenOddsBestComps.length, 6);
+    assert.equal(result.resultMeta.scannedQueryCount, 2);
+    assert.equal(calls.queryScreenOddsBestComps.length, 2);
   });
 
   it('sharp_plays adds empty-state diagnostics when strict filtering removes all rows', async () => {
@@ -1043,9 +1045,13 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.ok, true);
     assert.deepEqual(result.resultMeta.targetBooks, ['Fliff', 'NoVigApp']);
     assert.equal(result.resultMeta.targetBookCount, 2);
-    assert.equal(result.resultMeta.scannedQueryCount, 7);
-    assert.equal(calls.queryScreenOddsBestComps.length, 7);
-    assert.deepEqual(calls.queryScreenOddsBestComps.map((call) => call.books[0]), ['Fliff', 'NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
+    // 2 target book queries + 1 sharp book group query (all sharp books together)
+    assert.equal(result.resultMeta.scannedQueryCount, 3);
+    assert.equal(calls.queryScreenOddsBestComps.length, 3);
+    // First two calls are target book queries, third is the sharp book group query
+    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, ['Fliff', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
+    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, ['NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
+    assert.ok(calls.queryScreenOddsBestComps[2].books.length >= 5); // sharp book group
     assert.equal(result.result.length, 2);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
