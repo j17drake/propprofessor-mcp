@@ -21,7 +21,7 @@ const {
   normalizeBookList,
   getDebugFlag
 } = require('../lib/propprofessor-mcp-ranked-screen');
-const { getSharpBookComparisonSet, getSharpBookContext, ALL_SCREEN_BOOKS } = require('../lib/propprofessor-sharp-books');
+const { getSharpBookComparisonSet, getSharpBookContext, ALL_SCREEN_BOOKS, uniqueBooks } = require('../lib/propprofessor-sharp-books');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
 const {
   categorizeError,
@@ -311,9 +311,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const preset = getLeagueRankingPreset(league, market);
     const focusBook = requestedBooks[0] || preset.preferredBooks[0];
 
+    // Auto-augment with sharp books for consensus data.
+    // When the user requests a single non-sharp book (e.g. NoVigApp), the backend
+    // returns zero consensus because vig-removed lines don't match other books.
+    // We always query with the league's sharp book set included, so consensus
+    // and movement data populate. The focus book (user's execution book) is
+    // preserved for display via focusPlays in extractScreenRows.
+    const sharpBookSet = getSharpBookComparisonSet({ league, market });
+    const augmentedBooks = uniqueBooks([...requestedBooks, ...sharpBookSet]);
+
     // Check cache first (only cache full responses, not compact/fields-filtered)
+    // Use augmented books in cache key so different book combos don't collide
     const canCache = !args.compact && !args.fields && !args.include;
-    const cacheKey = canCache ? buildCacheKey('league', args, league) : null;
+    const cacheKey = canCache ? buildCacheKey('league', { ...args, books: augmentedBooks }, league) : null;
     if (cacheKey) {
       const cached = responseCache.get(cacheKey);
       if (cached) {
@@ -326,13 +336,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       league,
       games: Array.isArray(args.games) ? args.games : [],
       participants: Array.isArray(args.participants) ? args.participants : [],
-      books: requestedBooks,
+      books: augmentedBooks,
       is_live: Boolean(args.is_live)
     });
     const response = buildRankedScreenResponseShared({
       client,
       payloads: [payload],
-      args,
+      args: { ...args, historySportsbooks: augmentedBooks },
       league,
       focusBook,
       rankRows: (hydratedRows, { debug } = {}) =>

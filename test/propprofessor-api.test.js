@@ -694,7 +694,7 @@ describe('createPropProfessorClient', () => {
     assert.equal(result.result[0].lineHistory.length >= 2, true);
     assert.equal(typeof result.result[0].clvProxyPct, 'number');
     assert.equal(result.result[0].hasLineMovement, true);
-    assert.deepEqual(calls[0].books, ['NoVigApp']);
+    assert.deepEqual(calls[0].books, ['NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
   });
 
   it('screen_ranked uses the shared ranked screen flow with hydration and freshness', async () => {
