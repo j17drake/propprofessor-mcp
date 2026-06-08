@@ -31,53 +31,23 @@ AI Agent → pp-mcp → PropProfessor API → Ranked plays with movement signals
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 18+
-- Paid [PropProfessor](https://propprofessor.com) account
-
-### Install
+Full walkthrough: **[SETUP.md](SETUP.md)** — covers install, auth setup (3 steps), configs for every MCP client, first commands, and troubleshooting.
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
 cd propprofessor-mcp
 npm install
 npm link
-```
-
-After `npm link`, two commands are available:
-
-| Command    | Purpose                                      |
-| ---------- | -------------------------------------------- |
-| `pp-mcp`   | MCP server for AI agents (stdio transport)   |
-| `pp-query` | Local CLI for setup, debugging, quick checks |
-
-### Auth Setup
-
-**Option A: Automated login (recommended)**
-
-```bash
 pp-query login
+pp-query doctor
 ```
 
-This opens a Chromium browser, navigates to the PropProfessor login page, and waits for you to log in. Once you reach the dashboard, your session is automatically saved to `~/.propprofessor/auth.json`.
+Two commands after `npm link`:
 
-Requires playwright: `npm install --save-optional playwright && npx playwright install chromium`
-
-**Option B: Manual cookie export**
-
-```bash
-pp-query install-auth --source /path/to/auth.json
-```
-
-Auth lookup order: `AUTH_FILE` env var → `~/.propprofessor/auth.json` → `./auth.json`
-
-### Verify
-
-```bash
-pp-query doctor    # full setup check: Node, auth, endpoint
-pp-query health    # quick endpoint ping
-```
+| Command    | Purpose                                    |
+|------------|--------------------------------------------|
+| `pp-mcp`   | MCP server for AI agents (stdio transport) |
+| `pp-query` | CLI for setup, debug, quick checks         |
 
 ---
 
@@ -181,7 +151,7 @@ See [CONFIG.md](CONFIG.md) for client-specific configs. The server runs via:
 
 ---
 
-## Available MCP Tools (19)
+## Available MCP Tools (26)
 
 ### Screening & Ranking
 

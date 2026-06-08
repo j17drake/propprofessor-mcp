@@ -28,6 +28,7 @@
     "lib/",
     "scripts/",
     "README.md",
+    "SETUP.md",
     "AUTH.md",
     "CONFIG.md",
     "MAINTAINERS.md",
