@@ -36,7 +36,8 @@ async function loginAndSaveAuth(options = {}) {
       'Playwright is required for automated login. Install it with:\n' +
         '  npm install --save-optional playwright\n' +
         '  npx playwright install chromium\n' +
-        `\nOriginal error: ${err.message}`
+        `\nOriginal error: ${err.message}`,
+      { cause: err }
     );
   }
 

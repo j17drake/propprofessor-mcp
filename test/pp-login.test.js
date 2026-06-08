@@ -2,7 +2,6 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('node:path');
 
 const loginModule = require('../scripts/pp-login');
 
@@ -33,7 +32,6 @@ describe('pp-login module', () => {
   it('loginAndSaveAuth throws a helpful error when playwright is not installed', async () => {
     // We can't guarantee playwright is installed in CI, so we test the error path
     // by calling with a mock that simulates missing playwright
-    const originalRequire = require;
     let threw = false;
     let errorMessage = '';
 

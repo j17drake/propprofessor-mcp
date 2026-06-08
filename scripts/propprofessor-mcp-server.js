@@ -1037,7 +1037,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     async health_status() {
       const authFile = resolveAuthFile();
-      let authState = null;
+      let authState;
       try {
         authState = readAuthState(authFile);
       } catch {
