@@ -28,8 +28,7 @@ const {
   uniqueBooks
 } = require('../lib/propprofessor-sharp-books');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
-const {
-  categorizeError,
+const { categorizeError,
   createJsonRpcSuccess,
   createJsonRpcError,
   encodeMessage,
@@ -38,8 +37,7 @@ const {
 const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
-const {
-  analyzeMultiWindow,
+const { analyzeMultiWindow,
   summarizeResults,
   DEFAULT_WINDOWS,
   DEFAULT_SHARP_BOOKS
@@ -54,6 +52,14 @@ const {
   formatScreenRankedMinimal,
   formatScreenRankedStandard
 } = require('../lib/propprofessor-formatter');
+const {
+  getPickHistory,
+  getPickStats,
+  logPick,
+  readCheckpoint,
+  resolvePick,
+  writeCheckpoint
+} = require('../lib/propprofessor-picks');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -1369,6 +1375,157 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
 
       return workflows[userType] || workflows.intermediate;
+    },
+
+    async log_pick(args = {}) {
+      if (!args.game || !args.league || !args.market || !args.selection || !Number.isFinite(args.odds)) {
+        const error = new Error('game, league, market, selection, and odds are required');
+        error.code = 'VALIDATION_ERROR';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+      return logPick(args.game, args.league, args.market, args.selection, args.odds, {
+        stake: args.stake,
+        confidenceTier: args.confidenceTier,
+        kaiCall: args.kaiCall,
+        rationale: args.rationale,
+        notes: args.notes
+      });
+    },
+
+    async get_pick_history(args = {}) {
+      return getPickHistory({
+        status: args.status,
+        league: args.league,
+        days: args.days,
+        limit: args.limit
+      });
+    },
+
+    async resolve_pick(args = {}) {
+      if (!args.id || !args.result) {
+        const error = new Error('id and result are required');
+        error.code = 'VALIDATION_ERROR';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+      return resolvePick(args.id, args.result);
+    },
+
+    async get_pick_stats(args = {}) {
+      return getPickStats({ days: args.days });
+    },
+
+    async get_alerts(args = {}) {
+      const leagues = Array.isArray(args.leagues) && args.leagues.length
+        ? args.leagues
+        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
+      const lookbackHours = Number.isFinite(Number(args.lookbackHours))
+        ? Math.min(48, Math.max(1, Number(args.lookbackHours)))
+        : 6;
+      const minSteamBooks = Number.isFinite(Number(args.minSteamBooks))
+        ? Math.min(5, Math.max(1, Number(args.minSteamBooks)))
+        : 2;
+
+      const checkpoint = readCheckpoint();
+      const now = new Date().toISOString();
+      const alerts = [];
+
+      for (const league of leagues) {
+        try {
+          const screenResult = await handlers.screen_ranked({
+            league,
+            market: 'Moneyline',
+            limit: 20,
+            includeAll: true,
+            debug: false,
+            compact: true,
+            skipHistory: false,
+            is_live: false
+          });
+
+          const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
+          if (!rows.length) continue;
+
+          const lastChecked = checkpoint.leagues[league];
+          const lastCheckedMs = lastChecked ? new Date(lastChecked).getTime() : 0;
+
+          // Steam moves (strict rule: 3+ books, 5-min window)
+          const steamMoves = rows.filter((r) => r.steamMove && r.steamBookCount >= minSteamBooks);
+          if (steamMoves.length) {
+            alerts.push({
+              type: 'steam_move',
+              league,
+              count: steamMoves.length,
+              examples: steamMoves.slice(0, 3).map((r) => ({
+                game: r.game || `${r.awayTeam || '?'} @ ${r.homeTeam || '?'}`,
+                selection: r.selection || r.participant,
+                market: r.screenMarket || r.market,
+                direction: r.steamDirection,
+                books: r.steamBooks,
+                bookCount: r.steamBookCount
+              }))
+            });
+          }
+
+          // Significant CLV shifts (>= 2% CLV proxy)
+          const clvShifts = rows.filter((r) => Number.isFinite(r.clvProxyPct) && Math.abs(r.clvProxyPct) >= 2);
+          if (clvShifts.length) {
+            alerts.push({
+              type: 'clv_shift',
+              league,
+              count: clvShifts.length,
+              examples: clvShifts.slice(0, 3).map((r) => ({
+                game: r.game || `${r.awayTeam || '?'} @ ${r.homeTeam || '?'}`,
+                selection: r.selection || r.participant,
+                market: r.screenMarket || r.market,
+                clvPct: r.clvProxyPct,
+                direction: r.clvProxyPct > 0 ? 'supportive' : 'adverse'
+              }))
+            });
+          }
+
+          // New TIER 1 / TIER 2 plays
+          const newPlays = rows.filter((r) => {
+            if (!lastCheckedMs) return false;
+            const rowTime = r.freshnessMs || 0;
+            return rowTime > lastCheckedMs && (r.confidenceTier === 'TIER 1' || r.confidenceTier === 'TIER 2');
+          });
+          if (newPlays.length) {
+            alerts.push({
+              type: 'new_play',
+              league,
+              count: newPlays.length,
+              examples: newPlays.slice(0, 5).map((r) => ({
+                game: r.game || `${r.awayTeam || '?'} @ ${r.homeTeam || '?'}`,
+                selection: r.selection || r.participant,
+                tier: r.confidenceTier,
+                edge: r.consensusEdge,
+                clv: r.clvProxyPct
+              }))
+            });
+          }
+        } catch {
+          // League failed to scan — skip, continue with others
+        }
+      }
+
+      // Update checkpoint
+      const updatedLeagues = {};
+      for (const league of leagues) {
+        updatedLeagues[league] = now;
+      }
+      writeCheckpoint({ lastCheckedAt: now, leagues: { ...checkpoint.leagues, ...updatedLeagues } });
+
+      return {
+        ok: true,
+        totalAlerts: alerts.length,
+        alerts,
+        leaguesChecked: leagues,
+        lastCheckedAt: now
+      };
     }
   };
 

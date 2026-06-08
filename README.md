@@ -4,12 +4,12 @@
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-583%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-594%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-84%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Lean, fast odds analysis engine for AI agents. **21 tools, 583 tests, all performance features active.**
+Lean, fast odds analysis engine for AI agents. **26 tools, 594 tests, all performance features active.**
 
 Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection. Built for [Model Context Protocol](https://modelcontextprotocol.io) clients.
 
@@ -134,6 +134,11 @@ pp-query health    # quick endpoint ping
 | `unhide_bet`              | Unhide a bet              |        | ✓            | ✓     |
 | `clear_hidden_bets`       | Reset hidden bets         |        | ✓            | ✓     |
 | `get_hidden_bets`         | List hidden bets          |        | ✓            | ✓     |
+| `get_pick_history`        | View logged picks         |        | ✓            | ✓     |
+| `get_pick_stats`          | Personal win rate + P&L   | ✓      | ✓            | ✓     |
+| `get_alerts`              | Line movement alerts      |        |              | ✓     |
+| `log_pick`                | Log your bet              | ✓      | ✓            | ✓     |
+| `resolve_pick`            | Mark bet as won/lost      | ✓      | ✓            | ✓     |
 
 ---
 
