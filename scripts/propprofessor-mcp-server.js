@@ -1115,6 +1115,50 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
       const rows = extractScreenRows(payload);
       return findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });
+    },
+
+    async get_started(args = {}) {
+      const userType = args.user_type || 'intermediate';
+
+      const workflows = {
+        casual: {
+          summary: 'For casual bettors who just want top picks.',
+          steps: [
+            'Call recommended_bets with verbosity="minimal" to get plain English picks.',
+            'Present the top 3-5 plays to the user.',
+            'If they want more detail on a specific play, call player_context to check injury risk.'
+          ],
+          tools_to_use: ['recommended_bets', 'player_context'],
+          avoid: ['screen_raw', 'sharp_consensus', 'ev_candidates']
+        },
+        intermediate: {
+          summary: 'For bettors who understand edge and tier but want guidance.',
+          steps: [
+            'Call recommended_bets with verbosity="standard" to get structured plays.',
+            'Filter by tier (TIER 1, TIER 2) for highest confidence.',
+            'For each top play, call player_context to check injury risk.',
+            'If riskScore >= 7, warn the user.',
+            'Optionally call find_best_price to line shop.'
+          ],
+          tools_to_use: ['recommended_bets', 'player_context', 'find_best_price', 'league_presets'],
+          avoid: ['screen_raw', 'sharp_consensus']
+        },
+        sharp: {
+          summary: 'For sharp bettors who want full control and movement data.',
+          steps: [
+            'Call screen_ranked with verbosity="full" for complete data.',
+            'Use sharp_consensus to check multi-window movement.',
+            'Use sharp_plays to find plays with independent sharp support.',
+            'Call get_play_details for line history on specific plays.',
+            'Use staking_plan for Kelly sizing.',
+            'Check player_context for injury risk on final picks.'
+          ],
+          tools_to_use: ['screen_ranked', 'sharp_consensus', 'sharp_plays', 'get_play_details', 'staking_plan', 'player_context', 'find_best_price'],
+          avoid: []
+        }
+      };
+
+      return workflows[userType] || workflows.intermediate;
     }
   };
 
