@@ -36,6 +36,14 @@ const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
 const { analyzeMultiWindow, summarizeResults, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
 const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
+const {
+  formatRecommendedBetsMinimal,
+  formatRecommendedBetsStandard,
+  formatSharpPlaysMinimal,
+  formatSharpPlaysStandard,
+  formatScreenRankedMinimal,
+  formatScreenRankedStandard
+} = require('../lib/propprofessor-formatter');
 
 const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
@@ -624,7 +632,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         books: requestedBooks,
         is_live: Boolean(args.is_live)
       });
-      return buildRankedScreenResponseShared({
+      const response = await buildRankedScreenResponseShared({
         client, payloads: [payload], args, league, focusBook,
         rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
           league, market, limit: getLimit(args),
@@ -632,6 +640,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           includeAll: getIncludeAll(args), maxAgeMs: getMaxAgeMs(args), debug
         })
       });
+      // Apply verbosity formatting
+      const verbosity = String(args.verbosity || 'full').toLowerCase();
+      if (verbosity === 'minimal') return formatScreenRankedMinimal(response);
+      if (verbosity === 'standard') return formatScreenRankedStandard(response);
+      return response;
     },
 
     async screen(args = {}) {
@@ -639,10 +652,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async sharp_plays(args = {}) {
-      return runSharpPlays(args, {
+      const response = await runSharpPlays(args, {
         queryLeagueScreen: runLeagueScreen,
         queryTennisScreen: (rankedArgs) => runTennisScreen(rankedArgs)
       });
+      // Apply verbosity formatting
+      const verbosity = String(args.verbosity || 'full').toLowerCase();
+      if (verbosity === 'minimal') return formatSharpPlaysMinimal(response);
+      if (verbosity === 'standard') return formatSharpPlaysStandard(response);
+      return response;
     },
 
     async novig_screen(args = {}) {
@@ -848,7 +866,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           fallback.error = String(error.message || error);
         }
       }
-      return {
+      const response = {
         ok: true, totalRecommended: total,
         markets_queried: markets,
         leagues: allRecommended.filter((l) => l.count > 0),
@@ -860,6 +878,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         tierFilter: targetTiers,
         ...(fallback.enabled ? { fallback } : {})
       };
+      // Apply verbosity formatting
+      const verbosity = String(args.verbosity || 'full').toLowerCase();
+      if (verbosity === 'minimal') return formatRecommendedBetsMinimal(response);
+      if (verbosity === 'standard') return formatRecommendedBetsStandard(response);
+      return response;
     },
 
     async staking_plan(args = {}) {
