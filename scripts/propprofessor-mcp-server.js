@@ -28,7 +28,8 @@ const {
   uniqueBooks
 } = require('../lib/propprofessor-sharp-books');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
-const { categorizeError,
+const {
+  categorizeError,
   createJsonRpcSuccess,
   createJsonRpcError,
   encodeMessage,
@@ -37,7 +38,8 @@ const { categorizeError,
 const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
-const { analyzeMultiWindow,
+const {
+  analyzeMultiWindow,
   summarizeResults,
   DEFAULT_WINDOWS,
   DEFAULT_SHARP_BOOKS
@@ -788,7 +790,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     });
                   }
                 } catch (error) {
-                  process.stderr.write(`[propprofessor-mcp] Player context fetch failed for "${player}": ${error?.message || error}\n`);
+                  process.stderr.write(
+                    `[propprofessor-mcp] Player context fetch failed for "${player}": ${error?.message || error}\n`
+                  );
                   researchResults.push({ player, game: row.game, riskFlag: 'error', riskSummary: null });
                 }
               }
@@ -926,7 +930,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         } catch (error) {
           const categorized = categorizeError(error);
           allRecommended.push({
-            league, count: 0, markets_queried: markets,
+            league,
+            count: 0,
+            markets_queried: markets,
             error: categorized.message,
             code: categorized.code,
             recovery: categorized.recovery
@@ -1101,68 +1107,72 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const market = args.market || 'Moneyline';
       const limit = getLimit({ limit: args.limit || 15 });
 
-      const results = await mapWithConcurrency(leagues, async (league) => {
-        try {
-          const leagueKey = league.toUpperCase();
-          if (leagueKey === 'TENNIS') {
-            const tennisResult = await runTennisScreen({
-              market,
-              limit,
-              includeAll: args.includeAll,
-              lookbackHours: args.lookbackHours,
-              is_live: Boolean(args.is_live),
-              compact: Boolean(args.compact),
-              fields: Array.isArray(args.fields) ? args.fields : undefined,
-              include: Array.isArray(args.include) ? args.include : undefined,
-              skipHistory: args.skipHistory === true
-            });
+      const results = await mapWithConcurrency(
+        leagues,
+        async (league) => {
+          try {
+            const leagueKey = league.toUpperCase();
+            if (leagueKey === 'TENNIS') {
+              const tennisResult = await runTennisScreen({
+                market,
+                limit,
+                includeAll: args.includeAll,
+                lookbackHours: args.lookbackHours,
+                is_live: Boolean(args.is_live),
+                compact: Boolean(args.compact),
+                fields: Array.isArray(args.fields) ? args.fields : undefined,
+                include: Array.isArray(args.include) ? args.include : undefined,
+                skipHistory: args.skipHistory === true
+              });
+              return {
+                league,
+                rows: tennisResult.result || [],
+                meta: {
+                  rowCount: (tennisResult.result || []).length,
+                  source: tennisResult.source || 'screen',
+                  ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {})
+                }
+              };
+            }
+            const leagueResult = await runLeagueScreen(
+              {
+                market,
+                limit,
+                includeAll: args.includeAll,
+                lookbackHours: args.lookbackHours,
+                is_live: Boolean(args.is_live),
+                compact: Boolean(args.compact),
+                fields: Array.isArray(args.fields) ? args.fields : undefined,
+                include: Array.isArray(args.include) ? args.include : undefined,
+                skipHistory: args.skipHistory === true
+              },
+              league
+            );
             return {
               league,
-              rows: tennisResult.result || [],
+              rows: leagueResult.result || [],
               meta: {
-                rowCount: (tennisResult.result || []).length,
-                source: tennisResult.source || 'screen',
-                ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {})
+                rowCount: (leagueResult.result || []).length,
+                source: 'screen',
+                ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {})
+              }
+            };
+          } catch (error) {
+            const categorized = categorizeError(error);
+            return {
+              league,
+              rows: [],
+              meta: { rowCount: 0, source: 'error' },
+              error: {
+                error: categorized.message,
+                code: categorized.code,
+                recovery: categorized.recovery
               }
             };
           }
-          const leagueResult = await runLeagueScreen(
-            {
-              market,
-              limit,
-              includeAll: args.includeAll,
-              lookbackHours: args.lookbackHours,
-              is_live: Boolean(args.is_live),
-              compact: Boolean(args.compact),
-              fields: Array.isArray(args.fields) ? args.fields : undefined,
-              include: Array.isArray(args.include) ? args.include : undefined,
-              skipHistory: args.skipHistory === true
-            },
-            league
-          );
-          return {
-            league,
-            rows: leagueResult.result || [],
-            meta: {
-              rowCount: (leagueResult.result || []).length,
-              source: 'screen',
-              ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {})
-            }
-          };
-        } catch (error) {
-          const categorized = categorizeError(error);
-          return {
-            league,
-            rows: [],
-            meta: { rowCount: 0, source: 'error' },
-            error: {
-              error: categorized.message,
-              code: categorized.code,
-              recovery: categorized.recovery
-            }
-          };
-        }
-      }, { concurrency: 3 });
+        },
+        { concurrency: 3 }
+      );
 
       const errors = results.filter((r) => r.error).map((r) => ({ league: r.league, ...r.error }));
       const leagueMeta = Object.fromEntries(results.map((r) => [r.league, r.meta]));
@@ -1419,9 +1429,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async get_alerts(args = {}) {
-      const leagues = Array.isArray(args.leagues) && args.leagues.length
-        ? args.leagues
-        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
+      const leagues =
+        Array.isArray(args.leagues) && args.leagues.length ? args.leagues : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
       const lookbackHours = Number.isFinite(Number(args.lookbackHours))
         ? Math.min(48, Math.max(1, Number(args.lookbackHours)))
         : 6;
@@ -1443,6 +1452,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             debug: false,
             compact: true,
             skipHistory: false,
+            lookbackHours,
             is_live: false
           });
 

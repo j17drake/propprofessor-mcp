@@ -39,7 +39,7 @@ npm link
 That's it. Two commands available now:
 
 | Command    | Purpose                                    |
-|------------|--------------------------------------------|
+| ---------- | ------------------------------------------ |
 | `pp-mcp`   | MCP server for AI agents (stdio transport) |
 | `pp-query` | CLI for login, debug, quick checks         |
 
@@ -273,21 +273,27 @@ Then prefix your command with it:
 Once connected, ask your AI:
 
 **Health check:**
+
 > "Check if PropProfessor MCP is healthy."
 
 **What's playable today:**
+
 > "What are the top NBA plays right now?"
 
 **Your personal stats:**
+
 > "Show my pick history and win rate."
 
 **Player check before betting:**
+
 > "Any injury concerns for Giannis Antetokounmpo tonight?"
 
 **Line shopping:**
+
 > "What's the best price for Lakers moneyline across all books?"
 
 **Line movement alerts:**
+
 > "What's moved since I last checked?"
 
 ---
@@ -295,48 +301,55 @@ Once connected, ask your AI:
 ## 5. Tool Quick Reference
 
 ### Screening & Ranking
-| Tool | When to use |
-|---|---|
-| `recommended_bets` | **Start here.** TIER 1/2 plays across leagues with confidence. |
-| `screen` / `screen_ranked` | Dive into a specific league's full ranked board. |
-| `all_slates` | One call for all leagues at once. |
-| `sharp_plays` | Plays where a non-target sharp book confirmed the move. |
-| `sharp_consensus` | Multi-window (1h-48h) sharp book consensus analysis. |
+
+| Tool                       | When to use                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| `recommended_bets`         | **Start here.** TIER 1/2 plays across leagues with confidence. |
+| `screen` / `screen_ranked` | Dive into a specific league's full ranked board.               |
+| `all_slates`               | One call for all leagues at once.                              |
+| `sharp_plays`              | Plays where a non-target sharp book confirmed the move.        |
+| `sharp_consensus`          | Multi-window (1h-48h) sharp book consensus analysis.           |
 
 ### Player Context
-| Tool | When to use |
-|---|---|
+
+| Tool             | When to use                                            |
+| ---------------- | ------------------------------------------------------ |
 | `player_context` | Injury/news check before any bet. Returns a risk flag. |
 
 ### Line Shopping
-| Tool | When to use |
-|---|---|
+
+| Tool              | When to use                                                |
+| ----------------- | ---------------------------------------------------------- |
 | `find_best_price` | Every book's odds sorted best to worst for a specific bet. |
 
 ### Bet Management
-| Tool | When to use |
-|---|---|
-| `log_pick` | Record a bet before tip-off. |
-| `resolve_pick` | Mark it won/lost after the game. |
-| `get_pick_history` | View past picks with filters. |
-| `get_pick_stats` | Your win rate and P&L by league and tier. |
+
+| Tool               | When to use                               |
+| ------------------ | ----------------------------------------- |
+| `log_pick`         | Record a bet before tip-off.              |
+| `resolve_pick`     | Mark it won/lost after the game.          |
+| `get_pick_history` | View past picks with filters.             |
+| `get_pick_stats`   | Your win rate and P&L by league and tier. |
 
 ### Alerts
-| Tool | When to use |
-|---|---|
+
+| Tool         | When to use                                                                      |
+| ------------ | -------------------------------------------------------------------------------- |
 | `get_alerts` | Steam moves, CLV shifts, and fresh high-confidence plays since you last checked. |
 
 ### Staking
-| Tool | When to use |
-|---|---|
+
+| Tool           | When to use                  |
+| -------------- | ---------------------------- |
 | `staking_plan` | Kelly sizing for your plays. |
 
 ### Meta
-| Tool | When to use |
-|---|---|
-| `health_status` | Is the connection working? |
-| `get_started` | Workflow guide based on your experience level. |
-| `league_presets` | See per-sport ranking weights. |
+
+| Tool             | When to use                                    |
+| ---------------- | ---------------------------------------------- |
+| `health_status`  | Is the connection working?                     |
+| `get_started`    | Workflow guide based on your experience level. |
+| `league_presets` | See per-sport ranking weights.                 |
 
 ---
 
@@ -347,32 +360,33 @@ Once connected, ask your AI:
 - **`skipHistory: true`** — skip odds history if you only need current prices.
 
 Example:
+
 > "NBA screen, compact, top 5 plays."
 
 ---
 
 ## 7. Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| `pp-query doctor` fails auth | Re-login: `pp-query login` or re-export cookies |
+| Symptom                                   | Fix                                                     |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `pp-query doctor` fails auth              | Re-login: `pp-query login` or re-export cookies         |
 | "Connection refused" / server won't start | Run `pp-query doctor`, check path in config is absolute |
-| AI says "no tools found" | Restart client after config change |
-| Huge responses timeout the AI | Use `compact: true` |
-| `caveman-shrink` not found | Remove it from config, use plain `node` |
-| ChatGPT / web ChatGPT | Not supported — needs a local MCP client |
+| AI says "no tools found"                  | Restart client after config change                      |
+| Huge responses timeout the AI             | Use `compact: true`                                     |
+| `caveman-shrink` not found                | Remove it from config, use plain `node`                 |
+| ChatGPT / web ChatGPT                     | Not supported — needs a local MCP client                |
 
 ---
 
 ## 8. Environment Variables (Optional)
 
-| Variable | Default | Description |
-|---|---|---|
-| `AUTH_FILE` | `~/.propprofessor/auth.json` | Auth file path |
-| `PROPPROFESSOR_MCP_NDJSON` | (required) | Enable NDJSON framing |
-| `PROPPROFESSOR_CACHE_TTL_MS` | `60000` | Response cache TTL (ms) |
-| `PROPPROFESSOR_CACHE_MAX` | `50` | Max cache entries |
-| `LOCAL_TIMEZONE` | `America/Chicago` | CLI display timezone |
+| Variable                     | Default                      | Description             |
+| ---------------------------- | ---------------------------- | ----------------------- |
+| `AUTH_FILE`                  | `~/.propprofessor/auth.json` | Auth file path          |
+| `PROPPROFESSOR_MCP_NDJSON`   | (required)                   | Enable NDJSON framing   |
+| `PROPPROFESSOR_CACHE_TTL_MS` | `60000`                      | Response cache TTL (ms) |
+| `PROPPROFESSOR_CACHE_MAX`    | `50`                         | Max cache entries       |
+| `LOCAL_TIMEZONE`             | `America/Chicago`            | CLI display timezone    |
 
 ---
 

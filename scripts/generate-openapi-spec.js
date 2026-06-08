@@ -146,7 +146,10 @@ const RESPONSE_SCHEMAS = {
     type: 'object',
     properties: {
       ok: { type: 'boolean' },
-      auth: { type: 'object', properties: { valid: { type: 'boolean' }, file: { type: 'string' }, message: { type: 'string' } } },
+      auth: {
+        type: 'object',
+        properties: { valid: { type: 'boolean' }, file: { type: 'string' }, message: { type: 'string' } }
+      },
       backend: { type: 'object' }
     }
   },
@@ -258,7 +261,7 @@ function generateOpenApiSpec() {
           }
         },
         responses: {
-          '200': {
+          200: {
             description: 'Successful tool execution',
             content: {
               'application/json': {
@@ -272,15 +275,15 @@ function generateOpenApiSpec() {
               }
             }
           },
-          '400': {
+          400: {
             description: 'Validation error',
             content: { 'application/json': { schema: ERROR_RESPONSE_SCHEMA } }
           },
-          '401': {
+          401: {
             description: 'Auth error',
             content: { 'application/json': { schema: ERROR_RESPONSE_SCHEMA } }
           },
-          '503': {
+          503: {
             description: 'Backend error',
             content: { 'application/json': { schema: ERROR_RESPONSE_SCHEMA } }
           }

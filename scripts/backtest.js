@@ -68,11 +68,12 @@ function parseArgs(argv) {
     league: positional[0] || 'MLB',
     market: positional[1] || 'Moneyline',
     days: parseInt(positional[2], 10) || 30,
-    snapshot: flags.snapshot !== undefined ? (flags.snapshot === true || flags.snapshot === '' ? true : flags.snapshot) : false,
+    snapshot:
+      flags.snapshot !== undefined ? (flags.snapshot === true || flags.snapshot === '' ? true : flags.snapshot) : false,
     resolve: flags.resolve || null,
     wins: parseInt(flags.wins, 10) || 0,
     losses: parseInt(flags.losses, 10) || 0,
-    pushes: parseInt(flags.pushes, 10) || 0,
+    pushes: parseInt(flags.pushes, 10) || 0
   };
 }
 
@@ -106,11 +107,9 @@ async function takeSnapshot({ league, market, tag }) {
 
   const snapshot = {
     meta: { league, market, date: tag, capturedAt: new Date().toISOString(), totalRows: rows.length },
-    summary: Object.fromEntries(
-      Object.entries(byTier).map(([tier, picks]) => [tier, picks.length])
-    ),
+    summary: Object.fromEntries(Object.entries(byTier).map(([tier, picks]) => [tier, picks.length])),
     byTier,
-    resolved: null, // placeholder for manual outcome entry
+    resolved: null // placeholder for manual outcome entry
   };
 
   const fname = snapshotFilename(league, market, tag);
@@ -167,9 +166,9 @@ function resolveSnapshot(file, { wins, losses, pushes }) {
 
 async function aggregate({ league, market, days }) {
   ensureDataDir();
-  const tag = todayTag();
 
-  const files = fs.readdirSync(DATA_DIR)
+  const files = fs
+    .readdirSync(DATA_DIR)
     .filter((f) => f.endsWith('.json'))
     .filter((f) => !league || f.includes(league.toLowerCase()))
     .filter((f) => !market || f.includes(market.toLowerCase()))

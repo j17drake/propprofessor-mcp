@@ -81,18 +81,28 @@
   },
   "c8": {
     "all": true,
-    "include": ["lib/", "scripts/"],
-    "exclude": ["test/", "node_modules/", "coverage/"],
-    "reporter": ["text-summary", "lcov"],
+    "include": [
+      "lib/",
+      "scripts/"
+    ],
+    "exclude": [
+      "test/",
+      "node_modules/",
+      "coverage/"
+    ],
+    "reporter": [
+      "text-summary",
+      "lcov"
+    ],
     "branches": 60,
     "functions": 70,
     "lines": 70,
     "statements": 70
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.0.0",
     "c8": "^11.0.0",
-    "eslint": "^10.4.1",
+    "eslint": "^9.0.0",
     "globals": "^17.6.0",
     "prettier": "^3.8.3"
   }

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { backtest, parseArgs, takeSnapshot, resolveSnapshot, aggregate } = require('../scripts/backtest');
+const { backtest, parseArgs, resolveSnapshot } = require('../scripts/backtest');
 
 const DATA_DIR = path.join(__dirname, '..', 'backtest-data');
 
@@ -59,15 +59,26 @@ describe('backtest CLI', () => {
 
     before(() => {
       fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(testFile, JSON.stringify({
-        meta: { league: 'MLB', market: 'Moneyline', date: '2026-06-01', totalRows: 10 },
-        byTier: { 'TIER 1': [{ participant: 'Team A', odds: -120 }], 'TIER 4': [{ participant: 'Team B', odds: +150 }] },
-        resolved: null,
-      }), 'utf8');
+      fs.writeFileSync(
+        testFile,
+        JSON.stringify({
+          meta: { league: 'MLB', market: 'Moneyline', date: '2026-06-01', totalRows: 10 },
+          byTier: {
+            'TIER 1': [{ participant: 'Team A', odds: -120 }],
+            'TIER 4': [{ participant: 'Team B', odds: +150 }]
+          },
+          resolved: null
+        }),
+        'utf8'
+      );
     });
 
     after(() => {
-      try { fs.unlinkSync(testFile); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(testFile);
+      } catch {
+        /* ignore */
+      }
     });
 
     it('reports no outcomes when wins/losses/pushes are all 0', () => {

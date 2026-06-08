@@ -45,7 +45,7 @@ pp-query doctor
 Two commands after `npm link`:
 
 | Command    | Purpose                                    |
-|------------|--------------------------------------------|
+| ---------- | ------------------------------------------ |
 | `pp-mcp`   | MCP server for AI agents (stdio transport) |
 | `pp-query` | CLI for setup, debug, quick checks         |
 
@@ -81,34 +81,34 @@ Two commands after `npm link`:
 
 ### All Tools (Reference)
 
-| Tool                      | Purpose                   | Casual | Intermediate | Sharp |
-| ------------------------- | ------------------------- | ------ | ------------ | ----- |
-| `get_started`             | Workflow guide            | ✓      | ✓            | ✓     |
-| `recommended_bets`        | Top picks                 | ✓      | ✓            | ✓     |
-| `player_context`          | Injury risk               | ✓      | ✓            | ✓     |
-| `find_best_price`         | Line shopping             |        | ✓            | ✓     |
-| `league_presets`          | Ranking weights           |        | ✓            | ✓     |
-| `screen_ranked`           | Full ranked data          |        |              | ✓     |
-| `sharp_consensus`         | Multi-window movement     |        |              | ✓     |
-| `sharp_plays`             | Independent sharp support |        |              | ✓     |
-| `get_play_details`        | Line history              |        |              | ✓     |
-| `staking_plan`            | Kelly sizing              |        |              | ✓     |
-| `screen_raw`              | Raw odds screen           |        |              | ✓     |
-| `ev_candidates`           | +EV discovery             |        |              | ✓     |
-| `ufc_card`                | UFC event analysis        |        |              | ✓     |
-| `all_slates`              | All leagues at once       |        |              | ✓     |
-| `health_status`           | System health             | ✓      | ✓            | ✓     |
-| `screen`                  | League screen             |        |              | ✓     |
-| `novig_screen`            | NoVigApp-specific screen  |        | ✓            | ✓     |
-| `hide_bet`                | Hide a bet                |        | ✓            | ✓     |
-| `unhide_bet`              | Unhide a bet              |        | ✓            | ✓     |
-| `clear_hidden_bets`       | Reset hidden bets         |        | ✓            | ✓     |
-| `get_hidden_bets`         | List hidden bets          |        | ✓            | ✓     |
-| `get_pick_history`        | View logged picks         |        | ✓            | ✓     |
-| `get_pick_stats`          | Personal win rate + P&L   | ✓      | ✓            | ✓     |
-| `get_alerts`              | Line movement alerts      |        |              | ✓     |
-| `log_pick`                | Log your bet              | ✓      | ✓            | ✓     |
-| `resolve_pick`            | Mark bet as won/lost      | ✓      | ✓            | ✓     |
+| Tool                | Purpose                   | Casual | Intermediate | Sharp |
+| ------------------- | ------------------------- | ------ | ------------ | ----- |
+| `get_started`       | Workflow guide            | ✓      | ✓            | ✓     |
+| `recommended_bets`  | Top picks                 | ✓      | ✓            | ✓     |
+| `player_context`    | Injury risk               | ✓      | ✓            | ✓     |
+| `find_best_price`   | Line shopping             |        | ✓            | ✓     |
+| `league_presets`    | Ranking weights           |        | ✓            | ✓     |
+| `screen_ranked`     | Full ranked data          |        |              | ✓     |
+| `sharp_consensus`   | Multi-window movement     |        |              | ✓     |
+| `sharp_plays`       | Independent sharp support |        |              | ✓     |
+| `get_play_details`  | Line history              |        |              | ✓     |
+| `staking_plan`      | Kelly sizing              |        |              | ✓     |
+| `screen_raw`        | Raw odds screen           |        |              | ✓     |
+| `ev_candidates`     | +EV discovery             |        |              | ✓     |
+| `ufc_card`          | UFC event analysis        |        |              | ✓     |
+| `all_slates`        | All leagues at once       |        |              | ✓     |
+| `health_status`     | System health             | ✓      | ✓            | ✓     |
+| `screen`            | League screen             |        |              | ✓     |
+| `novig_screen`      | NoVigApp-specific screen  |        | ✓            | ✓     |
+| `hide_bet`          | Hide a bet                |        | ✓            | ✓     |
+| `unhide_bet`        | Unhide a bet              |        | ✓            | ✓     |
+| `clear_hidden_bets` | Reset hidden bets         |        | ✓            | ✓     |
+| `get_hidden_bets`   | List hidden bets          |        | ✓            | ✓     |
+| `get_pick_history`  | View logged picks         |        | ✓            | ✓     |
+| `get_pick_stats`    | Personal win rate + P&L   | ✓      | ✓            | ✓     |
+| `get_alerts`        | Line movement alerts      |        |              | ✓     |
+| `log_pick`          | Log your bet              | ✓      | ✓            | ✓     |
+| `resolve_pick`      | Mark bet as won/lost      | ✓      | ✓            | ✓     |
 
 ---
 
