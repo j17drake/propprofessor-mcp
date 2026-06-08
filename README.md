@@ -130,8 +130,10 @@ pp-query health    # quick endpoint ping
 | `health_status`           | System health             | ✓      | ✓            | ✓     |
 | `screen`                  | League screen             |        |              | ✓     |
 | `novig_screen`            | NoVigApp-specific screen  |        | ✓            | ✓     |
-| `hide_bet` / `unhide_bet` | Manage hidden bets        |        | ✓            | ✓     |
+| `hide_bet`                | Hide a bet                |        | ✓            | ✓     |
+| `unhide_bet`              | Unhide a bet              |        | ✓            | ✓     |
 | `clear_hidden_bets`       | Reset hidden bets         |        | ✓            | ✓     |
+| `get_hidden_bets`         | List hidden bets          |        | ✓            | ✓     |
 
 ---
 
