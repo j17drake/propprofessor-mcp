@@ -67,6 +67,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "docs:openapi": "node scripts/generate-openapi-spec.js > docs/openapi.json",
     "test": "node --test test/*.test.js",
     "test:coverage": "c8 --reporter=text-summary --reporter=lcov node --test test/*.test.js"
   },

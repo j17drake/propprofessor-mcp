@@ -1094,12 +1094,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           : DEFAULT_LEAGUES;
       const market = args.market || 'Moneyline';
       const limit = getLimit({ limit: args.limit || 15 });
-      const results = {};
-      const leagueMeta = {};
-      let totalPlays = 0;
-      const errors = [];
 
-      for (const league of leagues) {
+      const results = await mapWithConcurrency(leagues, async (league) => {
         try {
           const leagueKey = league.toUpperCase();
           if (leagueKey === 'TENNIS') {
@@ -1114,51 +1110,60 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               include: Array.isArray(args.include) ? args.include : undefined,
               skipHistory: args.skipHistory === true
             });
-            results[league] = tennisResult.result || [];
-            leagueMeta[league] = {
-              rowCount: results[league].length,
-              source: tennisResult.source || 'screen',
-              ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {})
+            return {
+              league,
+              rows: tennisResult.result || [],
+              meta: {
+                rowCount: (tennisResult.result || []).length,
+                source: tennisResult.source || 'screen',
+                ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {})
+              }
             };
-            totalPlays += results[league].length;
-          } else {
-            const leagueResult = await runLeagueScreen(
-              {
-                market,
-                limit,
-                includeAll: args.includeAll,
-                lookbackHours: args.lookbackHours,
-                is_live: Boolean(args.is_live),
-                compact: Boolean(args.compact),
-                fields: Array.isArray(args.fields) ? args.fields : undefined,
-                include: Array.isArray(args.include) ? args.include : undefined,
-                skipHistory: args.skipHistory === true
-              },
-              league
-            );
-            results[league] = leagueResult.result || [];
-            leagueMeta[league] = {
-              rowCount: results[league].length,
+          }
+          const leagueResult = await runLeagueScreen(
+            {
+              market,
+              limit,
+              includeAll: args.includeAll,
+              lookbackHours: args.lookbackHours,
+              is_live: Boolean(args.is_live),
+              compact: Boolean(args.compact),
+              fields: Array.isArray(args.fields) ? args.fields : undefined,
+              include: Array.isArray(args.include) ? args.include : undefined,
+              skipHistory: args.skipHistory === true
+            },
+            league
+          );
+          return {
+            league,
+            rows: leagueResult.result || [],
+            meta: {
+              rowCount: (leagueResult.result || []).length,
               source: 'screen',
               ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {})
-            };
-            totalPlays += results[league].length;
-          }
+            }
+          };
         } catch (error) {
           const categorized = categorizeError(error);
-          errors.push({
+          return {
             league,
-            error: categorized.message,
-            code: categorized.code,
-            recovery: categorized.recovery
-          });
-          results[league] = [];
-          leagueMeta[league] = { rowCount: 0, source: 'error' };
+            rows: [],
+            meta: { rowCount: 0, source: 'error' },
+            error: {
+              error: categorized.message,
+              code: categorized.code,
+              recovery: categorized.recovery
+            }
+          };
         }
-      }
+      }, { concurrency: 3 });
 
+      const errors = results.filter((r) => r.error).map((r) => ({ league: r.league, ...r.error }));
+      const leagueMeta = Object.fromEntries(results.map((r) => [r.league, r.meta]));
+      let totalPlays = 0;
       const allRows = [];
-      for (const [league, rows] of Object.entries(results)) {
+      for (const { league, rows } of results) {
+        totalPlays += rows.length;
         for (const row of rows) {
           allRows.push({ ...row, _league: league });
         }
