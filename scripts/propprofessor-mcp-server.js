@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const { createPropProfessorClient } = require('../lib/propprofessor-api');
+const { createPropProfessorClient, isAuthValid, resolveAuthFile, readAuthState } = require('../lib/propprofessor-api');
 const {
   normalizeTennisMarketQuery,
   rankTennisScreenRows,
@@ -1013,8 +1013,40 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async health_status() {
+      const authFile = resolveAuthFile();
+      let authState = null;
+      try {
+        authState = readAuthState(authFile);
+      } catch {
+        authState = null;
+      }
+
+      const authValid = isAuthValid(authState);
+      const authSection = {
+        valid: authValid,
+        file: authValid ? authFile : null,
+        message: authValid
+          ? 'Auth is valid'
+          : 'Auth missing or expired. Run: pp-query login'
+      };
+
+      if (!authValid) {
+        return { ok: false, auth: authSection };
+      }
+
       const result = await client.healthStatus();
-      return { ok: true, result };
+      return {
+        ok: true,
+        auth: authSection,
+        result,
+        backend: {
+          ok: result.ok,
+          message: result.ok
+            ? 'Backend is reachable'
+            : 'Backend returned an error',
+          ...result
+        }
+      };
     },
 
     async get_hidden_bets() {
