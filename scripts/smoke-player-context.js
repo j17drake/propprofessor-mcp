@@ -48,24 +48,24 @@ async function main() {
     error: ctx.error,
     tweetCount: ctx.tweets.length,
     newsCount: ctx.news.length,
-    topTweets: ctx.tweets.slice(0, 3).map(t => ({
+    topTweets: ctx.tweets.slice(0, 3).map((t) => ({
       author: t.author,
       text: (t.text || '').slice(0, 100),
       authorityScore: t.authorityScore,
-      isVerified: t.isVerified,
+      isVerified: t.isVerified
     })),
-    topNews: ctx.news.slice(0, 3).map(n => ({
+    topNews: ctx.news.slice(0, 3).map((n) => ({
       title: (n.title || '').slice(0, 100),
       source: n.source,
-      authorityScore: n.authorityScore,
+      authorityScore: n.authorityScore
     })),
-    fetchedAt: ctx.fetchedAt,
+    fetchedAt: ctx.fetchedAt
   };
 
   console.log(JSON.stringify(summary, null, 2));
 
   // Pass criteria: at least one of (tweets, news) is non-empty, AND no error
-  const passed = (summary.tweetCount + summary.newsCount > 0) && !summary.error;
+  const passed = summary.tweetCount + summary.newsCount > 0 && !summary.error;
   if (!passed) {
     console.error('[smoke-player-context] FAIL: no data and/or error');
     process.exitCode = 1;

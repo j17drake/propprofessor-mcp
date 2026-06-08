@@ -61,7 +61,10 @@ function getCommandInventory() {
     { command: 'health', description: 'Check auth and endpoint health' },
     { command: 'doctor', description: 'Run first-time setup checks and explain next steps' },
     { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' },
-    { command: 'login', description: 'Open a browser to log in to PropProfessor and save auth automatically (requires playwright)' }
+    {
+      command: 'login',
+      description: 'Open a browser to log in to PropProfessor and save auth automatically (requires playwright)'
+    }
   ];
 }
 
@@ -346,7 +349,10 @@ function getMultiValueOption(value) {
     return value.map((entry) => String(entry || '').trim()).filter(Boolean);
   }
   if (value === undefined || value === null || value === '') return [];
-  return String(value).split(',').map((entry) => entry.trim()).filter(Boolean);
+  return String(value)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function toBooleanOption(value) {
@@ -361,7 +367,10 @@ function renderUfcCardOutput(result, logger = console) {
   const officialPlays = Array.isArray(result?.officialPlays) ? result.officialPlays : [];
   const bestLooks = Array.isArray(result?.bestLooks) ? result.bestLooks : [];
   const passes = Array.isArray(result?.passes) ? result.passes : [];
-  const summaryText = result?.summaryText || result?.summary || `UFC card: ${officialPlays.length} official bet${officialPlays.length === 1 ? '' : 's'}, ${bestLooks.length} look${bestLooks.length === 1 ? '' : 's'}, ${passes.length} pass${passes.length === 1 ? '' : 'es'}.`;
+  const summaryText =
+    result?.summaryText ||
+    result?.summary ||
+    `UFC card: ${officialPlays.length} official bet${officialPlays.length === 1 ? '' : 's'}, ${bestLooks.length} look${bestLooks.length === 1 ? '' : 's'}, ${passes.length} pass${passes.length === 1 ? '' : 'es'}.`;
 
   const lines = [];
   const addSection = (title, rows) => {
@@ -371,7 +380,16 @@ function renderUfcCardOutput(result, logger = console) {
       return;
     }
     rows.slice(0, 10).forEach((row, index) => {
-      const label = row?.summary || row?.label || row?.name || row?.fighter || row?.participant || row?.selection || row?.market || row?.title || JSON.stringify(row);
+      const label =
+        row?.summary ||
+        row?.label ||
+        row?.name ||
+        row?.fighter ||
+        row?.participant ||
+        row?.selection ||
+        row?.market ||
+        row?.title ||
+        JSON.stringify(row);
       lines.push(`  ${index + 1}. ${label}`);
     });
   };
@@ -495,7 +513,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       sourceFile: opts.source,
       destinationFile: opts.destination || DEFAULT_USER_AUTH_FILE
     });
-    emitJson(logger, buildInstallAuthReport(installResult))
+    emitJson(logger, buildInstallAuthReport(installResult));
     return;
   } else if (command === 'login') {
     const { loginCli } = require('./pp-login');

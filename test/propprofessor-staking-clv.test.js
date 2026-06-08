@@ -147,7 +147,7 @@ describe('suggestStakes — CLV multiplier (Phase 6 of sharp-signal-tuning plan)
     const r = suggestStakes({ bankroll: 1000, plays });
     assert.equal(r.playCount, 10);
     assert.ok(r.totalStakePct > 25, `totalStakePct should exceed 25%, got ${r.totalStakePct}`);
-    assert.ok(r.warnings.some(w => w.includes('exposure')));
+    assert.ok(r.warnings.some((w) => w.includes('exposure')));
   });
 
   it('correlation warning still fires on multiple sides same game', () => {
@@ -156,7 +156,7 @@ describe('suggestStakes — CLV multiplier (Phase 6 of sharp-signal-tuning plan)
       playWith({ tier: 'TIER 2', edge: 0.6, clv: 3.0, selection: 'away' })
     ];
     const r = suggestStakes({ bankroll: 1000, plays });
-    assert.ok(r.warnings.some(w => w.includes('Correlated')));
+    assert.ok(r.warnings.some((w) => w.includes('Correlated')));
   });
 
   it('clvPct in output reflects input value (rounded to 2 dp)', () => {

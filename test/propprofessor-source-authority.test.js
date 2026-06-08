@@ -103,10 +103,15 @@ describe('scoreTweet', () => {
 
   it('clamps score to 0-100', () => {
     const { scoreTweet } = freshRequire();
-    const huge = scoreTweet({
-      author: 'BenRothenberg', isVerified: true,
-      favoriteCount: 10000, retweetCount: 5000
-    }, 'Tennis');
+    const huge = scoreTweet(
+      {
+        author: 'BenRothenberg',
+        isVerified: true,
+        favoriteCount: 10000,
+        retweetCount: 5000
+      },
+      'Tennis'
+    );
     assert.ok(huge <= 100, `expected <= 100, got ${huge}`);
   });
 });
@@ -138,7 +143,7 @@ describe('assessRiskFlag', () => {
     return {
       text,
       authorityScore: score,
-      createdAt: d.toUTCString().replace(/^.*?(\w{3} \d{2} \d{2}:\d{2}:\d{2} \+\d{4} \d{4}).*/, '$1'),
+      createdAt: d.toUTCString().replace(/^.*?(\w{3} \d{2} \d{2}:\d{2}:\d{2} \+\d{4} \d{4}).*/, '$1')
     };
   }
 
@@ -177,13 +182,17 @@ describe('assessRiskFlag', () => {
 
   it('considers news articles, not just tweets', () => {
     const { assessRiskFlag } = freshRequire();
-    const news = [{
-      title: 'Tiafoe ruled out for French Open with hamstring injury',
-      link: 'https://espn.com/tennis/story',
-      source: 'ESPN',
-      pubDate: new Date(Date.now() - 30 * 60 * 1000).toUTCString().replace(/^.*?(\w{3} \d{2} \d{2}:\d{2}:\d{2} \+\d{4} \d{4}).*/, '$1'),
-      authorityScore: 85,
-    }];
+    const news = [
+      {
+        title: 'Tiafoe ruled out for French Open with hamstring injury',
+        link: 'https://espn.com/tennis/story',
+        source: 'ESPN',
+        pubDate: new Date(Date.now() - 30 * 60 * 1000)
+          .toUTCString()
+          .replace(/^.*?(\w{3} \d{2} \d{2}:\d{2}:\d{2} \+\d{4} \d{4}).*/, '$1'),
+        authorityScore: 85
+      }
+    ];
     const result = assessRiskFlag([], news);
     assert.equal(result.riskFlag, 'high');
   });

@@ -24,12 +24,12 @@ The PropProfessor tools are built around this principle:
 
 ### Tier System (confidenceTier)
 
-| Tier | Label | Meaning | Action |
-|------|-------|---------|--------|
-| **TIER 1** | Lock | Green movement, risk 1–3, BET call. All signals aligned. | Bet confidently |
-| **TIER 2** | Value | Yellow-green movement, risk 3–5, BET or CONSIDER. Solid play. | Bet with standard stake |
-| **TIER 3** | Speculative | Yellow movement, risk 5–7, usually CONSIDER. Small stake only. | Skip or tiny stake |
-| **TIER 4** | Avoid | Red movement, risk 7+, or PASS call. Something is wrong. | **Never bet** |
+| Tier       | Label       | Meaning                                                        | Action                  |
+| ---------- | ----------- | -------------------------------------------------------------- | ----------------------- |
+| **TIER 1** | Lock        | Green movement, risk 1–3, BET call. All signals aligned.       | Bet confidently         |
+| **TIER 2** | Value       | Yellow-green movement, risk 3–5, BET or CONSIDER. Solid play.  | Bet with standard stake |
+| **TIER 3** | Speculative | Yellow movement, risk 5–7, usually CONSIDER. Small stake only. | Skip or tiny stake      |
+| **TIER 4** | Avoid       | Red movement, risk 7+, or PASS call. Something is wrong.       | **Never bet**           |
 
 **Never recommend TIER 4 plays to users under any circumstances.**
 
@@ -37,11 +37,11 @@ The PropProfessor tools are built around this principle:
 
 Three bands:
 
-| Band | Scores | Meaning |
-|------|--------|---------|
-| **Low risk** | 1–3 | Clean signals, no red flags. Green movement quality. |
-| **Moderate risk** | 4–6 | Some uncertainty. Yellow movement or mixed signals. |
-| **High risk** | 7–10 | Red flags present. Adverse movement, thin consensus, bad execution, or injury concerns. |
+| Band              | Scores | Meaning                                                                                 |
+| ----------------- | ------ | --------------------------------------------------------------------------------------- |
+| **Low risk**      | 1–3    | Clean signals, no red flags. Green movement quality.                                    |
+| **Moderate risk** | 4–6    | Some uncertainty. Yellow movement or mixed signals.                                     |
+| **High risk**     | 7–10   | Red flags present. Adverse movement, thin consensus, bad execution, or injury concerns. |
 
 **Always warn users when riskScore ≥ 7.** Append ⚠️ and explain the specific risk factors.
 
@@ -49,21 +49,21 @@ Three bands:
 
 The percentage advantage your book's line has over the sharp-book consensus. This is the theoretical long-run profit margin if the line is accurate.
 
-| Threshold | Label | Guidance |
-|-----------|-------|----------|
-| **< 1%** | Marginal | Not enough to overcome vig. Skip unless other signals are very strong. |
-| **1–3%** | Decent | Standard playable edge. The bread and butter. |
-| **> 3%** | Strong | Significant mispricing. Size up if tier and risk support it. |
+| Threshold | Label    | Guidance                                                               |
+| --------- | -------- | ---------------------------------------------------------------------- |
+| **< 1%**  | Marginal | Not enough to overcome vig. Skip unless other signals are very strong. |
+| **1–3%**  | Decent   | Standard playable edge. The bread and butter.                          |
+| **> 3%**  | Strong   | Significant mispricing. Size up if tier and risk support it.           |
 
 ### Movement Grade (movementGrade)
 
 A qualitative assessment of the line movement quality:
 
-| Grade | Color | Meaning |
-|-------|-------|---------|
-| **Green** | 🟢 | All conditions met: supportive label, high quality, strong consensus (5+ books), positive CLV, sustained agreement across time windows. |
-| **Yellow** | 🟡 | Some signals positive but not all conditions met. Playable with caution. |
-| **Red** | 🔴 | Adverse movement, bad execution quality, or thin consensus. Do not bet. |
+| Grade      | Color | Meaning                                                                                                                                 |
+| ---------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Green**  | 🟢    | All conditions met: supportive label, high quality, strong consensus (5+ books), positive CLV, sustained agreement across time windows. |
+| **Yellow** | 🟡    | Some signals positive but not all conditions met. Playable with caution.                                                                |
+| **Red**    | 🔴    | Adverse movement, bad execution quality, or thin consensus. Do not bet.                                                                 |
 
 ---
 
@@ -72,12 +72,14 @@ A qualitative assessment of the line movement quality:
 ### Casual Bettor ("Just tell me what to bet")
 
 **Tools to call:**
+
 1. `recommended_bets` with `verbosity: "minimal"` — plain English top picks
 2. `player_context` — check injury risk on the plays you're showing
 
 **Verbosity:** Minimal. One sentence per play. No jargon.
 
 **Example response:**
+
 ```
 1. Bet Bonfim at +105 (Bonfim vs Muhammad, UFC Moneyline). High confidence, low risk. Why: Sharp books agree, low injury risk.
 2. Bet Celtics at -150 (Celtics vs Heat, NBA Moneyline). High confidence, low risk. Why: 12 books in consensus, supportive movement.
@@ -86,6 +88,7 @@ No strong plays in MLB right now.
 ```
 
 **Rules:**
+
 - Don't explain edge percentages or movement grades unless asked
 - Don't show raw data or field names
 - Keep it to 3–5 plays maximum
@@ -96,6 +99,7 @@ No strong plays in MLB right now.
 ### Intermediate Bettor ("Show me the edge")
 
 **Tools to call:**
+
 1. `recommended_bets` with `verbosity: "standard"` — structured plays with edge/tier/risk
 2. `player_context` — injury risk check
 3. `find_best_price` — line shop across books
@@ -104,6 +108,7 @@ No strong plays in MLB right now.
 **Verbosity:** Standard. Show the key fields (tier, edge, riskScore, movementGrade, kaiCall) but strip line history and debug payloads.
 
 **Example response:**
+
 ```
 NBA — 2 plays:
 
@@ -121,6 +126,7 @@ Player context: Tatum (BOS) — no injury concerns, played yesterday.
 ```
 
 **Rules:**
+
 - Show tier, edge, risk, movement grade for every play
 - Line shop automatically — don't make them ask
 - Explain the "why" briefly (consensus count, movement direction)
@@ -131,6 +137,7 @@ Player context: Tatum (BOS) — no injury concerns, played yesterday.
 ### Sharp Bettor ("Give me the data")
 
 **Tools to call:**
+
 1. `screen_ranked` with `verbosity: "full"` — complete ranked data
 2. `sharp_consensus` — multi-window sharp movement analysis
 3. `sharp_plays` — plays with independent sharp support
@@ -141,6 +148,7 @@ Player context: Tatum (BOS) — no injury concerns, played yesterday.
 **Verbosity:** Full. Raw output. All fields. Let them draw their own conclusions.
 
 **Example response:**
+
 ```
 sharp_plays (Fliff, NBA Moneyline): 3 candidates
 
@@ -160,6 +168,7 @@ sharp_plays (Fliff, NBA Moneyline): 3 candidates
 ```
 
 **Rules:**
+
 - Show everything. Line history, multi-window scores, individual sharp book moves.
 - Don't editorialize unless there's a clear red flag
 - Let them ask follow-up questions about specific plays
@@ -172,6 +181,7 @@ sharp_plays (Fliff, NBA Moneyline): 3 candidates
 ### Always check player context before recommending
 
 Before telling a user to bet on a player or team, call `player_context` to check for:
+
 - Injury news or reports
 - Trade rumors or roster changes
 - Suspicious social media activity
@@ -186,6 +196,7 @@ TIER 4 means: red movement, PASS call, or risk ≥ 8. These are anti-plays. If `
 ### Warn about high-risk plays (riskScore ≥ 7)
 
 When presenting any play with riskScore ≥ 7:
+
 - Append ⚠️ warning emoji
 - Explain the specific risk factors (adverse movement? thin consensus? injury concern?)
 - Recommend skipping or reducing stake to 0.25% max
@@ -193,11 +204,11 @@ When presenting any play with riskScore ≥ 7:
 
 ### Match explanation depth to user sophistication
 
-| User Type | Do | Don't |
-|-----------|----|----|
-| **Casual** | Plain English. "Sharp books agree." | Explain consensus mechanics, CLV, Kelly |
-| **Intermediate** | Show edge/tier/risk. Brief "why." | Dump raw line history or debug payloads |
-| **Sharp** | Full data. Let them decide. | Oversimplify or hide fields |
+| User Type        | Do                                  | Don't                                   |
+| ---------------- | ----------------------------------- | --------------------------------------- |
+| **Casual**       | Plain English. "Sharp books agree." | Explain consensus mechanics, CLV, Kelly |
+| **Intermediate** | Show edge/tier/risk. Brief "why."   | Dump raw line history or debug payloads |
+| **Sharp**        | Full data. Let them decide.         | Oversimplify or hide fields             |
 
 ### Empty results are normal
 
@@ -229,6 +240,7 @@ If riskFlag is "low": "No red flags. Recent news is clean."
 ### "Why is this TIER 1?"
 
 Explain the signals that aligned:
+
 - Green movement quality (supportive + high quality + strong consensus)
 - Low risk score (1–3)
 - BET call from the ranking engine
@@ -244,6 +256,7 @@ Both are playable. TIER 1 is the stronger conviction play.
 ### "Should I bet this TIER 3 play?"
 
 Generally no, unless:
+
 - You're a sharp bettor who understands the specific edge
 - The stake is tiny (0.25% of bankroll max)
 - You've checked player context and it's clean
@@ -256,18 +269,19 @@ For casual/intermediate bettors: "I'd skip TIER 3 plays. The signals aren't stro
 
 Use fractional Kelly sizing. The `staking_plan` tool calculates this automatically, but here's the framework:
 
-| Tier | Base Stake | When to Adjust |
-|------|-----------|----------------|
-| **TIER 1** | 2% of bankroll | Scale up to 3% if edge > 3% and CLV > 5% |
-| **TIER 2** | 1% of bankroll | Scale down to 0.5% if risk > 4 or edge < 1% |
+| Tier       | Base Stake         | When to Adjust                              |
+| ---------- | ------------------ | ------------------------------------------- |
+| **TIER 1** | 2% of bankroll     | Scale up to 3% if edge > 3% and CLV > 5%    |
+| **TIER 2** | 1% of bankroll     | Scale down to 0.5% if risk > 4 or edge < 1% |
 | **TIER 3** | Skip, or 0.25% max | Only for sharp bettors with specific thesis |
-| **TIER 4** | 0% — Don't bet | No exceptions |
+| **TIER 4** | 0% — Don't bet     | No exceptions                               |
 
 **Total exposure cap:** Never risk more than 25% of bankroll on a single slate/day.
 
 **Correlation warning:** If recommending multiple plays from the same game (e.g., team ML + player prop), flag the correlation. A single outcome could win or lose both bets simultaneously.
 
 **Example:**
+
 ```
 Bankroll: $1,000
 

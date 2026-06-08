@@ -1,6 +1,6 @@
 ---
 name: propprofessor-mcp
-description: "PropProfessor MCP: sports betting analysis for AI agents. Screens 36+ books, ranks by sharp movement, validates with multi-window consensus."
+description: 'PropProfessor MCP: sports betting analysis for AI agents. Screens 36+ books, ranks by sharp movement, validates with multi-window consensus.'
 version: 1.1.0
 author: James Drake
 tags: [sports-betting, mcp, odds-analysis, sharp-movement]
@@ -17,23 +17,28 @@ PropProfessor is an odds analysis engine for AI agents. It screens 36+ sportsboo
 Pick the workflow that matches the user's sophistication.
 
 ### Casual bettor
+
 ```
 get_started
   → recommended_bets(leagues=[...], limit=3, compact=true, fields=["game","selection","odds","tier","kai"])
   → player_context(player=...)   # only if tier ≤ 2
 ```
+
 Keep output to 2-3 sentences. Lead with the pick and odds.
 
 ### Intermediate bettor
+
 ```
 get_started
   → recommended_bets(leagues=[...], limit=5)
   → player_context(player=...)   # for every TIER 1-2 candidate
   → find_best_price(league, market, game, selection)
 ```
+
 Explain edge, movement grade, and where to shop the line.
 
 ### Sharp bettor
+
 ```
 get_started
   → screen_ranked(league, market, fields=full)
@@ -41,6 +46,7 @@ get_started
   → sharp_plays(leagues=[...], targetBooks=[...])
   → staking_plan(bankroll=N, leagues=[...])
 ```
+
 Surface line-history detail, per-window consensus counts, and Kelly fractions.
 
 ## Key Concepts
@@ -55,6 +61,7 @@ Player/injury/news risk from `player_context`. 1-3 = clean, 4-6 = monitor, 7-10 
 How many sharp books moved supportive across the lookback window. A = broad sharp support, D = no support or contradictory. Grade A/B with TIER 1-2 is the sweet spot.
 
 **Verbosity Levels**
+
 - `minimal` — essentials only (game, selection, odds, tier). For casual users.
 - `standard` — adds edge, movement grade, kai call. Default.
 - `full` — includes line history, score breakdown, full odds maps. For sharp users and debugging.

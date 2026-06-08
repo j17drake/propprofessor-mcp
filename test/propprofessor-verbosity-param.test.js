@@ -6,7 +6,7 @@ const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions'
 
 describe('verbosity parameter in tool definitions', () => {
   const tools = buildToolDefinitions();
-  const toolMap = Object.fromEntries(tools.map(t => [t.name, t]));
+  const toolMap = Object.fromEntries(tools.map((t) => [t.name, t]));
 
   const VERBOSITY_ENUM = ['minimal', 'standard', 'full'];
 
@@ -41,7 +41,7 @@ describe('verbosity parameter in tool definitions', () => {
   });
 
   it('should have verbosity on at least 3 other tools besides recommended_bets', () => {
-    const others = toolsWithVerbosity.filter(n => n !== 'recommended_bets');
+    const others = toolsWithVerbosity.filter((n) => n !== 'recommended_bets');
     assert.ok(others.length >= 3, `Expected at least 3 other tools, got ${others.length}`);
     for (const name of others) {
       const tool = toolMap[name];
@@ -74,10 +74,7 @@ describe('verbosity parameter in tool definitions', () => {
     for (const name of toolsWithoutVerbosity) {
       const tool = toolMap[name];
       if (tool) {
-        assert.ok(
-          !tool.inputSchema.properties.verbosity,
-          `${name} should NOT have verbosity param`
-        );
+        assert.ok(!tool.inputSchema.properties.verbosity, `${name} should NOT have verbosity param`);
       }
     }
   });

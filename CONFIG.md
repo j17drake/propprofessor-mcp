@@ -16,12 +16,12 @@ pp-query doctor
 
 ## Required Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PROPPROFESSOR_MCP_NDJSON` | **Yes** | `true` — enables NDJSON framing for async tool calls |
-| `AUTH_FILE` | **Yes** | Path to auth file (e.g., `/path/to/.propprofessor/auth.json`) |
-| `PROPPROFESSOR_CACHE_TTL_MS` | No | Cache TTL ms (default 60000) |
-| `PROPPROFESSOR_CACHE_MAX` | No | Max cache entries (default 50) |
+| Variable                     | Required | Description                                                   |
+| ---------------------------- | -------- | ------------------------------------------------------------- |
+| `PROPPROFESSOR_MCP_NDJSON`   | **Yes**  | `true` — enables NDJSON framing for async tool calls          |
+| `AUTH_FILE`                  | **Yes**  | Path to auth file (e.g., `/path/to/.propprofessor/auth.json`) |
+| `PROPPROFESSOR_CACHE_TTL_MS` | No       | Cache TTL ms (default 60000)                                  |
+| `PROPPROFESSOR_CACHE_MAX`    | No       | Max cache entries (default 50)                                |
 
 ---
 
@@ -32,8 +32,8 @@ pp-query doctor
 mcp_servers:
   propprofessor:
     args:
-    - node
-    - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
+      - node
+      - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
     command: caveman-shrink
     enabled: true
     env:
@@ -65,6 +65,7 @@ Reload: `hermes mcp reload` → `hermes mcp test propprofessor`
 ```
 
 **Or without caveman-shrink**:
+
 ```json
 {
   "mcpServers": {
@@ -87,6 +88,7 @@ First prompt: `Check whether the PropProfessor MCP connection is healthy.`
 ## Cursor
 
 `.cursor/mcp.json`:
+
 ```json
 {
   "mcpServers": {
@@ -107,6 +109,7 @@ First prompt: `Check whether the PropProfessor MCP connection is healthy.`
 ## Cline
 
 `cline_mcp_settings.json`:
+
 ```json
 {
   "mcpServers": {
@@ -173,13 +176,14 @@ First prompt: `Check whether the PropProfessor MCP connection is healthy.`
 
 The tools accept three book parameters per-request (not via env vars):
 
-| Param | Purpose | Example Tools |
-|-------|---------|---------------|
+| Param                  | Purpose                                       | Example Tools                                           |
+| ---------------------- | --------------------------------------------- | ------------------------------------------------------- |
 | `targetBooks` / `book` | Your execution books (Fliff, NoVigApp, Rebet) | `sharp_plays`, `recommended_bets`, `screen`, `ufc_card` |
-| `sharpBooks` | Sharp comparison books for movement detection | `sharp_plays`, `sharp_consensus`, `screen_ranked` |
-| `books` | Display filter for line shopping / raw screen | `find_best_price`, `screen_raw`, `screen` |
+| `sharpBooks`           | Sharp comparison books for movement detection | `sharp_plays`, `sharp_consensus`, `screen_ranked`       |
+| `books`                | Display filter for line shopping / raw screen | `find_best_price`, `screen_raw`, `screen`               |
 
 **Default sharp sets** (used when you don't pass `sharpBooks`):
+
 - NBA main: Circa, Pinnacle, BookMaker, BetOnline, DraftKings
 - NBA props: FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle
 - NFL main: Circa, Pinnacle, BookMaker, NoVigApp, FanDuel
@@ -187,6 +191,7 @@ The tools accept three book parameters per-request (not via env vars):
 - Others: Pinnacle, Polymarket, Kalshi, BetOnline, Circa
 
 **CLI shortcuts**:
+
 ```bash
 pp-query sharp-plays --book Fliff          # single target
 pp-query sharp-plays --books Fliff,NoVigApp  # multiple

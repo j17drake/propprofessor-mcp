@@ -150,7 +150,12 @@ describe('extractTweets', () => {
                           tweet_results: {
                             result: {
                               __typename: 'Tweet',
-                              legacy: { full_text: 'Verified tweet', favorite_count: 0, retweet_count: 0, created_at: 'Mon Jun 02 12:00:00 +0000 2026' },
+                              legacy: {
+                                full_text: 'Verified tweet',
+                                favorite_count: 0,
+                                retweet_count: 0,
+                                created_at: 'Mon Jun 02 12:00:00 +0000 2026'
+                              },
                               core: {
                                 user_results: {
                                   result: {
@@ -231,7 +236,7 @@ describe('getPlayerContext', () => {
       const isNitterRss = argStr.includes('localhost:8080/search/rss');
       // X GraphQL API: python3 with 'search' arg
       const isXApi = file === 'python3' && argStr.includes('search');
-      
+
       if (isNitterRss || isXApi) {
         return cb(new Error('X API unavailable'));
       }

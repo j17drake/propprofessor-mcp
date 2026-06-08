@@ -145,7 +145,9 @@ function waitForJsonRpcMessage(proc, timeoutMs = 5000) {
       // Consume the header + exact body bytes from the buffer.
       // Encode full buffer to bytes, slice off consumed bytes, decode back.
       const headerBytes = Buffer.byteLength(buffer.slice(0, bodyStart), 'utf8');
-      buffer = Buffer.from(buffer, 'utf8').slice(headerBytes + contentLength).toString('utf8');
+      buffer = Buffer.from(buffer, 'utf8')
+        .slice(headerBytes + contentLength)
+        .toString('utf8');
       return JSON.parse(body);
     }
 
@@ -726,26 +728,54 @@ describe('propprofessor MCP server stdio contract', () => {
     });
 
     assert.equal(calls.queryScreenOddsBestComps.length, 2);
-    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, ['NoVigApp', 'Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']);
+    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, [
+      'NoVigApp',
+      'Pinnacle',
+      'Polymarket',
+      'Kalshi',
+      'BetOnline',
+      'Circa'
+    ]);
     assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
     assert.equal(bookResult.resultMeta.focusBook, 'NoVigApp');
-    assert.deepEqual(bookResult.resultMeta.historySportsbooksRequested, ['NoVigApp', 'Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']);
+    assert.deepEqual(bookResult.resultMeta.historySportsbooksRequested, [
+      'NoVigApp',
+      'Pinnacle',
+      'Polymarket',
+      'Kalshi',
+      'BetOnline',
+      'Circa'
+    ]);
 
-    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, ['DraftKings', 'Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']);
+    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, [
+      'DraftKings',
+      'Pinnacle',
+      'Polymarket',
+      'Kalshi',
+      'BetOnline',
+      'Circa'
+    ]);
     assert.equal(calls.queryScreenOddsBestComps[1].market, 'Total');
     assert.equal(targetBookResult.resultMeta.focusBook, 'DraftKings');
-    assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, ['DraftKings', 'Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']);
+    assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, [
+      'DraftKings',
+      'Pinnacle',
+      'Polymarket',
+      'Kalshi',
+      'BetOnline',
+      'Circa'
+    ]);
   });
 
   const screenLeagueExpectedBooks = {
-    NBA:   ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings'],
-    WNBA:  ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
-    MLB:   ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings', 'BetMGM'],
-    NFL:   ['Pinnacle', 'Circa', 'BookMaker', 'NoVigApp', 'FanDuel'],
-    NHL:   ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
-    UFC:   ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
+    NBA: ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings'],
+    WNBA: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
+    MLB: ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings', 'BetMGM'],
+    NFL: ['Pinnacle', 'Circa', 'BookMaker', 'NoVigApp', 'FanDuel'],
+    NHL: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
+    UFC: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
     NCAAB: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
-    NCAAF: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
+    NCAAF: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']
   };
   for (const { league } of [
     { league: 'NBA' },
@@ -996,7 +1026,10 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.ok(result.resultMeta.emptyState);
     assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
     assert.equal(result.resultMeta.emptyState.scannedRowCount, 2);
-    assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, { consensus_book_count_below_1: 2, movement_source_is_target_book: 2 });
+    assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, {
+      consensus_book_count_below_1: 2,
+      movement_source_is_target_book: 2
+    });
     assert.equal(result.resultMeta.emptyState.topNearMisses.length, 2);
     assert.equal(result.resultMeta.emptyState.topNearMisses[0].movementSourceBook, 'NoVigApp');
     assert.equal(typeof result.resultMeta.emptyState.topNearMisses[0].marketBookCount, 'number');
@@ -1051,8 +1084,22 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.scannedQueryCount, 3);
     assert.equal(calls.queryScreenOddsBestComps.length, 3);
     // First two calls are target book queries, third is the sharp book group query
-    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, ['Fliff', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
-    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, ['NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
+    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, [
+      'Fliff',
+      'Circa',
+      'Pinnacle',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings'
+    ]);
+    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, [
+      'NoVigApp',
+      'Circa',
+      'Pinnacle',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings'
+    ]);
     assert.ok(calls.queryScreenOddsBestComps[2].books.length >= 5); // sharp book group
     assert.equal(result.result.length, 2);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
@@ -1209,7 +1256,12 @@ describe('propprofessor MCP server stdio contract', () => {
       }
     });
 
-    const result = await handlers.screen({ league: 'Soccer', market: 'Moneyline', books: ['NoVigApp'], includeAll: true });
+    const result = await handlers.screen({
+      league: 'Soccer',
+      market: 'Moneyline',
+      books: ['NoVigApp'],
+      includeAll: true
+    });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].league, 'SOCCER');
     assert.equal(calls[0].market, 'Moneyline');

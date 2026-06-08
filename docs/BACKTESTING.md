@@ -7,12 +7,12 @@ system (TIER 1 – TIER 4) actually predicts outcomes.
 
 The tier system ranks plays by confidence:
 
-| Tier   | Meaning                                                    |
-|--------|------------------------------------------------------------|
+| Tier   | Meaning                                                      |
+| ------ | ------------------------------------------------------------ |
 | TIER 1 | Green movement grade + low risk score (≤ 2). Strongest play. |
-| TIER 2 | Green grade + moderate risk, or low risk without green.    |
-| TIER 3 | Moderate risk score (3–7), no red flags.                   |
-| TIER 4 | Red movement grade or PASS kai call. Avoid.                |
+| TIER 2 | Green grade + moderate risk, or low risk without green.      |
+| TIER 3 | Moderate risk score (3–7), no red flags.                     |
+| TIER 4 | Red movement grade or PASS kai call. Avoid.                  |
 
 The backtest script checks whether TIER 1 plays actually hit more often than
 TIER 4 plays. If they don't, the tier methodology needs revision.
@@ -25,11 +25,11 @@ node scripts/backtest.js [league] [market] [days]
 
 ### Arguments
 
-| Argument | Default    | Description                          |
-|----------|------------|--------------------------------------|
-| league   | `MLB`      | League name (e.g. `NBA`, `Tennis`)   |
-| market   | `Moneyline`| Market type (e.g. `Spread`, `Total`) |
-| days     | `30`       | Lookback window in days              |
+| Argument | Default     | Description                          |
+| -------- | ----------- | ------------------------------------ |
+| league   | `MLB`       | League name (e.g. `NBA`, `Tennis`)   |
+| market   | `Moneyline` | Market type (e.g. `Spread`, `Total`) |
+| days     | `30`        | Lookback window in days              |
 
 ### Examples
 

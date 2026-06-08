@@ -29,7 +29,10 @@ describe('UFC card/date filtering helpers', () => {
     ];
 
     const filtered = filterUfcRowsForCard(rows, { nowMs: now });
-    assert.deepEqual(filtered.map((row) => row.participant), ['Future', 'Unknown']);
+    assert.deepEqual(
+      filtered.map((row) => row.participant),
+      ['Future', 'Unknown']
+    );
   });
 
   it("filters to today's card window", () => {
@@ -41,7 +44,10 @@ describe('UFC card/date filtering helpers', () => {
     ];
 
     const filtered = filterUfcRowsForCard(rows, { nowMs: now, cardWindow: 'today' });
-    assert.deepEqual(filtered.map((row) => row.participant), ['Today']);
+    assert.deepEqual(
+      filtered.map((row) => row.participant),
+      ['Today']
+    );
   });
 
   it('filters by an explicit event date', () => {
@@ -56,10 +62,13 @@ describe('UFC card/date filtering helpers', () => {
       eventDate: '2025-05-10',
       upcomingOnly: true
     });
-    assert.deepEqual(filtered.map((row) => row.participant), ['Target']);
+    assert.deepEqual(
+      filtered.map((row) => row.participant),
+      ['Target']
+    );
   });
 
-  it("keeps strict eventDate filters composable with upcomingOnly and maxHoursAway", () => {
+  it('keeps strict eventDate filters composable with upcomingOnly and maxHoursAway', () => {
     const now = Date.parse('2025-05-10T08:00:00Z');
     const rows = [
       { scanLeague: 'UFC', participant: 'Future Within Range', start: '2025-05-10T10:00:00Z' },
@@ -74,7 +83,10 @@ describe('UFC card/date filtering helpers', () => {
       maxHoursAway: 4
     });
 
-    assert.deepEqual(filtered.map((row) => row.participant), ['Future Within Range']);
+    assert.deepEqual(
+      filtered.map((row) => row.participant),
+      ['Future Within Range']
+    );
   });
 
   it('keeps strict cardWindow filters composable with maxHoursAway when upcomingOnly is false', () => {
@@ -92,7 +104,10 @@ describe('UFC card/date filtering helpers', () => {
       maxHoursAway: 4
     });
 
-    assert.deepEqual(filtered.map((row) => row.participant), ['Within Range']);
+    assert.deepEqual(
+      filtered.map((row) => row.participant),
+      ['Within Range']
+    );
   });
 
   it('treats cardWindow next as the next UTC day and excludes malformed starts', () => {
@@ -104,7 +119,10 @@ describe('UFC card/date filtering helpers', () => {
     ];
 
     const filtered = filterUfcRowsForCard(rows, { nowMs: now, cardWindow: 'next' });
-    assert.deepEqual(filtered.map((row) => row.participant), ['Next UTC Day']);
+    assert.deepEqual(
+      filtered.map((row) => row.participant),
+      ['Next UTC Day']
+    );
   });
 });
 
@@ -133,96 +151,102 @@ describe('sharp play target book helpers', () => {
       gatePassed: true
     };
 
-    const result = buildSharpPlaysFromRankedRows([
-      { ...base, book: 'NoVigApp', targetBook: 'NoVigApp', odds: 116 },
-      { ...base, book: 'Fliff', targetBook: 'Fliff', odds: 108 }
-    ], {
-      targetBook: 'NoVigApp',
-      minConsensusBookCount: 1,
-      strict: true,
-      limit: 10
-    });
+    const result = buildSharpPlaysFromRankedRows(
+      [
+        { ...base, book: 'NoVigApp', targetBook: 'NoVigApp', odds: 116 },
+        { ...base, book: 'Fliff', targetBook: 'Fliff', odds: 108 }
+      ],
+      {
+        targetBook: 'NoVigApp',
+        minConsensusBookCount: 1,
+        strict: true,
+        limit: 10
+      }
+    );
 
     assert.equal(result.length, 2);
     assert.deepEqual(result.map((row) => row.book).sort(), ['Fliff', 'NoVigApp']);
   });
 
   it('summarizes strict empty-state diagnostics and counts target-book movement failures', () => {
-    const summary = summarizeSharpPlayRows([
+    const summary = summarizeSharpPlayRows(
+      [
+        {
+          gameId: 'nba-1',
+          scanLeague: 'NBA',
+          scanMarket: 'Moneyline',
+          pick: 'Minnesota Timberwolves',
+          odds: 175,
+          consensusBookCount: 5,
+          lineHistoryUsable: true,
+          movementMode: 'same_book',
+          movementSourceBook: 'NoVigApp',
+          movementLabel: 'supportive',
+          movementQualityScore: 1,
+          consensusEdge: 2.5,
+          gatePassed: true,
+          executionBook: 'NoVigApp',
+          targetBook: 'NoVigApp'
+        },
+        {
+          gameId: 'mlb-1',
+          scanLeague: 'MLB',
+          scanMarket: 'Moneyline',
+          pick: 'Los Angeles Dodgers',
+          odds: -167,
+          consensusBookCount: 6,
+          lineHistoryUsable: true,
+          movementMode: 'same_book',
+          movementSourceBook: 'NoVigApp',
+          movementLabel: 'supportive',
+          movementQualityScore: 0.9,
+          consensusEdge: 2.2,
+          gatePassed: true,
+          executionBook: 'NoVigApp',
+          targetBook: 'NoVigApp'
+        },
+        {
+          gameId: 'nba-2',
+          scanLeague: 'NBA',
+          scanMarket: 'Moneyline',
+          pick: 'Boston Celtics',
+          odds: 132,
+          consensusBookCount: 4,
+          lineHistoryUsable: true,
+          movementMode: 'same_book',
+          movementSourceBook: 'Pinnacle',
+          movementLabel: 'adverse',
+          movementQualityScore: 0.85,
+          consensusEdge: 1.4,
+          gatePassed: true,
+          executionBook: 'NoVigApp',
+          targetBook: 'NoVigApp'
+        },
+        {
+          gameId: 'nba-3',
+          scanLeague: 'NBA',
+          scanMarket: 'Moneyline',
+          pick: 'Chicago Bulls',
+          odds: 145,
+          consensusBookCount: 1,
+          lineHistoryUsable: true,
+          movementMode: 'same_book',
+          movementSourceBook: 'Pinnacle',
+          movementLabel: 'supportive',
+          movementQualityScore: 0.8,
+          consensusEdge: 1.1,
+          gatePassed: true,
+          executionBook: 'NoVigApp',
+          targetBook: 'NoVigApp'
+        }
+      ],
       {
-        gameId: 'nba-1',
-        scanLeague: 'NBA',
-        scanMarket: 'Moneyline',
-        pick: 'Minnesota Timberwolves',
-        odds: 175,
-        consensusBookCount: 5,
-        lineHistoryUsable: true,
-        movementMode: 'same_book',
-        movementSourceBook: 'NoVigApp',
-        movementLabel: 'supportive',
-        movementQualityScore: 1,
-        consensusEdge: 2.5,
-        gatePassed: true,
-        executionBook: 'NoVigApp',
-        targetBook: 'NoVigApp'
-      },
-      {
-        gameId: 'mlb-1',
-        scanLeague: 'MLB',
-        scanMarket: 'Moneyline',
-        pick: 'Los Angeles Dodgers',
-        odds: -167,
-        consensusBookCount: 6,
-        lineHistoryUsable: true,
-        movementMode: 'same_book',
-        movementSourceBook: 'NoVigApp',
-        movementLabel: 'supportive',
-        movementQualityScore: 0.9,
-        consensusEdge: 2.2,
-        gatePassed: true,
-        executionBook: 'NoVigApp',
-        targetBook: 'NoVigApp'
-      },
-      {
-        gameId: 'nba-2',
-        scanLeague: 'NBA',
-        scanMarket: 'Moneyline',
-        pick: 'Boston Celtics',
-        odds: 132,
-        consensusBookCount: 4,
-        lineHistoryUsable: true,
-        movementMode: 'same_book',
-        movementSourceBook: 'Pinnacle',
-        movementLabel: 'adverse',
-        movementQualityScore: 0.85,
-        consensusEdge: 1.4,
-        gatePassed: true,
-        executionBook: 'NoVigApp',
-        targetBook: 'NoVigApp'
-      },
-      {
-        gameId: 'nba-3',
-        scanLeague: 'NBA',
-        scanMarket: 'Moneyline',
-        pick: 'Chicago Bulls',
-        odds: 145,
-        consensusBookCount: 1,
-        lineHistoryUsable: true,
-        movementMode: 'same_book',
-        movementSourceBook: 'Pinnacle',
-        movementLabel: 'supportive',
-        movementQualityScore: 0.8,
-        consensusEdge: 1.1,
-        gatePassed: true,
-        executionBook: 'NoVigApp',
-        targetBook: 'NoVigApp'
+        targetBook: 'NoVigApp',
+        minConsensusBookCount: 2,
+        strict: true,
+        limit: 10
       }
-    ], {
-      targetBook: 'NoVigApp',
-      minConsensusBookCount: 2,
-      strict: true,
-      limit: 10
-    });
+    );
 
     assert.equal(summary.classificationSummary.totalRowsClassified, 4);
     assert.equal(summary.classificationSummary.verdictCounts['Pass'], 4);
@@ -329,37 +353,40 @@ describe('sharp play target book helpers', () => {
   });
 
   it('avalanche regression: insufficient history reports history failures, not target-book-only movement', () => {
-    const summary = summarizeSharpPlayRows([
+    const summary = summarizeSharpPlayRows(
+      [
+        {
+          gameId: 'nhl-avalanche-reg',
+          scanLeague: 'NHL',
+          scanMarket: 'Moneyline',
+          market: 'Moneyline',
+          pick: 'Colorado Avalanche',
+          odds: -118,
+          currentOdds: -118,
+          targetBookOdds: -118,
+          bestAvailableOdds: -120,
+          consensusBookCount: 2,
+          marketBookCount: 2,
+          supportBookCount: 2,
+          executionQuality: 'playable',
+          lineHistoryUsable: false,
+          movementMode: null,
+          movementSourceBook: null,
+          movementLabel: 'insufficient_history',
+          movementQualityScore: 0,
+          consensusEdge: 1.1,
+          gatePassed: true,
+          targetBook: 'NoVigApp',
+          executionBook: 'NoVigApp'
+        }
+      ],
       {
-        gameId: 'nhl-avalanche-reg',
-        scanLeague: 'NHL',
-        scanMarket: 'Moneyline',
-        market: 'Moneyline',
-        pick: 'Colorado Avalanche',
-        odds: -118,
-        currentOdds: -118,
-        targetBookOdds: -118,
-        bestAvailableOdds: -120,
-        consensusBookCount: 2,
-        marketBookCount: 2,
-        supportBookCount: 2,
-        executionQuality: 'playable',
-        lineHistoryUsable: false,
-        movementMode: null,
-        movementSourceBook: null,
-        movementLabel: 'insufficient_history',
-        movementQualityScore: 0,
-        consensusEdge: 1.1,
-        gatePassed: true,
         targetBook: 'NoVigApp',
-        executionBook: 'NoVigApp'
+        minConsensusBookCount: 2,
+        strict: true,
+        limit: 10
       }
-    ], {
-      targetBook: 'NoVigApp',
-      minConsensusBookCount: 2,
-      strict: true,
-      limit: 10
-    });
+    );
 
     assert.equal(summary.filteredRows.length, 0);
     assert.equal(summary.classificationSummary.verdictCounts['Pass'], 1);
@@ -409,37 +436,40 @@ describe('sharp play target book helpers', () => {
   });
 
   it('avalanche regression: insufficient history reports history failures, not target-book-only movement', () => {
-    const summary = summarizeSharpPlayRows([
+    const summary = summarizeSharpPlayRows(
+      [
+        {
+          gameId: 'nhl-avalanche-reg',
+          scanLeague: 'NHL',
+          scanMarket: 'Moneyline',
+          market: 'Moneyline',
+          pick: 'Colorado Avalanche',
+          odds: -118,
+          currentOdds: -118,
+          targetBookOdds: -118,
+          bestAvailableOdds: -120,
+          consensusBookCount: 2,
+          marketBookCount: 2,
+          supportBookCount: 2,
+          executionQuality: 'playable',
+          lineHistoryUsable: false,
+          movementMode: null,
+          movementSourceBook: null,
+          movementLabel: 'insufficient_history',
+          movementQualityScore: 0,
+          consensusEdge: 1.1,
+          gatePassed: true,
+          targetBook: 'NoVigApp',
+          executionBook: 'NoVigApp'
+        }
+      ],
       {
-        gameId: 'nhl-avalanche-reg',
-        scanLeague: 'NHL',
-        scanMarket: 'Moneyline',
-        market: 'Moneyline',
-        pick: 'Colorado Avalanche',
-        odds: -118,
-        currentOdds: -118,
-        targetBookOdds: -118,
-        bestAvailableOdds: -120,
-        consensusBookCount: 2,
-        marketBookCount: 2,
-        supportBookCount: 2,
-        executionQuality: 'playable',
-        lineHistoryUsable: false,
-        movementMode: null,
-        movementSourceBook: null,
-        movementLabel: 'insufficient_history',
-        movementQualityScore: 0,
-        consensusEdge: 1.1,
-        gatePassed: true,
         targetBook: 'NoVigApp',
-        executionBook: 'NoVigApp'
+        minConsensusBookCount: 2,
+        strict: true,
+        limit: 10
       }
-    ], {
-      targetBook: 'NoVigApp',
-      minConsensusBookCount: 2,
-      strict: true,
-      limit: 10
-    });
+    );
 
     assert.equal(summary.filteredRows.length, 0);
     assert.equal(summary.classificationSummary.verdictCounts['Pass'], 1);
@@ -450,70 +480,73 @@ describe('sharp play target book helpers', () => {
   });
 
   it('builds a UFC shortlist with lean fallback rows when strict sharp support is thin', () => {
-    const shortlist = buildUfcShortlist([
+    const shortlist = buildUfcShortlist(
+      [
+        {
+          gameId: 'ufc-1',
+          game: 'Costa vs Allen',
+          scanLeague: 'UFC',
+          market: 'Moneyline',
+          participant: 'Costa',
+          odds: 133,
+          screenScore: 12.76,
+          consensusBookCount: 9,
+          consensusEdge: 2.8,
+          movementLabel: 'insufficient_history',
+          lineHistoryUsable: false,
+          gatePassed: true,
+          targetBook: 'NoVigApp',
+          executionBook: 'NoVigApp',
+          start: '2025-05-10T02:00:00Z'
+        },
+        {
+          gameId: 'ufc-2',
+          game: 'Gomis vs Peek',
+          scanLeague: 'UFC',
+          market: 'Moneyline',
+          participant: 'Gomis',
+          odds: 151,
+          screenScore: 5.471,
+          consensusBookCount: 4,
+          consensusEdge: 1.6,
+          movementLabel: 'supportive',
+          movementMode: 'same_book',
+          movementSourceBook: 'Pinnacle',
+          movementQualityScore: 1,
+          lineHistoryUsable: true,
+          gatePassed: true,
+          targetBook: 'NoVigApp',
+          executionBook: 'NoVigApp',
+          start: '2025-05-09T02:00:00Z'
+        },
+        {
+          gameId: 'ufc-3',
+          game: 'Carpenter vs Reyes',
+          scanLeague: 'UFC',
+          market: 'Moneyline',
+          participant: 'Carpenter',
+          odds: 162,
+          screenScore: 4.795,
+          consensusBookCount: 4,
+          consensusEdge: 0.9,
+          movementLabel: 'adverse',
+          lineHistoryUsable: true,
+          gatePassed: true,
+          targetBook: 'NoVigApp',
+          executionBook: 'NoVigApp',
+          start: '2025-05-09T03:00:00Z'
+        }
+      ],
       {
-        gameId: 'ufc-1',
-        game: 'Costa vs Allen',
-        scanLeague: 'UFC',
-        market: 'Moneyline',
-        participant: 'Costa',
-        odds: 133,
-        screenScore: 12.76,
-        consensusBookCount: 9,
-        consensusEdge: 2.8,
-        movementLabel: 'insufficient_history',
-        lineHistoryUsable: false,
-        gatePassed: true,
         targetBook: 'NoVigApp',
-        executionBook: 'NoVigApp',
-        start: '2025-05-10T02:00:00Z'
-      },
-      {
-        gameId: 'ufc-2',
-        game: 'Gomis vs Peek',
-        scanLeague: 'UFC',
-        market: 'Moneyline',
-        participant: 'Gomis',
-        odds: 151,
-        screenScore: 5.471,
-        consensusBookCount: 4,
-        consensusEdge: 1.6,
-        movementLabel: 'supportive',
-        movementMode: 'same_book',
-        movementSourceBook: 'Pinnacle',
-        movementQualityScore: 1,
-        lineHistoryUsable: true,
-        gatePassed: true,
-        targetBook: 'NoVigApp',
-        executionBook: 'NoVigApp',
-        start: '2025-05-09T02:00:00Z'
-      },
-      {
-        gameId: 'ufc-3',
-        game: 'Carpenter vs Reyes',
-        scanLeague: 'UFC',
-        market: 'Moneyline',
-        participant: 'Carpenter',
-        odds: 162,
-        screenScore: 4.795,
-        consensusBookCount: 4,
-        consensusEdge: 0.9,
-        movementLabel: 'adverse',
-        lineHistoryUsable: true,
-        gatePassed: true,
-        targetBook: 'NoVigApp',
-        executionBook: 'NoVigApp',
-        start: '2025-05-09T03:00:00Z'
+        minConsensusBookCount: 2,
+        limit: 5,
+        strict: true,
+        eventDate: '2025-05-10',
+        nowMs: Date.parse('2025-05-09T12:00:00Z'),
+        upcomingOnly: false
       }
-    ], {
-      targetBook: 'NoVigApp',
-      minConsensusBookCount: 2,
-      limit: 5,
-      strict: true,
-      eventDate: '2025-05-10',
-      nowMs: Date.parse('2025-05-09T12:00:00Z'),
-      upcomingOnly: false
-    });
+    );
 
     assert.equal(shortlist.league, 'UFC');
     assert.equal(shortlist.officialCount, 0);
@@ -531,51 +564,54 @@ describe('sharp play target book helpers', () => {
   });
 
   it('only returns rows from the requested UFC card window', () => {
-    const shortlist = buildUfcShortlist([
+    const shortlist = buildUfcShortlist(
+      [
+        {
+          gameId: 'ufc-today',
+          scanLeague: 'UFC',
+          participant: 'Today Row',
+          odds: 125,
+          screenScore: 4,
+          consensusBookCount: 3,
+          consensusEdge: 1,
+          movementLabel: 'supportive',
+          movementMode: 'same_book',
+          movementSourceBook: 'Pinnacle',
+          movementQualityScore: 1,
+          lineHistoryUsable: true,
+          gatePassed: true,
+          executionBook: 'NoVigApp',
+          targetBook: 'NoVigApp',
+          start: '2025-05-09T16:00:00Z'
+        },
+        {
+          gameId: 'ufc-next',
+          scanLeague: 'UFC',
+          participant: 'Next Row',
+          odds: 125,
+          screenScore: 5,
+          consensusBookCount: 3,
+          consensusEdge: 1,
+          movementLabel: 'supportive',
+          movementMode: 'same_book',
+          movementSourceBook: 'Pinnacle',
+          movementQualityScore: 1,
+          lineHistoryUsable: true,
+          gatePassed: true,
+          executionBook: 'NoVigApp',
+          targetBook: 'NoVigApp',
+          start: '2025-05-10T02:00:00Z'
+        }
+      ],
       {
-        gameId: 'ufc-today',
-        scanLeague: 'UFC',
-        participant: 'Today Row',
-        odds: 125,
-        screenScore: 4,
-        consensusBookCount: 3,
-        consensusEdge: 1,
-        movementLabel: 'supportive',
-        movementMode: 'same_book',
-        movementSourceBook: 'Pinnacle',
-        movementQualityScore: 1,
-        lineHistoryUsable: true,
-        gatePassed: true,
-        executionBook: 'NoVigApp',
         targetBook: 'NoVigApp',
-        start: '2025-05-09T16:00:00Z'
-      },
-      {
-        gameId: 'ufc-next',
-        scanLeague: 'UFC',
-        participant: 'Next Row',
-        odds: 125,
-        screenScore: 5,
-        consensusBookCount: 3,
-        consensusEdge: 1,
-        movementLabel: 'supportive',
-        movementMode: 'same_book',
-        movementSourceBook: 'Pinnacle',
-        movementQualityScore: 1,
-        lineHistoryUsable: true,
-        gatePassed: true,
-        executionBook: 'NoVigApp',
-        targetBook: 'NoVigApp',
-        start: '2025-05-10T02:00:00Z'
+        cardWindow: 'today',
+        nowMs: Date.parse('2025-05-09T12:00:00Z'),
+        limit: 10,
+        strict: true,
+        upcomingOnly: false
       }
-    ], {
-      targetBook: 'NoVigApp',
-      cardWindow: 'today',
-      nowMs: Date.parse('2025-05-09T12:00:00Z'),
-      limit: 10,
-      strict: true,
-      upcomingOnly: false
-    });
+    );
 
     assert.equal(shortlist.bestBets.length + shortlist.bestLooks.length + shortlist.bestPasses.length, 1);
     assert.equal(shortlist.bestBets[0].participant, 'Today Row');

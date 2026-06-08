@@ -11,6 +11,7 @@
 **Problem:** `COMPACT_FIELDS` strips `steamMove`, `steamBooks`, `steamDirection`, `consensusEdge`, `multiWindowScore`, `clvProxyPct`, `openingOdds`, `movementLabel`, and `movementSourceBook`. These are small fields (bools, numbers, short strings) that are essential for deciding whether to bet. Compact mode currently gives you the grade but not the underlying signals.
 
 **Fix:** Add to `COMPACT_FIELDS` in `lib/propprofessor-mcp-ranked-screen.js`:
+
 - `steamMove` (boolean, 1 byte)
 - `consensusEdge` (number)
 - `movementLabel` (short string)
@@ -47,6 +48,7 @@
 **Problem:** `lineHistory` is the largest field per row (full array of odds points across books/time). It's always stripped in compact mode. There's no middle ground — you either get the full array or nothing.
 
 **Fix:** Add a `lineHistorySummary` field to ranked rows in `lib/propprofessor-screen-utils.js`:
+
 ```js
 lineHistorySummary: {
   opening: number,
@@ -55,6 +57,7 @@ lineHistorySummary: {
   points: number
 }
 ```
+
 Include `lineHistorySummary` in `COMPACT_FIELDS`.
 
 **Impact:** Gives movement context without the full array. Small token cost.
@@ -65,9 +68,10 @@ Include `lineHistorySummary` in `COMPACT_FIELDS`.
 
 ## P2 — `sharp_plays` output doesn't include movement context in near-miss previews
 
-**Problem:** `toNearMissPreview()` returns `lineHistoryUsable` (boolean) but not `movementLabel`, `steamMove`, or `consensusEdge`. When a play fails movement validation, you can't see *why* without a separate `get_play_details` call.
+**Problem:** `toNearMissPreview()` returns `lineHistoryUsable` (boolean) but not `movementLabel`, `steamMove`, or `consensusEdge`. When a play fails movement validation, you can't see _why_ without a separate `get_play_details` call.
 
 **Fix:** Add to `toNearMissPreview()`:
+
 - `movementLabel`
 - `steamMove`
 - `consensusEdge`
@@ -95,6 +99,7 @@ Include `lineHistorySummary` in `COMPACT_FIELDS`.
 ## P3 — Dependabot PRs (dev dependencies)
 
 3 open PRs:
+
 - `eslint` 9→10.4.1
 - `globals` 15→17.6.0
 - `@eslint/js` 9→10.0.1

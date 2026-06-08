@@ -21,7 +21,12 @@ const {
   normalizeBookList,
   getDebugFlag
 } = require('../lib/propprofessor-mcp-ranked-screen');
-const { getSharpBookComparisonSet, getSharpBookContext, ALL_SCREEN_BOOKS, uniqueBooks } = require('../lib/propprofessor-sharp-books');
+const {
+  getSharpBookComparisonSet,
+  getSharpBookContext,
+  ALL_SCREEN_BOOKS,
+  uniqueBooks
+} = require('../lib/propprofessor-sharp-books');
 const { resolveHistoryForEntity } = require('../lib/propprofessor-history');
 const {
   categorizeError,
@@ -33,7 +38,12 @@ const {
 const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
 const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
-const { analyzeMultiWindow, summarizeResults, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
+const {
+  analyzeMultiWindow,
+  summarizeResults,
+  DEFAULT_WINDOWS,
+  DEFAULT_SHARP_BOOKS
+} = require('../lib/propprofessor-sharp-consensus');
 const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
 const {
@@ -394,13 +404,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       payloads.push(payload);
     }
 
-    const rows = payloads.flatMap(payload => extractScreenRows(payload));
+    const rows = payloads.flatMap((payload) => extractScreenRows(payload));
 
-    const hasScreenBooks = rows.some(row => {
+    const hasScreenBooks = rows.some((row) => {
       const text = JSON.stringify(row || '');
-      return text.includes('"Pinnacle"') || text.includes('"Circa"') || text.includes('"BetOnline"') || text.includes('"Kalshi"');
+      return (
+        text.includes('"Pinnacle"') ||
+        text.includes('"Circa"') ||
+        text.includes('"BetOnline"') ||
+        text.includes('"Kalshi"')
+      );
     });
-    const hasScreenConsensus = rows.some(row => {
+    const hasScreenConsensus = rows.some((row) => {
       const text = JSON.stringify(row || '');
       return text.includes('"consensus"') || text.includes('"ev"') || text.includes('"value"');
     });
@@ -432,7 +447,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     try {
       evResult = await client.querySportsbook({
         leagues: ['Tennis'],
-        sportsbooks: ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle', 'Polymarket', 'Circa', 'BetOnline', 'Kalshi', 'NoVigApp'],
+        sportsbooks: [
+          'FanDuel',
+          'DraftKings',
+          'BetMGM',
+          'Caesars',
+          'Pinnacle',
+          'Polymarket',
+          'Circa',
+          'BetOnline',
+          'Kalshi',
+          'NoVigApp'
+        ],
         minOdds: -9999,
         maxOdds: 9999,
         minValue: 0,
@@ -441,17 +467,23 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
     } catch {
       return {
-        ok: true, result: [], league: 'Tennis',
+        ok: true,
+        result: [],
+        league: 'Tennis',
         resultMeta: { debugEnabled: false, source: 'fallback_empty' },
         freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
         warning: 'No tennis data available from either /screen or +EV endpoint'
       };
     }
 
-    const evCandidates = Array.isArray(evResult) ? evResult.filter(row => String(row.league || '').toLowerCase() === 'tennis') : [];
+    const evCandidates = Array.isArray(evResult)
+      ? evResult.filter((row) => String(row.league || '').toLowerCase() === 'tennis')
+      : [];
     if (!evCandidates.length) {
       return {
-        ok: true, result: [], league: 'Tennis',
+        ok: true,
+        result: [],
+        league: 'Tennis',
         resultMeta: { debugEnabled: false, source: 'fallback_empty' },
         freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
         warning: '/screen returned only Polymarket odds and +EV endpoint has no tennis candidates today'
@@ -459,11 +491,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     }
 
     const ranked = await enrichTennisEvCandidates(evCandidates, client, {
-      preferredBook, limit: getLimit(args), lookbackHours: getLookbackHours(args)
+      preferredBook,
+      limit: getLimit(args),
+      lookbackHours: getLookbackHours(args)
     });
     const correctedRanked = await correctTennisTimes(ranked);
     return {
-      ok: true, result: correctedRanked, league: 'Tennis',
+      ok: true,
+      result: correctedRanked,
+      league: 'Tennis',
       freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
       source: '+ev_enriched',
       note: '/screen returned insufficient tennis data; results enriched from +EV endpoint with odds history'
@@ -476,9 +512,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       throw new Error('league is required');
     }
     const presetLeague = getLeagueRankingPreset(requestedLeague).league;
-    return presetLeague === 'TENNIS'
-      ? runTennisScreen(args)
-      : runLeagueScreen(args, presetLeague || requestedLeague);
+    return presetLeague === 'TENNIS' ? runTennisScreen(args) : runLeagueScreen(args, presetLeague || requestedLeague);
   }
 
   async function runUfcCard(args = {}) {
@@ -550,47 +584,51 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   //   find_best_price        ← find_best_price (unchanged)
   const handlers = {
     async ev_candidates(args = {}) {
-      const leagues = Array.isArray(args.leagues) && args.leagues.length
-        ? args.leagues
-        : undefined;
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
       if (!leagues) {
         const error = new Error(
           'The leagues parameter is required on ev_candidates. ' +
-          'Pass one or more league names, e.g. leagues: ["NBA", "MLB", "Tennis"]. ' +
-          'An empty array or omitted leagues will cause the backend to return HTTP 400.'
+            'Pass one or more league names, e.g. leagues: ["NBA", "MLB", "Tennis"]. ' +
+            'An empty array or omitted leagues will cause the backend to return HTTP 400.'
         );
         error.code = 'MISSING_LEAGUES';
         error.category = 'validation';
         error.status = 400;
         throw error;
       }
-      const payload = await client.querySportsbook(defined({
-        isLive: args.isLive,
-        showBreakOnly: args.showBreakOnly,
-        showTimeoutOnly: args.showTimeoutOnly,
-        showPeriodEndOnly: args.showPeriodEndOnly,
-        timeAvailable: args.timeAvailable,
-        userState: args.userState,
-        hideNCAAPlayerProps: args.hideNCAAPlayerProps,
-        sportsbooks: Array.isArray(args.sportsbooks) ? args.sportsbooks : undefined,
-        leagues,
-        minOdds: args.minOdds,
-        maxOdds: args.maxOdds,
-        minValue: args.minValue,
-        maxValue: args.maxValue,
-        marketTypes: Array.isArray(args.marketTypes) ? args.marketTypes : undefined,
-        periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : undefined,
-        minHoursAway: args.minHoursAway,
-        maxHoursAway: args.maxHoursAway,
-        minLiquidity: args.minLiquidity,
-        maxLiquidity: args.maxLiquidity,
-        weightSettings: args.weightSettings && typeof args.weightSettings === 'object' ? args.weightSettings : undefined
-      }));
+      const payload = await client.querySportsbook(
+        defined({
+          isLive: args.isLive,
+          showBreakOnly: args.showBreakOnly,
+          showTimeoutOnly: args.showTimeoutOnly,
+          showPeriodEndOnly: args.showPeriodEndOnly,
+          timeAvailable: args.timeAvailable,
+          userState: args.userState,
+          hideNCAAPlayerProps: args.hideNCAAPlayerProps,
+          sportsbooks: Array.isArray(args.sportsbooks) ? args.sportsbooks : undefined,
+          leagues,
+          minOdds: args.minOdds,
+          maxOdds: args.maxOdds,
+          minValue: args.minValue,
+          maxValue: args.maxValue,
+          marketTypes: Array.isArray(args.marketTypes) ? args.marketTypes : undefined,
+          periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : undefined,
+          minHoursAway: args.minHoursAway,
+          maxHoursAway: args.maxHoursAway,
+          minLiquidity: args.minLiquidity,
+          maxLiquidity: args.maxLiquidity,
+          weightSettings:
+            args.weightSettings && typeof args.weightSettings === 'object' ? args.weightSettings : undefined
+        })
+      );
       const rows = Array.isArray(payload) ? payload : [];
       const baseResult = {
-        ok: true, count: rows.length, result: rows,
+        ok: true,
+        count: rows.length,
+        result: rows,
         notes: {
-          workflow: 'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
+          workflow:
+            'Use these rows as fast discovery candidates, then validate finalists with /screen, exact-line checks, and sharp-book movement.',
           minValueBehavior: args.minValue === undefined ? 'unset_here_use_frontend_filter' : 'explicit_request_override'
         }
       };
@@ -608,12 +646,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         league: args.league || 'NBA',
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : (useBestComps ? undefined : []),
+        books: Array.isArray(args.books) ? args.books : useBestComps ? undefined : [],
         is_live: Boolean(args.is_live)
       });
       const result = { ok: true, result: payload };
       if (useBestComps) {
-        result.comparisonBooks = getSharpBookComparisonSet({ league: args.league || 'NBA', market: args.market, requestedBooks: Array.isArray(args.books) ? args.books : undefined });
+        result.comparisonBooks = getSharpBookComparisonSet({
+          league: args.league || 'NBA',
+          market: args.market,
+          requestedBooks: Array.isArray(args.books) ? args.books : undefined
+        });
         result.sharpBookResearch = getSharpBookContext({ league: args.league || 'NBA', market: args.market });
       }
       return result;
@@ -626,19 +668,29 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const preset = getLeagueRankingPreset(league, market);
       const focusBook = requestedBooks[0] || preset.preferredBooks[0];
       const payload = await client.queryScreenOddsBestComps({
-        market, league,
+        market,
+        league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
         books: requestedBooks,
         is_live: Boolean(args.is_live)
       });
       const response = await buildRankedScreenResponseShared({
-        client, payloads: [payload], args, league, focusBook,
-        rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
-          league, market, limit: getLimit(args),
-          books: requestedBooks.length ? requestedBooks : undefined,
-          includeAll: getIncludeAll(args), maxAgeMs: getMaxAgeMs(args), debug
-        })
+        client,
+        payloads: [payload],
+        args,
+        league,
+        focusBook,
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankLeagueScreenRows(hydratedRows, {
+            league,
+            market,
+            limit: getLimit(args),
+            books: requestedBooks.length ? requestedBooks : undefined,
+            includeAll: getIncludeAll(args),
+            maxAgeMs: getMaxAgeMs(args),
+            debug
+          })
       });
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
@@ -664,14 +716,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async novig_screen(args = {}) {
-      const leagues = Array.isArray(args.leagues) && args.leagues.length
-        ? args.leagues
-        : args.league ? [args.league]
-          : ['NBA', 'MLB', 'NHL', 'WNBA', 'UFC'];
-      const markets = Array.isArray(args.markets) && args.markets.length
-        ? args.markets
-        : args.market ? [args.market]
-          : ['Moneyline'];
+      const leagues =
+        Array.isArray(args.leagues) && args.leagues.length
+          ? args.leagues
+          : args.league
+            ? [args.league]
+            : ['NBA', 'MLB', 'NHL', 'WNBA', 'UFC'];
+      const markets =
+        Array.isArray(args.markets) && args.markets.length ? args.markets : args.market ? [args.market] : ['Moneyline'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
       const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 50;
       const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
@@ -718,9 +770,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                       game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                       riskFlag: ctxResult.riskFlag || 'unknown',
                       riskSummary: ctxResult.summary || null,
-                      topTweet: Array.isArray(ctxResult.tweets) && ctxResult.tweets.length > 0
-                        ? ctxResult.tweets[0]?.text?.slice(0, 120) || null
-                        : null
+                      topTweet:
+                        Array.isArray(ctxResult.tweets) && ctxResult.tweets.length > 0
+                          ? ctxResult.tweets[0]?.text?.slice(0, 120) || null
+                          : null
                     });
                   }
                 } catch {
@@ -755,7 +808,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             });
           } catch (error) {
             allCandidates.push({
-              league, market, candidates: [],
+              league,
+              market,
+              candidates: [],
               error: String(error.message || error)
             });
           }
@@ -770,23 +825,24 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         totalCandidates: allCandidates.reduce((sum, l) => sum + (l.candidates?.length || 0), 0),
         results: allCandidates,
         research: researchResults,
-        workflow: 'NoVigApp target book. Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.'
+        workflow:
+          'NoVigApp target book. Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.'
       };
     },
 
-
     async recommended_bets(args = {}) {
-      const leagues = Array.isArray(args.leagues) && args.leagues.length
-        ? args.leagues
-        : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
-      const markets = Array.isArray(args.markets) && args.markets.length
-        ? args.markets
-        : args.market
-          ? [args.market]
-          : ['Moneyline', 'Spread', 'Total'];
-      const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length
-        ? args.targetTiers
-        : ['TIER 1', 'TIER 2'];
+      const leagues =
+        Array.isArray(args.leagues) && args.leagues.length
+          ? args.leagues
+          : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
+      const markets =
+        Array.isArray(args.markets) && args.markets.length
+          ? args.markets
+          : args.market
+            ? [args.market]
+            : ['Moneyline', 'Spread', 'Total'];
+      const targetTiers =
+        Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
       const allRecommended = [];
       for (const league of leagues) {
@@ -795,22 +851,27 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           let allRows = [];
           for (const market of markets) {
             const screenResult = await handlers.screen_ranked({
-              league, market, books: args.books, limit: limit * 2,
-              is_live: Boolean(args.is_live), includeAll: false, debug: false,
+              league,
+              market,
+              books: args.books,
+              limit: limit * 2,
+              is_live: Boolean(args.is_live),
+              includeAll: false,
+              debug: false,
               compact: Boolean(args.compact),
               fields: Array.isArray(args.fields) ? args.fields : undefined,
               include: Array.isArray(args.include) ? args.include : undefined,
               skipHistory: args.skipHistory === true
             });
             const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
-            allRows = allRows.concat(rows.map(r => ({ ...r, _market: market })));
+            allRows = allRows.concat(rows.map((r) => ({ ...r, _market: market })));
           }
           // Deduplicate by gameId+selection (keep higher screenScore)
           const seen = new Map();
           for (const row of allRows) {
             const key = `${row.gameId || ''}:${row.selection || ''}`;
             const existing = seen.get(key);
-            if (!existing || (Number(row.screenScore ?? 0) > Number(existing.screenScore ?? 0))) {
+            if (!existing || Number(row.screenScore ?? 0) > Number(existing.screenScore ?? 0)) {
               seen.set(key, row);
             }
           }
@@ -826,7 +887,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             .slice(0, limit);
           if (recommended.length) {
             allRecommended.push({
-              league, count: recommended.length,
+              league,
+              count: recommended.length,
               markets_queried: markets,
               plays: recommended.map((row) => ({
                 game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
@@ -834,11 +896,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 market: row._market || row.market || null,
                 start: row.start || null,
                 odds: row.targetBookOdds ?? null,
-                edge: row.consensusEdge, clv: row.clvProxyPct,
+                edge: row.consensusEdge,
+                clv: row.clvProxyPct,
                 consensusBookCount: row.consensusBookCount,
                 executionQuality: row.executionQuality,
-                movementGrade: row.movementGrade, riskScore: row.riskScore,
-                kaiCall: row.kaiCall, confidenceTier: row.confidenceTier,
+                movementGrade: row.movementGrade,
+                riskScore: row.riskScore,
+                kaiCall: row.kaiCall,
+                confidenceTier: row.confidenceTier,
                 rationale: row.rationale || buildRationale(row),
                 screenScore: row.screenScore
               }))
@@ -860,14 +925,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           });
           fallback.enabled = true;
           fallback.result = fb;
-          fallback.summary = 'No recommended_bets found; appended sharp_plays fallback with strict=false and includePasses=true.';
+          fallback.summary =
+            'No recommended_bets found; appended sharp_plays fallback with strict=false and includePasses=true.';
         } catch (error) {
           fallback.enabled = true;
           fallback.error = String(error.message || error);
         }
       }
       const response = {
-        ok: true, totalRecommended: total,
+        ok: true,
+        totalRecommended: total,
         markets_queried: markets,
         leagues: allRecommended.filter((l) => l.count > 0),
         emptyLeagues: allRecommended.filter((l) => !l.count && !l.error).map((l) => l.league),
@@ -888,47 +955,94 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async staking_plan(args = {}) {
       const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
-      const markets = Array.isArray(args.markets) && args.markets.length
-        ? args.markets
-        : args.market
-          ? [args.market]
-          : ['Moneyline', 'Spread', 'Total'];
-      const targetTiers = Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
+      const markets =
+        Array.isArray(args.markets) && args.markets.length
+          ? args.markets
+          : args.market
+            ? [args.market]
+            : ['Moneyline', 'Spread', 'Total'];
+      const targetTiers =
+        Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-      const recResult = await handlers.recommended_bets({ leagues, markets, targetTiers, limit, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true });
+      const recResult = await handlers.recommended_bets({
+        leagues,
+        markets,
+        targetTiers,
+        limit,
+        is_live: Boolean(args.is_live),
+        compact: Boolean(args.compact),
+        fields: Array.isArray(args.fields) ? args.fields : undefined,
+        include: Array.isArray(args.include) ? args.include : undefined,
+        skipHistory: args.skipHistory === true
+      });
       if (!recResult.ok || !recResult.totalRecommended) {
-        return { ok: true, bankroll, totalStake: 0, playCount: 0, stakes: [], warnings: ['No recommended plays found for the given criteria'], summary: 'No plays to stake' };
+        return {
+          ok: true,
+          bankroll,
+          totalStake: 0,
+          playCount: 0,
+          stakes: [],
+          warnings: ['No recommended plays found for the given criteria'],
+          summary: 'No plays to stake'
+        };
       }
       const allPlays = [];
       for (const league of recResult.leagues || []) {
-        for (const play of league.plays || []) { allPlays.push({ ...play, league: league.league }); }
+        for (const play of league.plays || []) {
+          allPlays.push({ ...play, league: league.league });
+        }
       }
       const plan = suggestStakes({ bankroll, plays: allPlays });
-      return { ...plan, bankroll, leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })), totalRecommended: recResult.totalRecommended, markets_queried: recResult.markets_queried };
+      return {
+        ...plan,
+        bankroll,
+        leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })),
+        totalRecommended: recResult.totalRecommended,
+        markets_queried: recResult.markets_queried
+      };
     },
 
     async player_context(args = {}) {
       const player = typeof args.player === 'string' ? args.player.trim() : '';
-      if (!player) { return { ok: false, error: 'player argument is required' }; }
+      if (!player) {
+        return { ok: false, error: 'player argument is required' };
+      }
       return getPlayerContext({
         player,
         sport: typeof args.sport === 'string' && args.sport.length > 0 ? args.sport : null,
         gameTime: typeof args.gameTime === 'string' && args.gameTime.length > 0 ? args.gameTime : null,
         maxAgeMinutes: Number.isFinite(Number(args.maxAgeMinutes)) ? Number(args.maxAgeMinutes) : 60,
-        useXurl: args.useXurl === true,
+        useXurl: args.useXurl === true
       });
     },
 
     async sharp_consensus(args = {}) {
       const league = String(args.league || 'Tennis').trim();
       const market = String(args.market || 'Moneyline').trim();
-      const windows = Array.isArray(args.windows) && args.windows.length ? args.windows.map(Number).filter(Boolean).sort((a, b) => a - b) : DEFAULT_WINDOWS;
-      const sharpBooks = Array.isArray(args.sharpBooks) && args.sharpBooks.length ? args.sharpBooks.map((b) => String(b).trim()).filter(Boolean) : DEFAULT_SHARP_BOOKS;
+      const windows =
+        Array.isArray(args.windows) && args.windows.length
+          ? args.windows
+              .map(Number)
+              .filter(Boolean)
+              .sort((a, b) => a - b)
+          : DEFAULT_WINDOWS;
+      const sharpBooks =
+        Array.isArray(args.sharpBooks) && args.sharpBooks.length
+          ? args.sharpBooks.map((b) => String(b).trim()).filter(Boolean)
+          : DEFAULT_SHARP_BOOKS;
       const minConsensusWindows = Number(args.minConsensusWindows) || 0;
       const lookbackHours = Number(args.lookbackHours) || 48;
       const limit = Number(args.limit) || 100;
       const rankedResponse = await handlers.screen_ranked({
-        league, market, historySportsbooks: sharpBooks, includeAll: true, limit, lookbackHours, debug: false, is_live: Boolean(args.is_live), skipHistory: args.skipHistory === true
+        league,
+        market,
+        historySportsbooks: sharpBooks,
+        includeAll: true,
+        limit,
+        lookbackHours,
+        debug: false,
+        is_live: Boolean(args.is_live),
+        skipHistory: args.skipHistory === true
       });
       if (!rankedResponse?.ok || !Array.isArray(rankedResponse.result)) {
         return { ok: false, error: 'Failed to fetch ranked screen data' };
@@ -938,14 +1052,30 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const analysisResults = analysis.results || [];
       const summary = summarizeResults(analysisResults);
       return {
-        ok: true, count: analysisResults.length, summary, result: analysisResults,
-        resultMeta: { league, market, windows, sharpBooks, lookbackHours, totalRowsScanned: rows.length, minConsensusWindows, rowsSkippedNoHistory: analysis.skippedNoHistory || 0, rowsSkippedInsufficientBooks: analysis.skippedInsufficientBooks || 0 }
+        ok: true,
+        count: analysisResults.length,
+        summary,
+        result: analysisResults,
+        resultMeta: {
+          league,
+          market,
+          windows,
+          sharpBooks,
+          lookbackHours,
+          totalRowsScanned: rows.length,
+          minConsensusWindows,
+          rowsSkippedNoHistory: analysis.skippedNoHistory || 0,
+          rowsSkippedInsufficientBooks: analysis.skippedInsufficientBooks || 0
+        }
       };
     },
 
     async all_slates(args = {}) {
       const DEFAULT_LEAGUES = ['NBA', 'MLB', 'NHL', 'TENNIS', 'WNBA', 'Soccer', 'UFC'];
-      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues.map((l) => String(l).trim()).filter(Boolean) : DEFAULT_LEAGUES;
+      const leagues =
+        Array.isArray(args.leagues) && args.leagues.length
+          ? args.leagues.map((l) => String(l).trim()).filter(Boolean)
+          : DEFAULT_LEAGUES;
       const market = args.market || 'Moneyline';
       const limit = getLimit({ limit: args.limit || 15 });
       const results = {};
@@ -957,14 +1087,45 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         try {
           const leagueKey = league.toUpperCase();
           if (leagueKey === 'TENNIS') {
-            const tennisResult = await runTennisScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true });
+            const tennisResult = await runTennisScreen({
+              market,
+              limit,
+              includeAll: args.includeAll,
+              lookbackHours: args.lookbackHours,
+              is_live: Boolean(args.is_live),
+              compact: Boolean(args.compact),
+              fields: Array.isArray(args.fields) ? args.fields : undefined,
+              include: Array.isArray(args.include) ? args.include : undefined,
+              skipHistory: args.skipHistory === true
+            });
             results[league] = tennisResult.result || [];
-            leagueMeta[league] = { rowCount: results[league].length, source: tennisResult.source || 'screen', ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {}) };
+            leagueMeta[league] = {
+              rowCount: results[league].length,
+              source: tennisResult.source || 'screen',
+              ...(tennisResult.warnings ? { warnings: tennisResult.warnings } : {})
+            };
             totalPlays += results[league].length;
           } else {
-            const leagueResult = await runLeagueScreen({ market, limit, includeAll: args.includeAll, lookbackHours: args.lookbackHours, is_live: Boolean(args.is_live), compact: Boolean(args.compact), fields: Array.isArray(args.fields) ? args.fields : undefined, include: Array.isArray(args.include) ? args.include : undefined, skipHistory: args.skipHistory === true }, league);
+            const leagueResult = await runLeagueScreen(
+              {
+                market,
+                limit,
+                includeAll: args.includeAll,
+                lookbackHours: args.lookbackHours,
+                is_live: Boolean(args.is_live),
+                compact: Boolean(args.compact),
+                fields: Array.isArray(args.fields) ? args.fields : undefined,
+                include: Array.isArray(args.include) ? args.include : undefined,
+                skipHistory: args.skipHistory === true
+              },
+              league
+            );
             results[league] = leagueResult.result || [];
-            leagueMeta[league] = { rowCount: results[league].length, source: 'screen', ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {}) };
+            leagueMeta[league] = {
+              rowCount: results[league].length,
+              source: 'screen',
+              ...(leagueResult.warnings ? { warnings: leagueResult.warnings } : {})
+            };
             totalPlays += results[league].length;
           }
         } catch (error) {
@@ -976,12 +1137,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       const allRows = [];
       for (const [league, rows] of Object.entries(results)) {
-        for (const row of rows) { allRows.push({ ...row, _league: league }); }
+        for (const row of rows) {
+          allRows.push({ ...row, _league: league });
+        }
       }
       allRows.sort((a, b) => Number(b.screenScore || 0) - Number(a.screenScore || 0));
 
       return {
-        ok: true, totalPlays, leaguesQueried: leagues, leagueMeta,
+        ok: true,
+        totalPlays,
+        leaguesQueried: leagues,
+        leagueMeta,
         consolidated: allRows.slice(0, limit * leagues.length),
         ...(errors.length > 0 ? { errors } : {})
       };
@@ -1008,21 +1174,33 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       // Fetch full screen data (with history hydration — this is the detailed view)
       const payload = await client.queryScreenOddsBestComps({
-        market, league, games: gameIds, participants: [],
-        books: requestedBooks, is_live: false
+        market,
+        league,
+        games: gameIds,
+        participants: [],
+        books: requestedBooks,
+        is_live: false
       });
       const response = buildRankedScreenResponseShared({
-        client, payloads: [payload], args: { ...args, compact: false, skipHistory: false }, league, focusBook,
-        rankRows: (hydratedRows, { debug } = {}) => rankLeagueScreenRows(hydratedRows, {
-          league, market, limit: gameIds.length * 4,
-          books: requestedBooks.length ? requestedBooks : undefined,
-          includeAll: true, debug
-        })
+        client,
+        payloads: [payload],
+        args: { ...args, compact: false, skipHistory: false },
+        league,
+        focusBook,
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankLeagueScreenRows(hydratedRows, {
+            league,
+            market,
+            limit: gameIds.length * 4,
+            books: requestedBooks.length ? requestedBooks : undefined,
+            includeAll: true,
+            debug
+          })
       });
 
       // Filter to only the requested game IDs
       const gameIdSet = new Set(gameIds);
-      response.result = response.result.filter(row => gameIdSet.has(row.gameId));
+      response.result = response.result.filter((row) => gameIdSet.has(row.gameId));
       response.resultMeta = {
         ...response.resultMeta,
         queryGameIds: gameIds,
@@ -1048,9 +1226,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const authSection = {
         valid: authValid,
         file: authValid ? authFile : null,
-        message: authValid
-          ? 'Auth is valid'
-          : 'Auth missing or expired. Run: pp-query login'
+        message: authValid ? 'Auth is valid' : 'Auth missing or expired. Run: pp-query login'
       };
 
       if (!authValid) {
@@ -1064,9 +1240,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         result,
         backend: {
           ok: result.ok,
-          message: result.ok
-            ? 'Backend is reachable'
-            : 'Backend returned an error',
+          message: result.ok ? 'Backend is reachable' : 'Backend returned an error',
           ...result
         }
       };
@@ -1107,7 +1281,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const league = args.league || 'NBA';
       const market = args.market || 'Moneyline';
       const payload = await client.queryScreenOddsBestComps({
-        market, league,
+        market,
+        league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
         books: Array.isArray(args.books) ? args.books : undefined,
@@ -1153,7 +1328,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             'Use staking_plan for Kelly sizing.',
             'Check player_context for injury risk on final picks.'
           ],
-          tools_to_use: ['screen_ranked', 'sharp_consensus', 'sharp_plays', 'get_play_details', 'staking_plan', 'player_context', 'find_best_price'],
+          tools_to_use: [
+            'screen_ranked',
+            'sharp_consensus',
+            'sharp_plays',
+            'get_play_details',
+            'staking_plan',
+            'player_context',
+            'find_best_price'
+          ],
           avoid: []
         }
       };
@@ -1224,11 +1407,13 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
             category: categorized.category,
             status: categorized.status,
             recovery: categorized.recovery,
-            ...(debugMode ? {
-              stack: error.stack || null,
-              originalMessage: error.message,
-              cause: error.cause ? error.cause.message || String(error.cause) : null
-            } : {})
+            ...(debugMode
+              ? {
+                  stack: error.stack || null,
+                  originalMessage: error.message,
+                  cause: error.cause ? error.cause.message || String(error.cause) : null
+                }
+              : {})
           }
         };
         return createJsonRpcSuccess(id, {

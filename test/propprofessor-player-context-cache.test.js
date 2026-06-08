@@ -19,8 +19,17 @@ const TWEET_FIXTURE = {
                       tweet_results: {
                         result: {
                           __typename: 'Tweet',
-                          legacy: { full_text: 'Tiafoe wins', favorite_count: 100, retweet_count: 20, created_at: 'Mon Jun 02 12:00:00 +0000 2026' },
-                          core: { user_results: { result: { legacy: { screen_name: 'BenRothenberg', name: 'Ben Rothenberg' } } } }
+                          legacy: {
+                            full_text: 'Tiafoe wins',
+                            favorite_count: 100,
+                            retweet_count: 20,
+                            created_at: 'Mon Jun 02 12:00:00 +0000 2026'
+                          },
+                          core: {
+                            user_results: {
+                              result: { legacy: { screen_name: 'BenRothenberg', name: 'Ben Rothenberg' } }
+                            }
+                          }
                         }
                       }
                     }
@@ -46,9 +55,11 @@ function mockExecSuccess() {
 
 function clearModuleCache() {
   for (const key of Object.keys(require.cache)) {
-    if (key.includes('propprofessor-news-sources')
-        || key.includes('propprofessor-player-context')
-        || key.includes('propprofessor-source-authority')) {
+    if (
+      key.includes('propprofessor-news-sources') ||
+      key.includes('propprofessor-player-context') ||
+      key.includes('propprofessor-source-authority')
+    ) {
       delete require.cache[key];
     }
   }

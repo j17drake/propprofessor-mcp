@@ -349,9 +349,18 @@ describe('tennis screen ranking helpers', () => {
     });
 
     assert.equal(ranked.length, 2);
-    assert.equal(ranked.every((row) => row.hasConsensus), true);
-    assert.equal(ranked.every((row) => row.consensusBookCount === 3), true);
-    assert.equal(ranked.every((row) => Number.isFinite(row.consensusEdge)), true);
+    assert.equal(
+      ranked.every((row) => row.hasConsensus),
+      true
+    );
+    assert.equal(
+      ranked.every((row) => row.consensusBookCount === 3),
+      true
+    );
+    assert.equal(
+      ranked.every((row) => Number.isFinite(row.consensusEdge)),
+      true
+    );
   });
 
   it('preserves the exact extracted prop selection when defaultKey points at a different alternate line', () => {
@@ -363,7 +372,7 @@ describe('tennis screen ranking helpers', () => {
           gameId: 'nba-hartenstein-reg',
           defaultKey: '8.5',
           selections: {
-            '7.5': {
+            7.5: {
               selection1: 'Isaiah Hartenstein Over 7.5',
               participant1: 'Isaiah Hartenstein',
               selection1Id: 'Player_Points:Isaiah_Hartenstein_Over_7.5',
@@ -378,7 +387,7 @@ describe('tennis screen ranking helpers', () => {
                 DraftKings: { odds1: -116, odds2: -104 }
               }
             },
-            '8.5': {
+            8.5: {
               selection1: 'Isaiah Hartenstein Over 8.5',
               participant1: 'Isaiah Hartenstein',
               selection1Id: 'Player_Points:Isaiah_Hartenstein_Over_8.5',
@@ -403,7 +412,9 @@ describe('tennis screen ranking helpers', () => {
       ]
     };
 
-    const extracted = extractScreenRows(payload, [{ book: 'NoVigApp' }]).filter((row) => row.selectionId === 'Player_Points:Isaiah_Hartenstein_Over_7.5');
+    const extracted = extractScreenRows(payload, [{ book: 'NoVigApp' }]).filter(
+      (row) => row.selectionId === 'Player_Points:Isaiah_Hartenstein_Over_7.5'
+    );
     assert.equal(extracted.length, 1);
 
     const ranked = rankScreenRows(extracted, {
@@ -433,7 +444,7 @@ describe('tennis screen ranking helpers', () => {
           awayTeam: 'San Antonio Spurs',
           defaultKey: '5.5',
           selections: {
-            '5.5': {
+            5.5: {
               selection1: 'Minnesota Timberwolves -5.5',
               participant1: 'Minnesota Timberwolves',
               selection1Id: 'Point_Spread:Minnesota_Timberwolves_-5.5',
@@ -686,7 +697,12 @@ describe('tennis screen ranking helpers', () => {
       }
     ];
 
-    const ranked = rankTennisScreenRows(rows, { limit: 2, preferredBook: 'NoVigApp', includeAll: true, recentWindowHours: 1 });
+    const ranked = rankTennisScreenRows(rows, {
+      limit: 2,
+      preferredBook: 'NoVigApp',
+      includeAll: true,
+      recentWindowHours: 1
+    });
 
     assert.equal(ranked[0].recentWindowHours, 1);
     assert.equal(ranked[0].movementDebug?.recentWindowHours, 1);
@@ -885,7 +901,9 @@ describe('tennis screen ranking helpers', () => {
       includeAll: true
     });
 
-    const row = ranked.find((r) => r.participant && r.participant.includes('Kyle Freeland') && String(r.odds) === '100');
+    const row = ranked.find(
+      (r) => r.participant && r.participant.includes('Kyle Freeland') && String(r.odds) === '100'
+    );
     assert.ok(row, 'Kyle Freeland Over row should exist');
     assert.equal(row.consensusBookCount, 0);
     assert.equal(row.marketBookCount, 0);

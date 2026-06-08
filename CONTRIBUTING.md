@@ -83,6 +83,7 @@ test/                          # Test files (mirrors lib/ structure)
 ## Reporting Bugs
 
 Open an issue with:
+
 - Tool name + params used
 - Expected vs actual output
 - Node version (`node --version`)

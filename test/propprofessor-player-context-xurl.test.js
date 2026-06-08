@@ -12,29 +12,29 @@ const XURL_SUCCESS_RESPONSE = {
       text: 'Carlos Alcaraz is OUT for Wimbledon with a wrist injury',
       author_id: '111',
       created_at: '2026-06-02T12:00:00.000Z',
-      public_metrics: { like_count: 2500, retweet_count: 800 },
+      public_metrics: { like_count: 2500, retweet_count: 800 }
     },
     {
       id: '1234567891',
       text: 'Alcaraz just won the French Open. Incredible.',
       author_id: '222',
       created_at: '2026-06-02T11:00:00.000Z',
-      public_metrics: { like_count: 100, retweet_count: 20 },
-    },
+      public_metrics: { like_count: 100, retweet_count: 20 }
+    }
   ],
   includes: {
     users: [
       { id: '111', username: 'josemorgado', name: 'José Morgado' },
-      { id: '222', username: 'tennis_fan', name: 'Tennis Fan' },
-    ],
-  },
+      { id: '222', username: 'tennis_fan', name: 'Tennis Fan' }
+    ]
+  }
 };
 
 const XURL_AUTH_ERROR = {
   title: 'Unauthorized',
   type: 'about:blank',
   status: 401,
-  detail: 'Unauthorized',
+  detail: 'Unauthorized'
 };
 
 let originalExecFile = null;
@@ -55,16 +55,22 @@ function mockExecError(message) {
 
 function clearModuleCache() {
   for (const key of Object.keys(require.cache)) {
-    if (key.includes('propprofessor-news-sources')
-        || key.includes('propprofessor-player-context')
-        || key.includes('propprofessor-source-authority')) {
+    if (
+      key.includes('propprofessor-news-sources') ||
+      key.includes('propprofessor-player-context') ||
+      key.includes('propprofessor-source-authority')
+    ) {
       delete require.cache[key];
     }
   }
 }
 
-before(() => { originalExecFile = cp.execFile; });
-after(() => { cp.execFile = originalExecFile; });
+before(() => {
+  originalExecFile = cp.execFile;
+});
+after(() => {
+  cp.execFile = originalExecFile;
+});
 
 describe('fetchViaXurl', () => {
   beforeEach(() => {
@@ -121,7 +127,9 @@ describe('extractXurlTweets', () => {
 
   it('handles missing includes.users gracefully', () => {
     const { extractXurlTweets } = require('../lib/propprofessor-player-context');
-    const noUsers = { data: [{ id: '1', text: 'orphan tweet', author_id: '999', created_at: '2026-06-02T12:00:00.000Z' }] };
+    const noUsers = {
+      data: [{ id: '1', text: 'orphan tweet', author_id: '999', created_at: '2026-06-02T12:00:00.000Z' }]
+    };
     const tweets = extractXurlTweets(noUsers);
     assert.equal(tweets.length, 1);
     assert.equal(tweets[0].author, '');
@@ -137,7 +145,9 @@ describe('extractXurlTweets', () => {
 
   it('marks tweets starting with "RT " as isRetweet', () => {
     const { extractXurlTweets } = require('../lib/propprofessor-player-context');
-    const rt = { data: [{ id: '1', text: 'RT @someone: hello', author_id: '1', created_at: '2026-06-02T12:00:00.000Z' }] };
+    const rt = {
+      data: [{ id: '1', text: 'RT @someone: hello', author_id: '1', created_at: '2026-06-02T12:00:00.000Z' }]
+    };
     const tweets = extractXurlTweets(rt);
     assert.equal(tweets[0].isRetweet, true);
   });
@@ -192,7 +202,9 @@ describe('getPlayerContext with useXurl', () => {
     cp.execFile = (file, args, arg3, arg4) => {
       const cb = typeof arg3 === 'function' ? arg3 : arg4;
       const isX = file === 'python3';
-      const stdout = isX ? JSON.stringify({ data: { search_by_raw_query: { search_timeline: { timeline: { instructions: [] } } } } }) : '';
+      const stdout = isX
+        ? JSON.stringify({ data: { search_by_raw_query: { search_timeline: { timeline: { instructions: [] } } } } })
+        : '';
       cb(null, stdout, '');
     };
     const { getPlayerContext, _ctxCache } = require('../lib/propprofessor-player-context');

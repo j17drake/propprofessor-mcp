@@ -3,7 +3,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { computeMultiWindowScore, DEFAULT_WINDOWS, DEFAULT_SHARP_BOOKS } = require('../lib/propprofessor-sharp-consensus');
+const {
+  computeMultiWindowScore,
+  DEFAULT_WINDOWS,
+  DEFAULT_SHARP_BOOKS
+} = require('../lib/propprofessor-sharp-consensus');
 
 /**
  * Build a row with lineHistory where each sharp book has points spanning the
@@ -63,7 +67,11 @@ describe('computeMultiWindowScore', () => {
       nowMs: now
     });
     const result = computeMultiWindowScore(row, { nowMs: now });
-    assert.equal(result.score, 1.0, `expected all 6 windows to agree, got ${result.score} (windows: ${result.consensusWindows.join(', ')})`);
+    assert.equal(
+      result.score,
+      1.0,
+      `expected all 6 windows to agree, got ${result.score} (windows: ${result.consensusWindows.join(', ')})`
+    );
     assert.equal(result.consensusWindowCount, 6);
   });
 
@@ -249,7 +257,10 @@ describe('multi-window score integration with risk grade and score', () => {
     const baseline = calculateRiskScore(makeRow({ multiWindowInsufficientData: true, multiWindowScore: 0 }));
     const weak = calculateRiskScore(makeRow({ multiWindowScore: 0.2, multiWindowInsufficientData: false }));
     assert.equal(weak - baseline, 3, `expected +3 (grade demotion -2, weak penalty +1), got ${weak - baseline}`);
-    assert.equal(gradeMovementQuality(makeRow({ multiWindowScore: 0.2, multiWindowInsufficientData: false })), 'yellow');
+    assert.equal(
+      gradeMovementQuality(makeRow({ multiWindowScore: 0.2, multiWindowInsufficientData: false })),
+      'yellow'
+    );
     assert.equal(gradeMovementQuality(makeRow({ multiWindowInsufficientData: true, multiWindowScore: 0 })), 'green');
   });
 
@@ -259,6 +270,9 @@ describe('multi-window score integration with risk grade and score', () => {
     const baseline = calculateRiskScore(makeRow({ multiWindowInsufficientData: true, multiWindowScore: 0 }));
     const neutral = calculateRiskScore(makeRow({ multiWindowScore: 0.5, multiWindowInsufficientData: false }));
     assert.equal(neutral - baseline, 2, `expected +2 (grade demotion only), got ${neutral - baseline}`);
-    assert.equal(gradeMovementQuality(makeRow({ multiWindowScore: 0.5, multiWindowInsufficientData: false })), 'yellow');
+    assert.equal(
+      gradeMovementQuality(makeRow({ multiWindowScore: 0.5, multiWindowInsufficientData: false })),
+      'yellow'
+    );
   });
 });

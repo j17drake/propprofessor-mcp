@@ -46,8 +46,17 @@ const X_TWEET_FIXTURE = {
                       tweet_results: {
                         result: {
                           __typename: 'Tweet',
-                          legacy: { full_text: 'Tiafoe wins', favorite_count: 100, retweet_count: 20, created_at: 'Mon Jun 02 12:00:00 +0000 2026' },
-                          core: { user_results: { result: { legacy: { screen_name: 'BenRothenberg', name: 'Ben Rothenberg' } } } }
+                          legacy: {
+                            full_text: 'Tiafoe wins',
+                            favorite_count: 100,
+                            retweet_count: 20,
+                            created_at: 'Mon Jun 02 12:00:00 +0000 2026'
+                          },
+                          core: {
+                            user_results: {
+                              result: { legacy: { screen_name: 'BenRothenberg', name: 'Ben Rothenberg' } }
+                            }
+                          }
                         }
                       }
                     }
@@ -101,18 +110,18 @@ function clearModuleCache() {
  * Google News RSS (curl to news.google.com), ESPN (curl to espn.com),
  * and X GraphQL API (python3 search).
  */
-function mockPlayerContextExecFile({ 
-  nitterRssResponse = '', 
-  xResponse = X_EMPTY_FIXTURE, 
+function mockPlayerContextExecFile({
+  nitterRssResponse = '',
+  xResponse = X_EMPTY_FIXTURE,
   newsResponse = GOOGLE_NEWS_FIXTURE,
   espnResponse = ESPN_FIXTURE,
   newsError = null,
   xError = null,
-  nitterError = null,
+  nitterError = null
 } = {}) {
   cp.execFile = (file, args, arg3, arg4) => {
     const cb = typeof arg3 === 'function' ? arg3 : arg4;
-    
+
     const argStr = Array.isArray(args) ? args.join(' ') : '';
     // Nitter RSS: curl to localhost:8080/search/rss (specific URL pattern)
     const isNitterRss = argStr.includes('localhost:8080/search/rss');
@@ -122,7 +131,7 @@ function mockPlayerContextExecFile({
     const isEspn = argStr.includes('espn.com');
     // X GraphQL API: python3 with 'search' arg (x-api.py script)
     const isXApi = file === 'python3' && argStr.includes('search');
-    
+
     if (isNitterRss) {
       if (nitterError) return cb(nitterError);
       return cb(null, nitterRssResponse, '');
@@ -138,7 +147,7 @@ function mockPlayerContextExecFile({
       if (xError) return cb(xError);
       return cb(null, JSON.stringify(xResponse), '');
     }
-    
+
     // Default fallback
     cb(new Error('Unexpected execFile call: ' + argStr));
   };
@@ -202,7 +211,7 @@ describe('fetchEspnSearch', () => {
     const articles = await fetchEspnSearch('Tiafoe');
     assert.ok(articles.length >= 1);
     // Should include the Tiafoe link
-    const tiafoeLink = articles.find(a => a.link.includes('tiafoe-injury'));
+    const tiafoeLink = articles.find((a) => a.link.includes('tiafoe-injury'));
     assert.ok(tiafoeLink, 'Expected tiafoe article in results');
     assert.equal(tiafoeLink.title, 'Tiafoe injury update from ESPN');
     assert.equal(tiafoeLink.source, 'ESPN');
@@ -224,7 +233,7 @@ describe('getPlayerContext with news fallback', () => {
   it('returns source "nitter-combined" when Nitter RSS returns tweets and news also returns data', async () => {
     mockPlayerContextExecFile({
       nitterRssResponse: GOOGLE_NEWS_FIXTURE, // reuse RSS fixture as Nitter RSS (same format)
-      xResponse: X_EMPTY_FIXTURE,
+      xResponse: X_EMPTY_FIXTURE
     });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
@@ -237,7 +246,7 @@ describe('getPlayerContext with news fallback', () => {
     mockPlayerContextExecFile({
       nitterRssResponse: GOOGLE_NEWS_FIXTURE,
       xResponse: X_EMPTY_FIXTURE,
-      newsResponse: '', // empty news
+      newsResponse: '' // empty news
     });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
@@ -248,7 +257,7 @@ describe('getPlayerContext with news fallback', () => {
   it('returns source "combined" when Nitter RSS empty, X returns tweets, and news returns data', async () => {
     mockPlayerContextExecFile({
       nitterRssResponse: '',
-      xResponse: X_TWEET_FIXTURE,
+      xResponse: X_TWEET_FIXTURE
     });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
@@ -261,7 +270,7 @@ describe('getPlayerContext with news fallback', () => {
     mockPlayerContextExecFile({
       nitterRssResponse: '',
       xResponse: X_TWEET_FIXTURE,
-      newsResponse: '',
+      newsResponse: ''
     });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
@@ -272,7 +281,7 @@ describe('getPlayerContext with news fallback', () => {
   it('returns source "news-fallback" when Nitter RSS and X both empty', async () => {
     mockPlayerContextExecFile({
       nitterRssResponse: '',
-      xResponse: X_EMPTY_FIXTURE,
+      xResponse: X_EMPTY_FIXTURE
     });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });
@@ -286,7 +295,7 @@ describe('getPlayerContext with news fallback', () => {
       nitterRssResponse: '',
       xResponse: X_EMPTY_FIXTURE,
       newsError: new Error('Network failure'),
-      espnResponse: '', // also fail ESPN
+      espnResponse: '' // also fail ESPN
     });
     const { getPlayerContext } = require('../lib/propprofessor-player-context');
     const result = await getPlayerContext({ player: 'Frances Tiafoe', sport: 'Tennis' });

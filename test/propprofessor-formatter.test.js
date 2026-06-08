@@ -318,9 +318,7 @@ describe('formatRecommendedBetsStandard', () => {
         {
           league: 'NBA',
           count: 1,
-          plays: [
-            { selection: 'Lakers', odds: -110, lineHistory: [1, 2], debug: {}, confidenceTier: 'TIER 1' }
-          ]
+          plays: [{ selection: 'Lakers', odds: -110, lineHistory: [1, 2], debug: {}, confidenceTier: 'TIER 1' }]
         }
       ]
     };

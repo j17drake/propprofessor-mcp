@@ -58,7 +58,11 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
   });
 
   it('screen_raw returns rows for default active league Moneyline', async () => {
-    const payload = await client.queryScreenOdds({ league: effectiveLeague, market: MARKET, books: ['NoVigApp', 'Pinnacle'] });
+    const payload = await client.queryScreenOdds({
+      league: effectiveLeague,
+      market: MARKET,
+      books: ['NoVigApp', 'Pinnacle']
+    });
     assert.ok(payload);
     const rows = extractScreenRows(payload);
     assert.ok(rows.length >= 1, `Expected at least 1 screen row for ${effectiveLeague} ${MARKET}, got ${rows.length}`);

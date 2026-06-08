@@ -221,7 +221,9 @@ describe('buildRankedScreenResponse', () => {
         }
       ]
     };
-    const rankRows = (rows, options = {}) => [{ rowCount: rows.length, recentWindowHours: options.recentWindowHours ?? null }];
+    const rankRows = (rows, options = {}) => [
+      { rowCount: rows.length, recentWindowHours: options.recentWindowHours ?? null }
+    ];
 
     const result = await buildRankedScreenResponse({
       client: null,
@@ -243,7 +245,9 @@ describe('buildRankedScreenResponse', () => {
         }
       ]
     };
-    const rankRows = (rows, options = {}) => [{ rowCount: rows.length, recentWindowHours: options.recentWindowHours ?? null }];
+    const rankRows = (rows, options = {}) => [
+      { rowCount: rows.length, recentWindowHours: options.recentWindowHours ?? null }
+    ];
 
     const result = await buildRankedScreenResponse({
       client: null,

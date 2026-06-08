@@ -147,9 +147,7 @@ describe('detectSteamMove', () => {
 
   it('rejects insufficient history', () => {
     const row = {
-      lineHistory: [
-        { book: 'Pinnacle', odds: -110, time: '2025-05-29T11:00:00Z' }
-      ]
+      lineHistory: [{ book: 'Pinnacle', odds: -110, time: '2025-05-29T11:00:00Z' }]
     };
     const result = detectSteamMove(row, { nowMs });
     assert.equal(result.isSteam, false);
@@ -202,9 +200,7 @@ describe('detectSteamMove', () => {
         { book: 'Circa', odds: -108, time: '2025-05-29T11:05:00Z' },
         { book: 'Circa', odds: -113, time: '2025-05-29T11:35:00Z' }
       ],
-      lineHistory: [
-        { book: 'Bovada', odds: -100, time: '2025-05-29T11:00:00Z' }
-      ]
+      lineHistory: [{ book: 'Bovada', odds: -100, time: '2025-05-29T11:00:00Z' }]
     };
     const result = detectSteamMove(row, { nowMs });
     assert.equal(result.isSteam, true);

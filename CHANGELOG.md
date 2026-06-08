@@ -5,38 +5,45 @@
 ### Universal Agent Access (Major)
 
 **Automated Auth Flow**
+
 - New `pp-query login` command opens browser, user logs in, auth saves automatically to `~/.propprofessor/auth.json`
 - No more manual cookie export — just run one command
 - Added Playwright as optional dependency for browser automation
 - Health endpoint now reports auth status with clear recovery instructions ("Run: pp-query login")
 
 **Verbosity Levels**
+
 - All bet-returning tools (`recommended_bets`, `sharp_plays`, `screen_ranked`, `screen`, `novig_screen`, `all_slates`, `staking_plan`, `ev_candidates`, `ufc_card`) now accept `verbosity: "minimal" | "standard" | "full"`
 - `minimal`: Plain English for casual bettors ("Bet Bonfim at +105, high confidence, low risk")
 - `standard`: Structured data without debug noise (edge, tier, risk, rationale)
 - `full`: Everything — line history, movement data, debug payloads (default, backward compatible)
 
 **Tool Discoverability**
+
 - New `get_started` meta-tool tells agents the workflow based on user type (casual/intermediate/sharp)
 - Returns structured workflow with steps, tools to use, and tools to avoid
 - README now has "Tool Guide" section grouping tools by user type
 
 **Agent Onboarding**
+
 - `docs/AGENT_PROMPT.md` — system prompt template for agents serving bettors
 - `docs/HERMES_SKILL.md` — Hermes skill file for quick context
 - Covers tier system, risk scores, movement grades, workflows by user type
 
 **Structured Error Handling**
+
 - Error codes: `AUTH_EXPIRED`, `BACKEND_DOWN`, `RATE_LIMITED`, `BACKEND_ERROR`, `INTERNAL_ERROR`
 - Each error includes recovery instructions
 - Agents know exactly what to tell users when something breaks
 
 **Backtesting**
+
 - New `scripts/backtest.js` CLI validates tier system predicts outcomes
 - `docs/BACKTESTING.md` explains usage and limitations
 - Ready for historical data when available
 
 **Stats**
+
 - 583 tests passing (up from 489)
 - 20 tools (up from 19 — added `get_started`)
 - All lint checks pass
@@ -44,6 +51,7 @@
 ## 1.1.0
 
 ### Multi-market defaults for recommended_bets, staking_plan, sharp_plays
+
 - `recommended_bets` now defaults to scanning Moneyline + Spread + Total markets (was Moneyline only). Queries each market per league, deduplicates by gameId+selection (keeps higher screenScore), then applies tier filtering. Returns the best plays across all markets.
 - `staking_plan` inherits the same multi-market default via `recommended_bets`.
 - `sharp_plays` now defaults to scanning Moneyline + Spread + Total (was Moneyline only).
@@ -52,14 +60,17 @@
 - Response includes `markets_queried: string[]` showing which markets were scanned.
 
 ### Equalized market priority weights
+
 - Moneyline, spread, and total weights are now equal within each league's ranking preset. Previously spreads and totals had lower weights, requiring stronger signals to pass the same ranking gate.
 - Props retain higher weights (harder markets to find edges in).
 - Affected leagues: NBA, MLB, NFL, NHL, SOCCER, UFC, NCAAB, NCAAF, WNBA, and fallback.
 
 ### markets_queried in resultMeta
+
 - All screen responses (`screen`, `screen_ranked`, `all_slates`, `ufc_card`) now include `resultMeta.markets_queried: string[]` indicating which markets were scanned.
 
 ### Tool description updates
+
 - `recommended_bets`: documents multi-market default and `markets` param.
 - `staking_plan`: documents multi-market inheritance.
 - `sharp_plays`: documents multi-market default.
@@ -69,41 +80,49 @@
 ## 1.0.8
 
 ### Compact mode for screen/recommended/all_slates/staking_plan
+
 - New `compact=true` param on `screen_ranked`, `screen`, `recommended_bets`, `all_slates`, and `staking_plan` tools. Strips each row to ~25 essential fields (no lineHistory, scoreBreakdown, full odds maps). Reduces response size by ~90%.
 - When `compact=true`, history hydration (N+1 API calls to odds history endpoint) is skipped entirely, making compact queries 10-50x faster.
 - `resultMeta.compact` flag indicates whether the response was compacted.
 
 ### `fields` param for selective field return
+
 - New `fields: string[]` param on all screen/recommended/all_slates/staking_plan tools. Overrides `compact` when both are set.
 - Example: `fields: ["game","selection","odds","edge","tier","kai"]` returns only those fields per row.
 - `resultMeta.fields` lists the fields that were returned.
 
 ### `include` param for top-level metadata filtering
+
 - New `include: string[]` param on all screen/recommended/all_slates/staking_plan tools.
 - Values: `"freshness"`, `"warnings"`, `"resultMeta"`, `"league"`. Example: `include: ["resultMeta"]` returns only `ok`, `result`, and `resultMeta`.
 
 ### Response caching
+
 - In-memory LRU cache with TTL (default 60s, configurable via `PROPPROFESSOR_CACHE_TTL_MS`).
 - Max entries: 50, configurable via `PROPPROFESSOR_CACHE_MAX`.
 - Cache hits reported via `resultMeta.cached: true`.
 - Only caches full responses (not compact/fields-filtered).
 
 ### `get_play_details` MCP tool
+
 - New tool: `get_play_details(league, game_ids)` — returns full rows (with line history, consensus, movement debug) for specific game IDs.
 - Designed for the workflow: compact list → drill into selected plays.
 
 ### Lint cleanup
+
 - Fixed 22 pre-existing lint errors across lib and test files (unused imports, duplicate keys, redundant Boolean casts).
 
 ## Unreleased
 
 ### Sharp book cross-reference for `sharp_plays`
+
 - `sharp_plays` now cross-references each sharp book's screen individually to find independent supportive movement on the same game+selection. This satisfies the "movement from a non-target sharp book" requirement for books like NoVigApp whose vig-removed lines always show as self-sourced.
 - New row fields: `sharpBookMovementConfirmed`, `sharpBookMovementSource`, `sharpBookClv` — populated when a sharp book independently confirms the play.
 - `movementIsSharpSourced` now accepts `sharpBookMovementConfirmed` as an alternative to traditional independent sharp movement.
 - Misleading pass reasons (`no_usable_line_history`, `movement_source_is_target_book`, etc.) are suppressed when sharp book confirmation exists.
 
 ### Removed fallback paths
+
 - Removed `consensusEdgeOnlyOk`, `consensusOnlyOk`, and `clvOnlyOk` as `Bet candidate` paths. These previously accepted rows based on consensus edge or CLV alone without actual sharp movement confirmation.
 - All `Bet candidates` now require either traditional `movementIsSharpSourced` (independent sharp book movement) or `sharpBookMovementConfirmed` (sharp book cross-reference).
 - Removed `consensusValidated` path (consensus edge without movement confirmation).
@@ -111,10 +130,12 @@
 - Simplified pass reason logic — no longer conditional on fallback flags.
 
 ### Test updates
+
 - Updated all test expectations to reflect stricter Bet candidate criteria.
 - 489/489 tests passing.
 
 ### Nitter RSS as primary tweet source in `player_context`
+
 - `player_context` now tries Nitter RSS first (fast, no auth, local instance via `NITTER_BASE` env var, default `http://localhost:8080`).
 - Fallback chain: Nitter RSS → X GraphQL (nitter-session-api) → Google News RSS → ESPN search.
 - New source labels: `nitter-rss`, `nitter-combined`, `news-fallback` (previously only `x-direct`, `combined`, `empty`).
@@ -122,6 +143,7 @@
 - Tests: updated `test/propprofessor-news-sources.test.js` and `test/propprofessor-player-context.test.js` with Nitter RSS fixtures and source label assertions.
 
 ### `skipHistory` param on screen tools
+
 - New `skipHistory: boolean` param on `screen_ranked`, `recommended_bets`, `all_slates`, `staking_plan`, and `sharp_consensus` tools.
 - When `true`, skips odds history hydration entirely — useful when you only need current odds/edges and don't need movement data.
 - Propagated through all handler call chains: `recommended_bets` → `screen_ranked`, `staking_plan` → `recommended_bets`, `all_slates` → `runLeagueScreen`/`runTennisScreen`, `sharp_consensus` → `screen_ranked`.
@@ -129,21 +151,25 @@
 - `compact` description clarified: it only affects output formatting, not data hydration. Use `skipHistory` to skip hydration.
 
 ### Compact mode description fix
+
 - Clarified `compact` param description across all tools: "Does NOT affect history hydration — movement data is always fetched." Previously implied compact skipped history.
 
 ## 1.0.7
 
 ### Screen API migration
+
 - Migrated screen endpoint from `screen.propprofessor.com/api/retrieve-data-new` → `backend.propprofessor.com/screen`
 - Now passes the full `ALL_SCREEN_BOOKS` list (36 books) by default, fixing non-major sports (Tennis, Soccer, etc.) returning only Polymarket data
 - Added book name canonicalization via `canonicalizeScreenBookName()` with alias support (e.g. "rebet" → "Rebet", "propbuilder" → "Prop Builder")
 
 ### New analysis modules
+
 - `propprofessor-steam-move.js` — Steam move detection integrated into screen ranking (exposes `steamMove`, `steamBooks`, `steamDirection` per row)
 - `propprofessor-sharp-consensus.js` — Multi-window sharp consensus analysis across 1h/2h/6h/12h/24h/48h windows
 - `propprofessor-best-price.js` — Line shopping: finds best price across all books for a given play
 
 ### New MCP tools (6)
+
 - `query_sharp_consensus_windows` — Detect sustained sharp book consensus movement across time windows
 - `query_all_slates` — Query 7+ leagues at once with consolidated ranked output
 - `find_best_price` — Compare odds across all books for line shopping
@@ -152,6 +178,7 @@
 - `query_screen_odds_best_comps` / `query_screen_odds_ranked` — Explicit MCP tools for the screen ranking pipeline
 
 ### Sharp plays upgrades
+
 - Steam bonus (+15pts) added to sharp play scoring
 - Consensus-only fallback for execution books (Fliff, etc.) that can't validate independent sharp movement
 - `requireIndependentSharpMovement` flag for flexible movement verification
@@ -159,17 +186,21 @@
 - Removed `book: executionBook` override that was clobbering the actual book name in `sharp-plays-service`
 
 ### Screen ranking improvements
+
 - `buildDegradedDataWarnings()` — Data quality transparency: warns when line history, consensus, or freshness is missing
 - `recentWindowHours` now configurable via args (was hardcoded 6h)
 - `getResolvedScreenSelection()` now matches by `selectionId` or exact `line+odds`, not just `defaultKey` (fixes prop selection mismatches)
 - Steam move detection integrated into ranking pipeline
 
 ### Tennis two-phase fallback
+
 - Phase 1: `/screen` with full book list (fixes Polymarket-only results)
 - Phase 2: When `/screen` has insufficient data, falls back to +EV endpoint with odds history enrichment via `enrichTennisEvCandidates()`
 
 ### Handler renaming for consistency
+
 All MCP tool handlers prefixed with `query_` for consistency:
+
 - `ev_discover` → `query_positive_ev_candidates` (with mandatory `leagues` validation)
 - `ev_validate` → `query_validated_positive_ev_candidates`
 - `screen` → `query_screen_odds`
@@ -182,6 +213,7 @@ All MCP tool handlers prefixed with `query_` for consistency:
 - CLI `ufc-card` command updated to call `query_ufc_card`
 
 ### Test coverage (+500 lines)
+
 - Steam move detection and best-price analysis tests
 - Prop selection resolution with multi-line alternates (Hartenstein O7.5 vs O8.5)
 - Execution field preservation for selection2 rows (Spurs +5.5)

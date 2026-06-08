@@ -91,9 +91,9 @@ describe('strict steam rule (5-min window, 3+ sharp books)', () => {
         { book: 'Pinnacle', time: openTime, odds: -140 },
         { book: 'Pinnacle', time: recentTime, odds: -160 }, // down
         { book: 'Circa', time: openTime, odds: -140 },
-        { book: 'Circa', time: recentTime, odds: -120 },    // up (mixed)
+        { book: 'Circa', time: recentTime, odds: -120 }, // up (mixed)
         { book: 'BookMaker', time: openTime, odds: -140 },
-        { book: 'BookMaker', time: recentTime, odds: -160 }  // down
+        { book: 'BookMaker', time: recentTime, odds: -160 } // down
       ]
     };
     const strict = detectSteamMove(row, { ...STRICT, nowMs: now });
@@ -139,8 +139,8 @@ describe('strict + legacy side-by-side comparison (what the daily report will se
 
     // Simulating the dual call in screen-utils.js
     const output = {
-      steamMove: strictResult.isSteam,           // false
-      steamMoveLegacy: legacyResult.isSteam,     // true
+      steamMove: strictResult.isSteam, // false
+      steamMoveLegacy: legacyResult.isSteam, // true
       steamBooks: strictResult.steamBooks,
       steamBooksLegacy: legacyResult.steamBooks
     };

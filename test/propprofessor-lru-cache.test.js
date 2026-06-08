@@ -20,7 +20,7 @@ describe('LruCache — basic ops', () => {
     const c = new LruCache();
     c.set('k', 'v', 20);
     assert.equal(c.get('k'), 'v');
-    await new Promise(r => setTimeout(r, 40));
+    await new Promise((r) => setTimeout(r, 40));
     assert.equal(c.get('k'), undefined);
   });
 

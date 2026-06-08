@@ -21,6 +21,7 @@
 **Objective:** Automate the browser login flow so users don't need to manually export cookies.
 
 **Files:**
+
 - Create: `scripts/pp-login.js`
 - Modify: `package.json` (add `playwright` as optional dependency)
 
@@ -128,13 +129,14 @@ if (command === 'login') {
 
 Add to Quick Start section:
 
-```markdown
+````markdown
 ### Auth Setup (Automated)
 
 ```bash
 pp-query login
 # Opens browser, log in, auth saved automatically
 ```
+````
 
 ### Auth Setup (Manual)
 
@@ -143,14 +145,15 @@ If you already have an exported session:
 ```bash
 pp-query install-auth --source /path/to/auth.json
 ```
-```
+
+````
 
 **Step 7: Commit**
 
 ```bash
 git add scripts/pp-login.js scripts/query-propprofessor.js test/pp-login.test.js package.json README.md
 git commit -m "feat: automated login flow with Playwright"
-```
+````
 
 ---
 
@@ -159,6 +162,7 @@ git commit -m "feat: automated login flow with Playwright"
 **Objective:** When auth expires or is missing, return a clear agent-friendly error with recovery instructions.
 
 **Files:**
+
 - Modify: `lib/propprofessor-api.js` (add `isAuthValid()` function)
 - Modify: `scripts/propprofessor-mcp-server.js` (update `health_status` handler)
 
@@ -181,9 +185,7 @@ describe('isAuthValid', () => {
 
   it('should return true for auth with PropProfessor cookies', () => {
     const auth = {
-      cookies: [
-        { name: 'session', domain: '.propprofessor.com', value: 'abc123' }
-      ]
+      cookies: [{ name: 'session', domain: '.propprofessor.com', value: 'abc123' }]
     };
     assert.strictEqual(isAuthValid(auth), true);
   });
@@ -275,6 +277,7 @@ git commit -m "feat: clear auth status in health endpoint"
 **Objective:** Allow agents to request different output formats based on user sophistication.
 
 **Files:**
+
 - Modify: `lib/propprofessor-tool-definitions.js` (add `verbosity` param to key tools)
 
 **Step 1: Write failing test**
@@ -290,11 +293,7 @@ describe('verbosity parameter', () => {
     const tools = buildToolDefinitions();
     const recBets = tools.find((t) => t.name === 'recommended_bets');
     assert.ok(recBets.inputSchema.properties.verbosity);
-    assert.deepStrictEqual(recBets.inputSchema.properties.verbosity.enum, [
-      'minimal',
-      'standard',
-      'full'
-    ]);
+    assert.deepStrictEqual(recBets.inputSchema.properties.verbosity.enum, ['minimal', 'standard', 'full']);
   });
 });
 ```
@@ -345,6 +344,7 @@ git commit -m "feat: add verbosity parameter to key tools"
 **Objective:** Convert raw bet data into plain English for casual bettors.
 
 **Files:**
+
 - Create: `lib/propprofessor-formatter.js`
 - Modify: `scripts/propprofessor-mcp-server.js` (apply formatter when verbosity=minimal)
 
@@ -411,25 +411,12 @@ Expected: FAIL — "Cannot find module '../lib/propprofessor-formatter'"
 'use strict';
 
 function formatBetMinimal(bet = {}) {
-  const {
-    selection,
-    odds,
-    game,
-    league,
-    market,
-    tier,
-    edge,
-    riskScore,
-    rationale
-  } = bet;
+  const { selection, odds, game, league, market, tier, edge, riskScore, rationale } = bet;
 
-  const confidence = tier === 'TIER 1' ? 'high confidence' :
-                     tier === 'TIER 2' ? 'moderate confidence' :
-                     'low confidence';
+  const confidence =
+    tier === 'TIER 1' ? 'high confidence' : tier === 'TIER 2' ? 'moderate confidence' : 'low confidence';
 
-  const risk = riskScore >= 7 ? '⚠️ Risky' :
-               riskScore >= 4 ? 'Moderate risk' :
-               'Low risk';
+  const risk = riskScore >= 7 ? '⚠️ Risky' : riskScore >= 4 ? 'Moderate risk' : 'Low risk';
 
   const action = tier === 'TIER 1' || tier === 'TIER 2' ? 'Bet' : 'Consider';
 
@@ -499,6 +486,7 @@ git commit -m "feat: minimal verbosity formatter for casual bettors"
 **Objective:** Provide edge/tier/risk with brief rationale for intermediate bettors.
 
 **Files:**
+
 - Modify: `lib/propprofessor-formatter.js` (add `formatBetStandard`)
 - Modify: `scripts/propprofessor-mcp-server.js` (apply formatter when verbosity=standard)
 
@@ -638,6 +626,7 @@ git commit -m "feat: standard verbosity formatter for intermediate bettors"
 **Objective:** Provide a single entry point that tells agents the recommended workflow based on user type.
 
 **Files:**
+
 - Modify: `lib/propprofessor-tool-definitions.js` (add `get_started` tool)
 - Modify: `scripts/propprofessor-mcp-server.js` (implement handler)
 
@@ -770,6 +759,7 @@ git commit -m "feat: get_started meta-tool for agent workflow guidance"
 **Objective:** Document tools by use case so agents (and humans reading the docs) understand the workflow.
 
 **Files:**
+
 - Modify: `README.md` (add "Tool Guide" section)
 
 **Step 1: Add tool guide section**
@@ -805,23 +795,23 @@ git commit -m "feat: get_started meta-tool for agent workflow guidance"
 
 ### All Tools (Reference)
 
-| Tool | Purpose | Casual | Intermediate | Sharp |
-|------|---------|--------|--------------|-------|
-| `get_started` | Workflow guide | ✓ | ✓ | ✓ |
-| `recommended_bets` | Top picks | ✓ | ✓ | ✓ |
-| `player_context` | Injury risk | ✓ | ✓ | ✓ |
-| `find_best_price` | Line shopping | | ✓ | ✓ |
-| `league_presets` | Ranking weights | | ✓ | ✓ |
-| `screen_ranked` | Full ranked data | | | ✓ |
-| `sharp_consensus` | Multi-window movement | | | ✓ |
-| `sharp_plays` | Independent sharp support | | | ✓ |
-| `get_play_details` | Line history | | | ✓ |
-| `staking_plan` | Kelly sizing | | | ✓ |
-| `screen_raw` | Raw odds screen | | | ✓ |
-| `ev_candidates` | +EV discovery | | | ✓ |
-| `ufc_card` | UFC event analysis | | | ✓ |
-| `all_slates` | All leagues at once | | | ✓ |
-| `health_status` | System health | ✓ | ✓ | ✓ |
+| Tool               | Purpose                   | Casual | Intermediate | Sharp |
+| ------------------ | ------------------------- | ------ | ------------ | ----- |
+| `get_started`      | Workflow guide            | ✓      | ✓            | ✓     |
+| `recommended_bets` | Top picks                 | ✓      | ✓            | ✓     |
+| `player_context`   | Injury risk               | ✓      | ✓            | ✓     |
+| `find_best_price`  | Line shopping             |        | ✓            | ✓     |
+| `league_presets`   | Ranking weights           |        | ✓            | ✓     |
+| `screen_ranked`    | Full ranked data          |        |              | ✓     |
+| `sharp_consensus`  | Multi-window movement     |        |              | ✓     |
+| `sharp_plays`      | Independent sharp support |        |              | ✓     |
+| `get_play_details` | Line history              |        |              | ✓     |
+| `staking_plan`     | Kelly sizing              |        |              | ✓     |
+| `screen_raw`       | Raw odds screen           |        |              | ✓     |
+| `ev_candidates`    | +EV discovery             |        |              | ✓     |
+| `ufc_card`         | UFC event analysis        |        |              | ✓     |
+| `all_slates`       | All leagues at once       |        |              | ✓     |
+| `health_status`    | System health             | ✓      | ✓            | ✓     |
 ```
 
 **Step 2: Commit**
@@ -844,6 +834,7 @@ git commit -m "docs: add tool guide by user type"
 **Objective:** Provide a recommended system prompt that agents can use to understand PropProfessor MCP.
 
 **Files:**
+
 - Create: `docs/AGENT_PROMPT.md`
 
 **Step 1: Write agent prompt**
@@ -860,23 +851,28 @@ You are a sports betting assistant powered by PropProfessor MCP. You help users 
 ## Understanding the Outputs
 
 ### Tier System
+
 - **TIER 1**: Highest confidence. Sharp books agree, strong movement, low risk.
 - **TIER 2**: Good confidence. Sharp support present, moderate risk.
 - **TIER 3**: Lower confidence. Mixed signals, higher risk.
 - **TIER 4**: Pass. Not enough confirmation or too risky.
 
 ### Risk Score (1-10)
+
 - **1-3**: Low risk. Sharp books agree, no injury concerns, stable line.
 - **4-6**: Moderate risk. Some uncertainty, check player context.
 - **7-10**: High risk. Injury concerns, sharp books split, volatile line.
 
 ### Edge (%)
+
 The percentage advantage you have over the book. Higher is better.
+
 - **< 1%**: Marginal. Skip unless other signals are strong.
 - **1-3%**: Decent. Worth considering.
 - **> 3%**: Strong. Good value if confirmed by sharp movement.
 
 ### Movement Grade
+
 - **A**: Strong supportive movement from sharp books.
 - **B**: Moderate supportive movement.
 - **C**: Mixed or neutral movement.
@@ -885,21 +881,27 @@ The percentage advantage you have over the book. Higher is better.
 ## Workflow by User Type
 
 ### Casual Bettors
+
 They just want to know what to bet. Use `recommended_bets` with `verbosity: "minimal"` to get plain English picks. Present the top 3-5 plays. If they ask "why," check `player_context` for injury risk.
 
 **Example response:**
+
 > "Bet Bonfim at +105 (UFC, Moneyline). High confidence, low risk. Sharp books agree, no injury concerns, good value."
 
 ### Intermediate Bettors
+
 They understand edge and tier. Use `recommended_bets` with `verbosity: "standard"` to get structured data. Explain what the edge and tier mean. Warn them if riskScore >= 7.
 
 **Example response:**
+
 > "Bonfim +105 is TIER 1 with 2.57% edge. Risk score is 2 (low). Sharp books (Pinnacle, BetOnline, BookMaker) all moved supportive in the 2h, 6h, and 12h windows. No injury concerns. Good value."
 
 ### Sharp Bettors
+
 They want full control. Use `screen_ranked` with `verbosity: "full"` and let them explore. They'll ask for specific data (line history, consensus windows, steam moves). Provide it.
 
 **Example response:**
+
 > "Bonfim +105 has movement grade A. Multi-window consensus: supportive in 2h, 6h, 12h, 24h. All three sharp books (Pinnacle, BetOnline, BookMaker) agree. Line history shows 5-cent move from +110 to +105 over 6 hours. No injury risk. Kelly suggests 2% of bankroll."
 
 ## Key Rules
@@ -931,6 +933,7 @@ They want full control. Use `screen_ranked` with `verbosity: "full"` and let the
 ## Bankroll Management
 
 If the user asks how much to bet:
+
 - **TIER 1**: 1-2% of bankroll
 - **TIER 2**: 0.5-1% of bankroll
 - **TIER 3**: Skip or 0.25% max
@@ -953,6 +956,7 @@ git commit -m "docs: add agent system prompt template"
 **Objective:** Provide a Hermes skill that agents can load to understand PropProfessor MCP.
 
 **Files:**
+
 - Create: `docs/HERMES_SKILL.md`
 
 **Step 1: Write skill file**
@@ -982,26 +986,31 @@ PropProfessor MCP is an odds analysis engine for AI agents. It screens 36+ sport
 ### For Casual Bettors
 
 ```
+
 1. Call get_started(user_type: "casual")
 2. Call recommended_bets(verbosity: "minimal")
 3. Present top 3-5 plays in plain English
 4. Check player_context for injury risk if asked
+
 ```
 
 ### For Intermediate Bettors
 
 ```
+
 1. Call get_started(user_type: "intermediate")
 2. Call recommended_bets(verbosity: "standard")
 3. Filter by TIER 1, TIER 2
 4. Check player_context for each top play
 5. Warn if riskScore >= 7
 6. Optionally call find_best_price to line shop
+
 ```
 
 ### For Sharp Bettors
 
 ```
+
 1. Call get_started(user_type: "sharp")
 2. Call screen_ranked(verbosity: "full")
 3. Use sharp_consensus for multi-window movement
@@ -1009,6 +1018,7 @@ PropProfessor MCP is an odds analysis engine for AI agents. It screens 36+ sport
 5. Call get_play_details for line history
 6. Use staking_plan for Kelly sizing
 7. Check player_context for final picks
+
 ```
 
 ## Key Concepts
@@ -1072,6 +1082,7 @@ git commit -m "docs: add Hermes skill file for agent onboarding"
 **Objective:** Return clear error codes with recovery instructions so agents can guide users.
 
 **Files:**
+
 - Modify: `lib/propprofessor-mcp-stdio.js` (enhance error categorization)
 - Modify: `scripts/propprofessor-mcp-server.js` (return structured errors)
 
@@ -1182,6 +1193,7 @@ git commit -m "feat: structured error codes with recovery instructions"
 **Objective:** Validate that the tier system actually predicts outcomes.
 
 **Files:**
+
 - Create: `scripts/backtest.js`
 - Create: `docs/BACKTESTING.md`
 
@@ -1254,7 +1266,7 @@ module.exports = { backtest };
 
 **Step 2: Add documentation**
 
-```markdown
+````markdown
 # Backtesting Guide
 
 ## Run a Backtest
@@ -1262,6 +1274,7 @@ module.exports = { backtest };
 ```bash
 node scripts/backtest.js MLB Moneyline 30
 ```
+````
 
 This tests the last 30 days of MLB Moneyline plays.
 
@@ -1291,14 +1304,15 @@ If TIER 1 hit rate is significantly higher than TIER 4, the tier system is worki
 - Historical data availability depends on PropProfessor's API
 - Past performance doesn't guarantee future results
 - Small sample sizes (< 50 bets per tier) may not be statistically significant
-```
+
+````
 
 **Step 3: Commit**
 
 ```bash
 git add scripts/backtest.js docs/BACKTESTING.md
 git commit -m "feat: backtesting script to validate tier system"
-```
+````
 
 ---
 

@@ -397,7 +397,11 @@ describe('createPropProfessorClient', () => {
 
     try {
       assert.equal(typeof client.queryFantasyPicks, 'function');
-      const payload = await client.queryFantasyPicks({ sportsbook: 'DraftKings6', league: 'NBA', market: 'Fantasy Points' });
+      const payload = await client.queryFantasyPicks({
+        sportsbook: 'DraftKings6',
+        league: 'NBA',
+        market: 'Fantasy Points'
+      });
       assert.equal(fetchCalls.length, 1);
       assert.equal(fetchCalls[0].url, 'https://slipgen.propprofessor.com/fantasy-picks');
       const body = JSON.parse(fetchCalls[0].options.body);

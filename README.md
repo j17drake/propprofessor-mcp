@@ -1,6 +1,7 @@
 # PropProfessor MCP
 
 <!-- Badges -->
+
 [![npm version](https://img.shields.io/npm/v/propprofessor-mcp?color=44cc11&label=npm)](https://www.npmjs.com/package/propprofessor-mcp)
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
@@ -46,9 +47,9 @@ npm link
 
 After `npm link`, two commands are available:
 
-| Command | Purpose |
-|---------|---------|
-| `pp-mcp` | MCP server for AI agents (stdio transport) |
+| Command    | Purpose                                      |
+| ---------- | -------------------------------------------- |
+| `pp-mcp`   | MCP server for AI agents (stdio transport)   |
 | `pp-query` | Local CLI for setup, debugging, quick checks |
 
 ### Auth Setup
@@ -110,27 +111,27 @@ pp-query health    # quick endpoint ping
 
 ### All Tools (Reference)
 
-| Tool | Purpose | Casual | Intermediate | Sharp |
-|------|---------|--------|--------------|-------|
-| `get_started` | Workflow guide | ✓ | ✓ | ✓ |
-| `recommended_bets` | Top picks | ✓ | ✓ | ✓ |
-| `player_context` | Injury risk | ✓ | ✓ | ✓ |
-| `find_best_price` | Line shopping | | ✓ | ✓ |
-| `league_presets` | Ranking weights | | ✓ | ✓ |
-| `screen_ranked` | Full ranked data | | | ✓ |
-| `sharp_consensus` | Multi-window movement | | | ✓ |
-| `sharp_plays` | Independent sharp support | | | ✓ |
-| `get_play_details` | Line history | | | ✓ |
-| `staking_plan` | Kelly sizing | | | ✓ |
-| `screen_raw` | Raw odds screen | | | ✓ |
-| `ev_candidates` | +EV discovery | | | ✓ |
-| `ufc_card` | UFC event analysis | | | ✓ |
-| `all_slates` | All leagues at once | | | ✓ |
-| `health_status` | System health | ✓ | ✓ | ✓ |
-| `screen` | League screen | | | ✓ |
-| `novig_screen` | NoVigApp-specific screen | | ✓ | ✓ |
-| `hide_bet` / `unhide_bet` | Manage hidden bets | | ✓ | ✓ |
-| `clear_hidden_bets` | Reset hidden bets | | ✓ | ✓ |
+| Tool                      | Purpose                   | Casual | Intermediate | Sharp |
+| ------------------------- | ------------------------- | ------ | ------------ | ----- |
+| `get_started`             | Workflow guide            | ✓      | ✓            | ✓     |
+| `recommended_bets`        | Top picks                 | ✓      | ✓            | ✓     |
+| `player_context`          | Injury risk               | ✓      | ✓            | ✓     |
+| `find_best_price`         | Line shopping             |        | ✓            | ✓     |
+| `league_presets`          | Ranking weights           |        | ✓            | ✓     |
+| `screen_ranked`           | Full ranked data          |        |              | ✓     |
+| `sharp_consensus`         | Multi-window movement     |        |              | ✓     |
+| `sharp_plays`             | Independent sharp support |        |              | ✓     |
+| `get_play_details`        | Line history              |        |              | ✓     |
+| `staking_plan`            | Kelly sizing              |        |              | ✓     |
+| `screen_raw`              | Raw odds screen           |        |              | ✓     |
+| `ev_candidates`           | +EV discovery             |        |              | ✓     |
+| `ufc_card`                | UFC event analysis        |        |              | ✓     |
+| `all_slates`              | All leagues at once       |        |              | ✓     |
+| `health_status`           | System health             | ✓      | ✓            | ✓     |
+| `screen`                  | League screen             |        |              | ✓     |
+| `novig_screen`            | NoVigApp-specific screen  |        | ✓            | ✓     |
+| `hide_bet` / `unhide_bet` | Manage hidden bets        |        | ✓            | ✓     |
+| `clear_hidden_bets`       | Reset hidden bets         |        | ✓            | ✓     |
 
 ---
 
@@ -177,60 +178,60 @@ See [CONFIG.md](CONFIG.md) for client-specific configs. The server runs via:
 
 ### Screening & Ranking
 
-| Tool | Description |
-|------|-------------|
-| `screen_ranked` | **Primary.** Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`, `skipHistory`. |
-| `screen` | League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis). |
-| `screen_raw` | Raw odds payload. `bestComps: true` for sharper comparison books. |
-| `all_slates` | Consolidated ranked list across multiple leagues. |
-| `get_play_details` | Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query. |
+| Tool               | Description                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `screen_ranked`    | **Primary.** Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`, `skipHistory`. |
+| `screen`           | League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis).                                     |
+| `screen_raw`       | Raw odds payload. `bestComps: true` for sharper comparison books.                                                              |
+| `all_slates`       | Consolidated ranked list across multiple leagues.                                                                              |
+| `get_play_details` | Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query.                       |
 
 ### Sharp Movement
 
-| Tool | Description |
-|------|-------------|
-| `sharp_plays` | Target-book plays with **independently confirmed** sharp movement. Cross-references Pinnacle, Circa, BookMaker, BetOnline to verify supportive movement on the same game+selection. Only returns `Bet candidate` when a non-target sharp book confirms the move. |
-| `sharp_consensus` | Multi-window (1h–48h) sharp book consensus analysis. |
+| Tool              | Description                                                                                                                                                                                                                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sharp_plays`     | Target-book plays with **independently confirmed** sharp movement. Cross-references Pinnacle, Circa, BookMaker, BetOnline to verify supportive movement on the same game+selection. Only returns `Bet candidate` when a non-target sharp book confirms the move. |
+| `sharp_consensus` | Multi-window (1h–48h) sharp book consensus analysis.                                                                                                                                                                                                             |
 
 ### Line Shopping
 
-| Tool | Description |
-|------|-------------|
+| Tool              | Description                                                      |
+| ----------------- | ---------------------------------------------------------------- |
 | `find_best_price` | Every book's odds sorted best→worst with spread from best price. |
 
 ### Player Context
 
-| Tool | Description |
-|------|-------------|
+| Tool             | Description                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `player_context` | News, tweets, riskFlag for a player. Nitter RSS → X → Google News RSS → ESPN fallback. Source authority scoring. |
 
 ### Betting
 
-| Tool | Description |
-|------|-------------|
+| Tool               | Description                                                                      |
+| ------------------ | -------------------------------------------------------------------------------- |
 | `recommended_bets` | TIER 1/2 plays across leagues with movementGrade, riskScore, kaiCall, rationale. |
-| `staking_plan` | Fractional Kelly stakes (TIER 1=2%, TIER 2=1% of bankroll). |
-| `ev_candidates` | Fast +EV discovery (secondary; validate on `/screen`). |
+| `staking_plan`     | Fractional Kelly stakes (TIER 1=2%, TIER 2=1% of bankroll).                      |
+| `ev_candidates`    | Fast +EV discovery (secondary; validate on `/screen`).                           |
 
 ### UFC
 
-| Tool | Description |
-|------|-------------|
+| Tool       | Description                                                    |
+| ---------- | -------------------------------------------------------------- |
 | `ufc_card` | First-class shortlist with official plays, best looks, passes. |
 
 ### Bet Management
 
-| Tool | Description |
-|------|-------------|
-| `hide_bet` / `unhide_bet` | Toggle fantasy optimizer visibility per bet. |
-| `get_hidden_bets` / `clear_hidden_bets` | List or clear all hidden bets. |
+| Tool                                    | Description                                  |
+| --------------------------------------- | -------------------------------------------- |
+| `hide_bet` / `unhide_bet`               | Toggle fantasy optimizer visibility per bet. |
+| `get_hidden_bets` / `clear_hidden_bets` | List or clear all hidden bets.               |
 
 ### Meta
 
-| Tool | Description |
-|------|-------------|
-| `health_status` | Auth freshness, endpoint connectivity. |
-| `league_presets` | Sport-specific ranking presets. |
+| Tool             | Description                            |
+| ---------------- | -------------------------------------- |
+| `health_status`  | Auth freshness, endpoint connectivity. |
+| `league_presets` | Sport-specific ranking presets.        |
 
 ---
 
@@ -238,12 +239,12 @@ See [CONFIG.md](CONFIG.md) for client-specific configs. The server runs via:
 
 All screen/recommended/staking tools support these params:
 
-| Flag | Effect |
-|------|--------|
-| `compact: true` | ~90% smaller response. Retains movement signals (steamMove, consensusEdge, movementLabel). Does NOT skip history hydration. |
-| `skipHistory: true` | Skips odds history hydration entirely. Use when you only need current odds/edges. |
-| `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`). |
-| `include: ["resultMeta"]` | Top-level section filtering. |
+| Flag                                                      | Effect                                                                                                                      |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `compact: true`                                           | ~90% smaller response. Retains movement signals (steamMove, consensusEdge, movementLabel). Does NOT skip history hydration. |
+| `skipHistory: true`                                       | Skips odds history hydration entirely. Use when you only need current odds/edges.                                           |
+| `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`).                                                                               |
+| `include: ["resultMeta"]`                                 | Top-level section filtering.                                                                                                |
 
 ---
 
@@ -309,48 +310,48 @@ Books to show in `find_best_price` or `screen_raw`:
 
 Pre-configured in `lib/propprofessor-sharp-books.js`:
 
-| Sport | Main Market | Props |
-|-------|-------------|-------|
-| **NBA** | Circa, Pinnacle, BookMaker, BetOnline, DraftKings | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle |
-| **NFL** | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel | Pinnacle, FanDuel, BookMaker, Circa, BetOnline |
-| **MLB** | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
-| **Others** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa | Same |
+| Sport      | Main Market                                               | Props                                                     |
+| ---------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| **NBA**    | Circa, Pinnacle, BookMaker, BetOnline, DraftKings         | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle       |
+| **NFL**    | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel             | Pinnacle, FanDuel, BookMaker, Circa, BetOnline            |
+| **MLB**    | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
+| **Others** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa            | Same                                                      |
 
 ---
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AUTH_FILE` | `~/.propprofessor/auth.json` | Auth file path |
-| `PROPPROFESSOR_MCP_NDJSON` | (required) | Enable NDJSON framing |
-| `PROPPROFESSOR_CACHE_TTL_MS` | `60000` | Response cache TTL (ms) |
-| `PROPPROFESSOR_CACHE_MAX` | `50` | Max cache entries (LRU) |
-| `LOCAL_TIMEZONE` | `America/Chicago` | CLI display timezone |
+| Variable                     | Default                      | Description             |
+| ---------------------------- | ---------------------------- | ----------------------- |
+| `AUTH_FILE`                  | `~/.propprofessor/auth.json` | Auth file path          |
+| `PROPPROFESSOR_MCP_NDJSON`   | (required)                   | Enable NDJSON framing   |
+| `PROPPROFESSOR_CACHE_TTL_MS` | `60000`                      | Response cache TTL (ms) |
+| `PROPPROFESSOR_CACHE_MAX`    | `50`                         | Max cache entries (LRU) |
+| `LOCAL_TIMEZONE`             | `America/Chicago`            | CLI display timezone    |
 
 ---
 
 ## Known Issues
 
-| Issue | Fix |
-|-------|-----|
-| `pp-query doctor` auth missing | Export fresh session to `~/.propprofessor/auth.json` |
-| Endpoint check fails | Session stale — re-login and re-export |
-| MCP client won't start | Run `pp-query doctor`; ensure `caveman-shrink` on PATH if using Hermes config |
-| Large responses timeout | Use `compact: true` and/or `fields` param |
-| No Bet candidates returned | Sharp book cross-reference requires overlap between target book and sharp book screens. Try different `sharpBooks` or check `emptyState.failureBreakdown` for reasons. |
-| ChatGPT | Not supported for local stdio; use remote MCP endpoint |
+| Issue                          | Fix                                                                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pp-query doctor` auth missing | Export fresh session to `~/.propprofessor/auth.json`                                                                                                                   |
+| Endpoint check fails           | Session stale — re-login and re-export                                                                                                                                 |
+| MCP client won't start         | Run `pp-query doctor`; ensure `caveman-shrink` on PATH if using Hermes config                                                                                          |
+| Large responses timeout        | Use `compact: true` and/or `fields` param                                                                                                                              |
+| No Bet candidates returned     | Sharp book cross-reference requires overlap between target book and sharp book screens. Try different `sharpBooks` or check `emptyState.failureBreakdown` for reasons. |
+| ChatGPT                        | Not supported for local stdio; use remote MCP endpoint                                                                                                                 |
 
 ---
 
 ## Verified Runtime Behavior (2026-06-06)
 
-| Tool | Status | Notes |
-|------|--------|-------|
-| `screen` / `screen_ranked` | Healthy | Primary discovery path |
-| `sharp_plays` | Healthy | Sharp book cross-reference confirms NoVigApp/Fliff plays against Pinnacle, Circa, BookMaker, BetOnline. Only returns `Bet candidate` with independent sharp confirmation. |
-| `recommended_bets` | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. Expected, not a bug. |
-| `ev_candidates` | Healthy | Fast +EV discovery; validate with `/screen` |
+| Tool                       | Status  | Notes                                                                                                                                                                     |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `screen` / `screen_ranked` | Healthy | Primary discovery path                                                                                                                                                    |
+| `sharp_plays`              | Healthy | Sharp book cross-reference confirms NoVigApp/Fliff plays against Pinnacle, Circa, BookMaker, BetOnline. Only returns `Bet candidate` with independent sharp confirmation. |
+| `recommended_bets`         | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. Expected, not a bug.                                                                                                |
+| `ev_candidates`            | Healthy | Fast +EV discovery; validate with `/screen`                                                                                                                               |
 
 ---
 
