@@ -34,7 +34,6 @@ AI Agent → pp-mcp → PropProfessor API → Ranked plays with movement signals
 
 - Node.js 18+
 - Paid [PropProfessor](https://propprofessor.com) account
-- Logged-in browser session → export as `auth.json`
 
 ### Install
 
@@ -53,6 +52,18 @@ After `npm link`, two commands are available:
 | `pp-query` | Local CLI for setup, debugging, quick checks |
 
 ### Auth Setup
+
+**Option A: Automated login (recommended)**
+
+```bash
+pp-query login
+```
+
+This opens a Chromium browser, navigates to the PropProfessor login page, and waits for you to log in. Once you reach the dashboard, your session is automatically saved to `~/.propprofessor/auth.json`.
+
+Requires playwright: `npm install --save-optional playwright && npx playwright install chromium`
+
+**Option B: Manual cookie export**
 
 ```bash
 pp-query install-auth --source /path/to/auth.json
@@ -197,6 +208,7 @@ Get full line history for game ID 12345 on NBA screen.
 ## CLI Commands
 
 ```bash
+pp-query login                           # automated browser login (requires playwright)
 pp-query doctor                        # full setup check
 pp-query health                        # quick health
 pp-query screen --league NBA           # ranked screen

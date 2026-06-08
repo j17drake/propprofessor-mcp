@@ -60,7 +60,8 @@ function getCommandInventory() {
     { command: 'list', description: 'Show the command inventory' },
     { command: 'health', description: 'Check auth and endpoint health' },
     { command: 'doctor', description: 'Run first-time setup checks and explain next steps' },
-    { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' }
+    { command: 'install-auth', description: 'Copy a saved browser session into the default auth location' },
+    { command: 'login', description: 'Open a browser to log in to PropProfessor and save auth automatically (requires playwright)' }
   ];
 }
 
@@ -69,11 +70,12 @@ function buildHelpText() {
     'PropProfessor query CLI',
     '',
     'Start here:',
-    '  pp-query install-auth --source /path/to/auth.json',
+    '  pp-query login',
     '  pp-query doctor',
     '  pp-query health',
     '',
     'Common commands:',
+    '  pp-query login                           # automated browser login (requires playwright)',
     '  pp-query install-auth --source /path/to/auth.json',
     '  pp-query doctor',
     '  pp-query health',
@@ -257,6 +259,9 @@ function parseArgs(argv) {
       i += 1;
     } else if (arg === '--days') {
       opts.days = next;
+      i += 1;
+    } else if (arg === '--timeout') {
+      opts.timeout = next;
       i += 1;
     }
   }
@@ -491,6 +496,15 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       destinationFile: opts.destination || DEFAULT_USER_AUTH_FILE
     });
     emitJson(logger, buildInstallAuthReport(installResult))
+    return;
+  } else if (command === 'login') {
+    const { loginCli } = require('./pp-login');
+    await loginCli({
+      authFile: opts.destination || DEFAULT_USER_AUTH_FILE,
+      timeoutMs: opts.timeout ? Number(opts.timeout) : undefined,
+      json: Boolean(opts.json),
+      logger
+    });
     return;
   } else {
     throw new Error(`Unknown command: ${command}`);

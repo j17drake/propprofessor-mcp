@@ -69,6 +69,9 @@
     "got-scraping": "^4.2.1",
     "superjson": "^2.2.6"
   },
+  "optionalDependencies": {
+    "playwright": "^1.52.0"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.4.1",

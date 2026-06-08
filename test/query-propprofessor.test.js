@@ -123,7 +123,8 @@ describe('query-propprofessor CLI parsing', () => {
       'list',
       'health',
       'doctor',
-      'install-auth'
+      'install-auth',
+      'login'
     ]);
   });
 
