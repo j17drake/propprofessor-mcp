@@ -80,6 +80,60 @@ pp-query health    # quick endpoint ping
 
 ---
 
+## Tool Guide
+
+### For Casual Bettors (Just Tell Me What to Bet)
+
+1. **`get_started`** (user_type: "casual") — Get the workflow
+2. **`recommended_bets`** (verbosity: "minimal") — Plain English top picks
+3. **`player_context`** — Check injury risk on specific plays
+
+**That's it.** Three tools.
+
+### For Intermediate Bettors (Show Me the Edge)
+
+1. **`get_started`** (user_type: "intermediate") — Get the workflow
+2. **`recommended_bets`** (verbosity: "standard") — Structured plays with edge/tier/risk
+3. **`player_context`** — Injury risk check
+4. **`find_best_price`** — Line shop across books
+5. **`league_presets`** — See league-specific ranking weights
+
+### For Sharp Bettors (Full Control)
+
+1. **`get_started`** (user_type: "sharp") — Get the workflow
+2. **`screen_ranked`** (verbosity: "full") — Complete ranked data
+3. **`sharp_consensus`** — Multi-window sharp movement
+4. **`sharp_plays`** — Plays with independent sharp support
+5. **`get_play_details`** — Line history for specific plays
+6. **`staking_plan`** — Kelly sizing
+7. **`player_context`** — Injury risk on final picks
+
+### All Tools (Reference)
+
+| Tool | Purpose | Casual | Intermediate | Sharp |
+|------|---------|--------|--------------|-------|
+| `get_started` | Workflow guide | ✓ | ✓ | ✓ |
+| `recommended_bets` | Top picks | ✓ | ✓ | ✓ |
+| `player_context` | Injury risk | ✓ | ✓ | ✓ |
+| `find_best_price` | Line shopping | | ✓ | ✓ |
+| `league_presets` | Ranking weights | | ✓ | ✓ |
+| `screen_ranked` | Full ranked data | | | ✓ |
+| `sharp_consensus` | Multi-window movement | | | ✓ |
+| `sharp_plays` | Independent sharp support | | | ✓ |
+| `get_play_details` | Line history | | | ✓ |
+| `staking_plan` | Kelly sizing | | | ✓ |
+| `screen_raw` | Raw odds screen | | | ✓ |
+| `ev_candidates` | +EV discovery | | | ✓ |
+| `ufc_card` | UFC event analysis | | | ✓ |
+| `all_slates` | All leagues at once | | | ✓ |
+| `health_status` | System health | ✓ | ✓ | ✓ |
+| `screen` | League screen | | | ✓ |
+| `novig_screen` | NoVigApp-specific screen | | ✓ | ✓ |
+| `hide_bet` / `unhide_bet` | Manage hidden bets | | ✓ | ✓ |
+| `clear_hidden_bets` | Reset hidden bets | | ✓ | ✓ |
+
+---
+
 ## MCP Client Setup
 
 ### Hermes Agent
