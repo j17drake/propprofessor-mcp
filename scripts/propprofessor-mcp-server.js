@@ -1223,6 +1223,7 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
             message: categorized.message,
             category: categorized.category,
             status: categorized.status,
+            recovery: categorized.recovery,
             ...(debugMode ? {
               stack: error.stack || null,
               originalMessage: error.message,

@@ -394,7 +394,8 @@ describe('propprofessor MCP server stdio contract', () => {
       code: 'AUTH_REQUIRED',
       message: 'Missing PropProfessor auth token',
       category: 'auth',
-      status: 401
+      status: 401,
+      recovery: 'Run: pp-query login'
     });
   });
 

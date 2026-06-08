@@ -60,8 +60,9 @@ describe('categorizeError', () => {
   it('categorizes auth errors via status 401', () => {
     const result = categorizeError({ message: 'nope', status: 401 });
     assert.equal(result.category, 'auth');
-    assert.equal(result.code, 'AUTH_REQUIRED');
+    assert.equal(result.code, 'AUTH_EXPIRED');
     assert.equal(result.status, 401);
+    assert.ok(result.recovery.includes('pp-query login'));
   });
 
   it('categorizes auth errors via "auth" keyword', () => {
@@ -82,7 +83,8 @@ describe('categorizeError', () => {
   it('categorizes transport errors via status 429', () => {
     const result = categorizeError({ message: 'slow down', status: 429 });
     assert.equal(result.category, 'transport');
-    assert.equal(result.code, 'TRANSPORT_ERROR');
+    assert.equal(result.code, 'RATE_LIMITED');
+    assert.ok(result.recovery.includes('Wait'));
   });
 
   it('categorizes transport errors via "content-length" keyword', () => {
