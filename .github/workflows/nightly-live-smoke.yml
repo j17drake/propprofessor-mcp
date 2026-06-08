@@ -1,6 +1,9 @@
-name: manual-live-smoke
+name: nightly-live-smoke
 
 on:
+  schedule:
+    # Runs daily at 8:00 AM Central (13:00 UTC during CDT, 14:00 UTC during CST)
+    - cron: '0 13 * * *'
   workflow_dispatch:
 
 jobs:

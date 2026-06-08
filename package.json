@@ -67,7 +67,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:coverage": "c8 --reporter=text-summary --reporter=lcov node --test test/*.test.js"
   },
   "dependencies": {
     "got-scraping": "^4.2.1",
@@ -76,8 +77,19 @@
   "optionalDependencies": {
     "playwright": "^1.52.0"
   },
+  "c8": {
+    "all": true,
+    "include": ["lib/", "scripts/"],
+    "exclude": ["test/", "node_modules/", "coverage/"],
+    "reporter": ["text-summary", "lcov"],
+    "branches": 60,
+    "functions": 70,
+    "lines": 70,
+    "statements": 70
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "c8": "^11.0.0",
     "eslint": "^10.4.1",
     "globals": "^17.6.0",
     "prettier": "^3.8.3"
