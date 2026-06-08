@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.2.0
+
+### Universal Agent Access (Major)
+
+**Automated Auth Flow**
+- New `pp-query login` command opens browser, user logs in, auth saves automatically to `~/.propprofessor/auth.json`
+- No more manual cookie export — just run one command
+- Added Playwright as optional dependency for browser automation
+- Health endpoint now reports auth status with clear recovery instructions ("Run: pp-query login")
+
+**Verbosity Levels**
+- All bet-returning tools (`recommended_bets`, `sharp_plays`, `screen_ranked`, `screen`, `novig_screen`, `all_slates`, `staking_plan`, `ev_candidates`, `ufc_card`) now accept `verbosity: "minimal" | "standard" | "full"`
+- `minimal`: Plain English for casual bettors ("Bet Bonfim at +105, high confidence, low risk")
+- `standard`: Structured data without debug noise (edge, tier, risk, rationale)
+- `full`: Everything — line history, movement data, debug payloads (default, backward compatible)
+
+**Tool Discoverability**
+- New `get_started` meta-tool tells agents the workflow based on user type (casual/intermediate/sharp)
+- Returns structured workflow with steps, tools to use, and tools to avoid
+- README now has "Tool Guide" section grouping tools by user type
+
+**Agent Onboarding**
+- `docs/AGENT_PROMPT.md` — system prompt template for agents serving bettors
+- `docs/HERMES_SKILL.md` — Hermes skill file for quick context
+- Covers tier system, risk scores, movement grades, workflows by user type
+
+**Structured Error Handling**
+- Error codes: `AUTH_EXPIRED`, `BACKEND_DOWN`, `RATE_LIMITED`, `BACKEND_ERROR`, `INTERNAL_ERROR`
+- Each error includes recovery instructions
+- Agents know exactly what to tell users when something breaks
+
+**Backtesting**
+- New `scripts/backtest.js` CLI validates tier system predicts outcomes
+- `docs/BACKTESTING.md` explains usage and limitations
+- Ready for historical data when available
+
+**Stats**
+- 583 tests passing (up from 489)
+- 20 tools (up from 19 — added `get_started`)
+- All lint checks pass
+
 ## 1.1.0
 
 ### Multi-market defaults for recommended_bets, staking_plan, sharp_plays

@@ -4,11 +4,11 @@
 [![npm version](https://img.shields.io/npm/v/propprofessor-mcp?color=44cc11&label=npm)](https://www.npmjs.com/package/propprofessor-mcp)
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-489%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-583%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Lean, fast odds analysis engine for AI agents. **19 tools, 489 tests, all performance features active.**
+Lean, fast odds analysis engine for AI agents. **20 tools, 583 tests, all performance features active.**
 
 Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection. Built for [Model Context Protocol](https://modelcontextprotocol.io) clients.
 
@@ -356,7 +356,7 @@ Pre-configured in `lib/propprofessor-sharp-books.js`:
 
 ## For Maintainers
 
-- **Tests**: `npm test` (489 passing, includes live API integration tests)
+- **Tests**: `npm test` (583 passing, includes live API integration tests)
 - **Live smoke**: `npm run smoke:live` (requires `auth.json`)
 - **Lint**: `npm run lint`
 - **Format**: `npm run format:check`
