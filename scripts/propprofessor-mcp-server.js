@@ -465,7 +465,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         maxHoursAway: 48,
         isLive: Boolean(args.is_live)
       });
-    } catch {
+    } catch (error) {
+      process.stderr.write(`[propprofessor-mcp] Tennis +EV fallback query failed: ${error?.message || error}\n`);
       return {
         ok: true,
         result: [],
@@ -509,7 +510,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   async function runSportScreen(args = {}) {
     const requestedLeague = String(args.league || '').trim();
     if (!requestedLeague) {
-      throw new Error('league is required');
+      const error = new Error('league is required. Pass a league parameter, e.g. league: "NBA"');
+      error.code = 'LEAGUE_REQUIRED';
+      error.category = 'validation';
+      error.status = 400;
+      throw error;
     }
     const presetLeague = getLeagueRankingPreset(requestedLeague).league;
     return presetLeague === 'TENNIS' ? runTennisScreen(args) : runLeagueScreen(args, presetLeague || requestedLeague);
@@ -776,8 +781,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                           : null
                     });
                   }
-                } catch {
-                  // Player context failed — continue without it
+                } catch (error) {
+                  process.stderr.write(`[propprofessor-mcp] Player context fetch failed for "${player}": ${error?.message || error}\n`);
                   researchResults.push({ player, game: row.game, riskFlag: 'error', riskSummary: null });
                 }
               }
@@ -807,11 +812,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               }))
             });
           } catch (error) {
+            const categorized = categorizeError(error);
             allCandidates.push({
               league,
               market,
               candidates: [],
-              error: String(error.message || error)
+              error: categorized.message,
+              code: categorized.code,
+              recovery: categorized.recovery
             });
           }
         }
@@ -910,7 +918,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             });
           }
         } catch (error) {
-          allRecommended.push({ league, count: 0, markets_queried: markets, error: String(error.message || error) });
+          const categorized = categorizeError(error);
+          allRecommended.push({
+            league, count: 0, markets_queried: markets,
+            error: categorized.message,
+            code: categorized.code,
+            recovery: categorized.recovery
+          });
         }
       }
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
@@ -928,8 +942,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           fallback.summary =
             'No recommended_bets found; appended sharp_plays fallback with strict=false and includePasses=true.';
         } catch (error) {
+          const categorized = categorizeError(error);
           fallback.enabled = true;
-          fallback.error = String(error.message || error);
+          fallback.error = categorized.message;
+          fallback.recovery = categorized.recovery;
         }
       }
       const response = {
@@ -1129,7 +1145,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             totalPlays += results[league].length;
           }
         } catch (error) {
-          errors.push({ league, error: error.message || String(error) });
+          const categorized = categorizeError(error);
+          errors.push({
+            league,
+            error: categorized.message,
+            code: categorized.code,
+            recovery: categorized.recovery
+          });
           results[league] = [];
           leagueMeta[league] = { rowCount: 0, source: 'error' };
         }
