@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased — 1.3.0]
+
+### In Progress
+- Freshness engine overhaul (P0 bug from 2026-06-09 debug session)
+- Market name normalization (P0 from PLAN-MARKET-DIVERSITY)
+- Scoring pipeline restoration
+- Cross-book consensus expansion for alt markets
+- Token persistence layer
+- 700+ tests target (583 → 700)
+
+### Breaking Changes (will be in 1.3.0 release)
+- `/screen` endpoint will return `edge`, `tier`, `kai` fields (were null in 1.2.0 fallback mode)
+- Token storage format will include `expiresAt` and `lastRefreshed`
+- `freshnessFallbackUsed` will be `false` on healthy responses
+
+### Notes
+- See `/Users/jamesdrake/Documents/workspace/propprofessor-mcp/UPGRADE-PLAN-V2.md` for the full 10-phase plan
+- Branch: `release/v1.3.0-market-freshness-overhaul`
+
 ## 1.2.0
 
 ### Universal Agent Access (Major)
