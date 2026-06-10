@@ -3,6 +3,7 @@
 
 const { createPropProfessorClient, getCookieExpiryInfo, isAuthValid, resolveAuthFile, readAuthState } = require('../lib/propprofessor-api');
 const {
+  getTennisMarketFamily,
   normalizeTennisMarketQuery,
   rankTennisScreenRows,
   rankLeagueScreenRows,
@@ -554,7 +555,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const evCandidates = Array.isArray(evResult)
       ? evResult.filter((row) => String(row.league || '').toLowerCase() === 'tennis')
       : [];
-    if (!evCandidates.length) {
+
+    // Filter by requested market family if a specific market was requested
+    const requestedMarket = marketResolution.single || null;
+    const marketFamilyCandidates = requestedMarket
+      ? evCandidates.filter((row) => {
+          const rowFamily = getTennisMarketFamily(row);
+          const requestedFamilies = normalizeTennisMarketQuery(requestedMarket)
+            .map((m) => getTennisMarketFamily({ market: m }));
+          return rowFamily !== null && requestedFamilies.includes(rowFamily);
+        })
+      : evCandidates;
+
+    if (!marketFamilyCandidates.length) {
       return {
         ok: true,
         result: [],
@@ -565,10 +578,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     }
 
-    const ranked = await enrichTennisEvCandidates(evCandidates, client, {
+    const ranked = await enrichTennisEvCandidates(marketFamilyCandidates, client, {
       preferredBook,
       limit: getLimit(args),
-      lookbackHours: getLookbackHours(args)
+      lookbackHours: getLookbackHours(args),
+      requestedMarket
     });
     const correctedRanked = await correctTennisTimes(ranked);
     return {
