@@ -1,6 +1,6 @@
 {
   "name": "propprofessor-mcp",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Beginner-friendly PropProfessor MCP server and setup CLI for any MCP client",
   "type": "commonjs",
   "private": true,

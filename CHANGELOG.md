@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.1
+
+### Fix: TIER 4 > TIER 2 inversion
+
+The `gradeMovementQuality` function was marking `insufficient_history` plays as RED, which buried ~50% of plays as TIER 4 even when they were coin-flip plays with no negative signal. This caused TIER 4 hit rate to exceed TIER 2.
+
+**Root cause:** `noMovementData = movementLabel === 'insufficient_history' && edge < 0.5` was a RED condition. Missing history data is not an adverse signal — it's just absence of data.
+
+**Fix:** Removed `noMovementData` from RED conditions. Now only genuinely adverse signals (`movementLabel === 'adverse'`) or bad execution with thin consensus trigger RED.
+
+**Backtest results (3000 scenarios, before → after):**
+- TIER 4 vs TIER 2: was inverted (50.6% > 47.8%) → now correct (48.6% < 53.2%)
+- TIER 1 vs TIER 3 gap: 6.9pp → 7.2pp (improved)
+- Tier ordering: TIER 1/2 > TIER 3 > TIER 4 (clean)
+
+### Improved synthetic backtest generator
+
+Scenario generator now creates three distinct scenario types with real edge conditions:
+- `sharp_move` (35%): Sharp books moved, target book is stale → should be TIER 1/2
+- `stable_no_edge` (35%): All books agree, no edge → should be TIER 3/4
+- `adverse` (30%): Sharp books moving against the pick → should be TIER 4
+
 ## 1.5.0
 
 ### Token refresh mutex

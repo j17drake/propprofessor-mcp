@@ -44,8 +44,14 @@ function randomChoice(arr) {
  * Generate a single synthetic game scenario with a known outcome.
  *
  * The outcome is determined by the "true probability" — if the favorite's
- * true prob > 0.5, they win. The odds are generated with varying degrees
- * of sharp consensus and movement to exercise different ranking paths.
+ * true prob > 0.5, they win. The odds are generated with deliberate
+ * mispricing at the target book to create real edge conditions that the
+ * ranking engine should detect.
+ *
+ * Three scenario types:
+ * - 'sharp_move': Sharp books moved, target book is stale → high edge, should be TIER 1/2
+ * - 'stable_no_edge': All books agree, no edge → coin flip, should be TIER 3/4
+ * - 'adverse': Sharp books moving against the pick → should be TIER 4
  *
  * @returns {{ screenPayload, oddsHistory, outcome, description }}
  */
@@ -54,62 +60,90 @@ function generateScenario() {
   const gameId = `synth-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // Determine "true" outcome — home team wins with some probability
-  const homeWinProb = 0.3 + Math.random() * 0.4; // 30-70% range
+  const homeWinProb = 0.35 + Math.random() * 0.3; // 35-65% range
   const homeWins = Math.random() < homeWinProb;
 
-  // Generate odds with varying consensus quality
-  const consensusQuality = Math.random(); // 0 = no consensus, 1 = strong consensus
-  const hasSharpMovement = Math.random() > 0.5;
-  const baseOdds = Math.round(-100 / (homeWinProb - 0.01)); // Implied from true prob
+  // Choose scenario type — determines whether there's real edge
+  const scenarioRoll = Math.random();
+  const scenarioType = scenarioRoll < 0.35 ? 'sharp_move'
+    : scenarioRoll < 0.7 ? 'stable_no_edge'
+    : 'adverse';
+
+  // Base odds from true probability
+  const baseOdds = Math.round(-100 / (homeWinProb - 0.01));
 
   // Build odds across books
   const odds = {};
   const history = {};
   const nowSec = Math.floor(Date.now() / 1000);
 
+  // Sharp books reflect the "true" line
+  const sharpOdds = baseOdds + randomInt(-3, 3);
+
   for (const book of BOOKS) {
     const isSharp = ['Pinnacle', 'Circa', 'BetOnline', 'BookMaker'].includes(book);
-    const isLagging = book === 'Fliff' && hasSharpMovement;
+    const isTarget = book === 'Fliff' || book === 'NoVigApp';
 
-    // Sharp books move toward the true line; lagging books stay stale
     let bookOdds;
-    if (isLagging) {
-      bookOdds = baseOdds + randomInt(-5, 5); // Stale — doesn't move
+    if (scenarioType === 'sharp_move' && isTarget) {
+      // Target book is STALE — hasn't caught up to the sharp move
+      // This creates real positive edge for the pick
+      bookOdds = sharpOdds + randomInt(15, 35); // Worse price for the favorite
+    } else if (scenarioType === 'adverse' && isTarget) {
+      // Target book is moving AGAINST the pick — adverse signal
+      bookOdds = sharpOdds - randomInt(10, 25); // Better price = moving against
     } else if (isSharp) {
-      bookOdds = baseOdds + randomInt(-3, 3); // Tight to true line
+      bookOdds = sharpOdds + randomInt(-3, 3);
     } else {
-      bookOdds = baseOdds + randomInt(-8, 8); // More noise
+      bookOdds = sharpOdds + randomInt(-8, 8);
     }
 
-    // Ensure odds are valid American odds
     bookOdds = Math.max(-300, Math.min(300, bookOdds));
     const awayOdds = Math.round(bookOdds > 0 ? -(bookOdds + 100) : (-bookOdds + 100));
-
     odds[book] = { odds1: bookOdds, odds2: awayOdds };
 
-    // Generate odds history (movement over 6 hours)
+    // Generate odds history
     const historyPoints = [];
     const hoursBack = 6;
-    let currentOdds = bookOdds;
 
-    for (let h = hoursBack; h >= 0; h--) {
-      const ts = nowSec - h * 3600;
-      if (isLagging && h < hoursBack / 2) {
-        // Lagging book stops moving after the first half
-        historyPoints.push({ odds: currentOdds, start_ts: ts });
-      } else {
-        // Gradual movement toward final value
-        const drift = hasSharpMovement && isSharp
-          ? Math.round((bookOdds - baseOdds) * (1 - h / hoursBack) * 0.8)
-          : randomInt(-2, 2);
-        currentOdds = baseOdds + drift;
-        currentOdds = Math.max(-300, Math.min(300, currentOdds));
-        historyPoints.push({ odds: currentOdds, start_ts: ts });
+    if (scenarioType === 'sharp_move') {
+      // Sharp books show clear movement; target book is flat
+      let currentOdds = sharpOdds - randomInt(10, 20); // Started lower
+      for (let h = hoursBack; h >= 0; h--) {
+        const ts = nowSec - h * 3600;
+        if (isTarget) {
+          // Target book barely moved
+          historyPoints.push({ odds: bookOdds + randomInt(-2, 2), start_ts: ts });
+        } else {
+          // Sharp books gradually moved to current
+          const progress = 1 - h / hoursBack;
+          currentOdds = Math.round(currentOdds + (sharpOdds - currentOdds) * progress * 0.3);
+          historyPoints.push({ odds: currentOdds + randomInt(-2, 2), start_ts: ts });
+        }
+      }
+    } else if (scenarioType === 'adverse') {
+      // Sharp books moving against the pick
+      let currentOdds = sharpOdds + randomInt(5, 15);
+      for (let h = hoursBack; h >= 0; h--) {
+        const ts = nowSec - h * 3600;
+        if (isTarget) {
+          historyPoints.push({ odds: bookOdds + randomInt(-2, 2), start_ts: ts });
+        } else {
+          const progress = 1 - h / hoursBack;
+          currentOdds = Math.round(currentOdds + (sharpOdds - currentOdds) * progress * 0.3);
+          historyPoints.push({ odds: currentOdds + randomInt(-2, 2), start_ts: ts });
+        }
+      }
+    } else {
+      // Stable — all books roughly the same, minimal movement
+      for (let h = hoursBack; h >= 0; h--) {
+        const ts = nowSec - h * 3600;
+        historyPoints.push({ odds: sharpOdds + randomInt(-3, 3), start_ts: ts });
       }
     }
 
-    // Only include history for some books (not all have data)
-    if (Math.random() > 0.2) {
+    // Only include history for some books
+    if (Math.random() > 0.15) {
       history[book] = historyPoints;
     }
   }
@@ -138,18 +172,15 @@ function generateScenario() {
     }]
   };
 
-  const description = [
-    hasSharpMovement ? 'sharp_move' : 'stable',
-    consensusQuality > 0.7 ? 'strong_consensus' : consensusQuality > 0.3 ? 'moderate' : 'weak',
-    homeWins ? `${home}_wins` : `${away}_wins`
-  ].join('_');
+  const description = `${scenarioType}_${homeWins ? home.replace(/\s+/g, '_') : away.replace(/\s+/g, '_')}_wins`;
 
   return {
     screenPayload,
     oddsHistory: { [gameId]: history },
-    outcome: homeWins ? home : away, // The winner
+    outcome: homeWins ? home : away,
     gameId,
-    description
+    description,
+    scenarioType
   };
 }
 
