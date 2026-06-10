@@ -9,6 +9,7 @@ const {
   extractScreenRows,
   enrichTennisEvCandidates
 } = require('../lib/propprofessor-screen-utils');
+const { resolveMarketName } = require('../lib/propprofessor-shared-utils');
 const { buildUfcShortlist } = require('../lib/propprofessor-sharp-plays');
 const { findBestPrice } = require('../lib/propprofessor-best-price');
 const {
@@ -78,6 +79,54 @@ function defined(obj) {
 }
 
 // ALL_SCREEN_BOOKS is imported from propprofessor-sharp-books.js
+
+/**
+ * Resolve market alias(es) in args using the league context.
+ * Returns an object with resolved market(s) and alias info for resultMeta.
+ *
+ * @param {Object} args - The args object containing market/markets
+ * @param {string} league - League name (required for alias lookup)
+ * @param {string} [defaultMarket='Moneyline'] - Default market if none provided
+ * @returns {{ single: string, array: string[], aliasesUsed: string[] }}
+ */
+function resolveMarkets(args, league, defaultMarket = 'Moneyline') {
+  const leagueKey = league ? String(league).trim().toUpperCase() : '';
+  const result = { single: defaultMarket, array: [], aliasesUsed: [] };
+
+  // Resolve single market
+  const singleRaw = args.market;
+  if (singleRaw !== undefined && singleRaw !== null) {
+    const resolved = resolveMarketName(singleRaw, leagueKey);
+    result.single = resolved.resolved;
+    if (resolved.wasAliased) {
+      result.aliasesUsed.push(`${singleRaw} → ${resolved.resolved}`);
+    }
+  }
+
+  // Resolve markets array
+  if (Array.isArray(args.markets) && args.markets.length) {
+    result.array = args.markets.map((m) => {
+      const resolved = resolveMarketName(m, leagueKey);
+      if (resolved.wasAliased) {
+        result.aliasesUsed.push(`${m} → ${resolved.resolved}`);
+      }
+      return resolved.resolved;
+    });
+  } else if (Array.isArray(args.markets) && args.markets.length === 0) {
+    // Empty array stays empty
+    result.array = [];
+  } else if (singleRaw !== undefined && singleRaw !== null) {
+    // No markets array, but single market was provided
+    result.array = [result.single];
+  }
+
+  // If only markets array provided (no single market), use first element as single
+  if ((singleRaw === undefined || singleRaw === null) && result.array.length > 0) {
+    result.single = result.array[0];
+  }
+
+  return result;
+}
 
 async function mapWithConcurrency(items, worker, { concurrency = VALIDATED_EV_CONCURRENCY } = {}) {
   const list = Array.isArray(items) ? items : [];
@@ -333,7 +382,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
   async function runLeagueScreen(args = {}, league) {
     const requestedBooks = normalizeBookList(args.books);
-    const market = args.market || 'Moneyline';
+    const marketResolution = resolveMarkets(args, league);
+    const market = marketResolution.single;
     const preset = getLeagueRankingPreset(league, market);
     const focusBook = requestedBooks[0] || preset.preferredBooks[0];
 
@@ -383,6 +433,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         })
     });
 
+    // Add market alias info to resultMeta if any aliases were used
+    if (marketResolution.aliasesUsed.length) {
+      response.resultMeta = {
+        ...response.resultMeta,
+        markets_alias_used: marketResolution.aliasesUsed
+      };
+    }
+
     // Store in cache
     if (cacheKey) {
       responseCache.set(cacheKey, response);
@@ -395,7 +453,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   async function runTennisScreen(args = {}) {
     const preferredBook = String(args.book || 'Pinnacle').trim() || 'Pinnacle';
     const requestedBooks = normalizeBookList(args.books);
-    const marketQuery = normalizeTennisMarketQuery(args.market || 'Moneyline');
+    const marketResolution = resolveMarkets(args, 'Tennis');
+    const marketQuery = normalizeTennisMarketQuery(marketResolution.single);
     const queryFn =
       typeof client.queryScreenOdds === 'function'
         ? client.queryScreenOdds.bind(client)
@@ -446,6 +505,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
       if (screenResult?.result) {
         screenResult.result = await correctTennisTimes(screenResult.result);
+      }
+      // Add market alias info to resultMeta if any aliases were used
+      if (marketResolution.aliasesUsed.length) {
+        screenResult.resultMeta = {
+          ...screenResult.resultMeta,
+          markets_alias_used: marketResolution.aliasesUsed
+        };
       }
       return screenResult;
     }
@@ -529,10 +595,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
 
   async function runUfcCard(args = {}) {
-    const normalizedMarkets = Array.isArray(args.markets)
-      ? args.markets.map((value) => String(value || '').trim()).filter(Boolean)
-      : [];
-    const market = normalizedMarkets[0] || String(args.market || 'Moneyline').trim() || 'Moneyline';
+    const marketResolution = resolveMarkets(args, 'UFC');
+    const normalizedMarkets = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
+    const market = normalizedMarkets[0];
     const targetBook = String(args.book || args.targetBook || '').trim();
     const rankedArgs = {
       ...args,
@@ -564,6 +629,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         cardWindow,
         eventDate,
         count,
+        // Include aliases from the UFC card's own resolution
+        markets_alias_used: [
+          ...(rankedResponse.resultMeta?.markets_alias_used || []),
+          ...marketResolution.aliasesUsed
+        ],
         shortlist: {
           ...shortlist,
           count
@@ -652,11 +722,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async screen_raw(args = {}) {
+      const league = args.league || 'NBA';
+      const marketResolution = resolveMarkets(args, league);
+      const market = marketResolution.single;
       const useBestComps = Boolean(args.bestComps);
       const queryFn = useBestComps ? client.queryScreenOddsBestComps.bind(client) : client.queryScreenOdds.bind(client);
       const payload = await queryFn({
-        market: args.market || 'Moneyline',
-        league: args.league || 'NBA',
+        market,
+        league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
         books: Array.isArray(args.books) ? args.books : useBestComps ? undefined : [],
@@ -665,11 +738,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const result = { ok: true, result: payload };
       if (useBestComps) {
         result.comparisonBooks = getSharpBookComparisonSet({
-          league: args.league || 'NBA',
-          market: args.market,
+          league,
+          market,
           requestedBooks: Array.isArray(args.books) ? args.books : undefined
         });
-        result.sharpBookResearch = getSharpBookContext({ league: args.league || 'NBA', market: args.market });
+        result.sharpBookResearch = getSharpBookContext({ league, market });
+      }
+      if (marketResolution.aliasesUsed.length) {
+        result.markets_alias_used = marketResolution.aliasesUsed;
       }
       return result;
     },
@@ -677,7 +753,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async screen_ranked(args = {}) {
       const requestedBooks = normalizeBookList(args.books);
       const league = args.league || 'NBA';
-      const market = args.market || 'Moneyline';
+      const marketResolution = resolveMarkets(args, league);
+      const market = marketResolution.single;
       const preset = getLeagueRankingPreset(league, market);
       const focusBook = requestedBooks[0] || preset.preferredBooks[0];
       const payload = await client.queryScreenOddsBestComps({
@@ -705,6 +782,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             debug
           })
       });
+      // Add market alias info to resultMeta if any aliases were used
+      if (marketResolution.aliasesUsed.length) {
+        response.resultMeta = {
+          ...response.resultMeta,
+          markets_alias_used: marketResolution.aliasesUsed
+        };
+      }
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
       if (verbosity === 'minimal') return formatScreenRankedMinimal(response);
@@ -735,19 +819,35 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           : args.league
             ? [args.league]
             : ['NBA', 'MLB', 'NHL', 'WNBA', 'UFC'];
+      // Resolve markets using aliases for each league
       const markets =
-        Array.isArray(args.markets) && args.markets.length ? args.markets : args.market ? [args.market] : ['Moneyline'];
+        Array.isArray(args.markets) && args.markets.length
+          ? args.markets
+          : args.market
+            ? [args.market]
+            : ['Moneyline', 'Spread', 'Total'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
       const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 50;
       const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
       const includeResearch = args.includeResearch !== undefined ? Boolean(args.includeResearch) : true;
       const debug = Boolean(args.debug);
 
+      // Track aliases used across all leagues
+      const allAliasesUsed = [];
+
+      // Pre-resolve markets for each league
+      const resolvedMarketsByLeague = {};
+      for (const league of leagues) {
+        const marketResolution = resolveMarkets({ markets }, league);
+        resolvedMarketsByLeague[league] = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
+        allAliasesUsed.push(...marketResolution.aliasesUsed);
+      }
+
       const allCandidates = [];
       const researchResults = [];
 
       for (const league of leagues) {
-        for (const market of markets) {
+        for (const market of resolvedMarketsByLeague[league] || []) {
           try {
             // Step 1: Run sharp_plays with NoVigApp as target, relaxed price requirements
             const spResult = await handlers.sharp_plays({
@@ -844,7 +944,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         results: allCandidates,
         research: researchResults,
         workflow:
-          'NoVigApp target book. Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.'
+          'NoVigApp target book. Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.',
+        markets_alias_used: allAliasesUsed
       };
     },
 
@@ -853,12 +954,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         Array.isArray(args.leagues) && args.leagues.length
           ? args.leagues
           : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
-      const markets =
-        Array.isArray(args.markets) && args.markets.length
-          ? args.markets
-          : args.market
-            ? [args.market]
-            : ['Moneyline', 'Spread', 'Total'];
+      // Resolve markets using aliases for each league
+      const allAliasesUsed = [];
+      const resolvedMarketsByLeague = {};
+      const defaultMarkets = ['Moneyline', 'Spread', 'Total'];
+      for (const league of leagues) {
+        const marketResolution = resolveMarkets({ markets: args.markets, market: args.market }, league, defaultMarkets[0]);
+        resolvedMarketsByLeague[league] = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
+        allAliasesUsed.push(...marketResolution.aliasesUsed);
+      }
+      // Use the first league's resolved markets as the default "markets" for response
+      const firstLeague = leagues[0];
+      const markets = resolvedMarketsByLeague[firstLeague] || defaultMarkets;
       const targetTiers =
         Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
@@ -867,7 +974,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         try {
           // Query each market type, collect all rows
           let allRows = [];
-          for (const market of markets) {
+          for (const market of resolvedMarketsByLeague[league] || markets) {
             const screenResult = await handlers.screen_ranked({
               league,
               market,
@@ -971,6 +1078,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ? `Found ${total} recommended bet${total === 1 ? '' : 's'} across ${allRecommended.filter((l) => l.count > 0).length} league${allRecommended.filter((l) => l.count > 0).length === 1 ? '' : 's'}`
           : 'No TIER 1 or TIER 2 plays found across requested leagues',
         tierFilter: targetTiers,
+        markets_alias_used: allAliasesUsed,
         ...(fallback.enabled ? { fallback } : {})
       };
       // Apply verbosity formatting
@@ -1026,7 +1134,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         bankroll,
         leagueBreakdown: recResult.leagues.map((l) => ({ league: l.league, count: l.count })),
         totalRecommended: recResult.totalRecommended,
-        markets_queried: recResult.markets_queried
+        markets_queried: recResult.markets_queried,
+        markets_alias_used: recResult.markets_alias_used
       };
     },
 
@@ -1046,7 +1155,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     async sharp_consensus(args = {}) {
       const league = String(args.league || 'Tennis').trim();
-      const market = String(args.market || 'Moneyline').trim();
+      const marketResolution = resolveMarkets(args, league);
+      const market = marketResolution.single;
       const windows =
         Array.isArray(args.windows) && args.windows.length
           ? args.windows
@@ -1093,7 +1203,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           totalRowsScanned: rows.length,
           minConsensusWindows,
           rowsSkippedNoHistory: analysis.skippedNoHistory || 0,
-          rowsSkippedInsufficientBooks: analysis.skippedInsufficientBooks || 0
+          rowsSkippedInsufficientBooks: analysis.skippedInsufficientBooks || 0,
+          markets_alias_used: marketResolution.aliasesUsed
         }
       };
     },
@@ -1104,7 +1215,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         Array.isArray(args.leagues) && args.leagues.length
           ? args.leagues.map((l) => String(l).trim()).filter(Boolean)
           : DEFAULT_LEAGUES;
-      const market = args.market || 'Moneyline';
+      const allAliasesUsed = [];
+      const marketResolutionByLeague = {};
+      for (const league of leagues) {
+        const marketResolution = resolveMarkets(args, league);
+        marketResolutionByLeague[league] = marketResolution.single;
+        allAliasesUsed.push(...marketResolution.aliasesUsed);
+      }
+      // Use first league's market as default
+      const market = marketResolutionByLeague[leagues[0]] || 'Moneyline';
       const limit = getLimit({ limit: args.limit || 15 });
 
       const results = await mapWithConcurrency(
@@ -1112,9 +1231,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         async (league) => {
           try {
             const leagueKey = league.toUpperCase();
+            const resolvedMarket = marketResolutionByLeague[league] || market;
             if (leagueKey === 'TENNIS') {
               const tennisResult = await runTennisScreen({
-                market,
+                market: resolvedMarket,
                 limit,
                 includeAll: args.includeAll,
                 lookbackHours: args.lookbackHours,
@@ -1192,6 +1312,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         leaguesQueried: leagues,
         leagueMeta,
         consolidated: allRows.slice(0, limit * leagues.length),
+        markets_alias_used: allAliasesUsed,
         ...(errors.length > 0 ? { errors } : {})
       };
     },
@@ -1210,7 +1331,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         error.status = 400;
         throw error;
       }
-      const market = args.market || 'Moneyline';
+      const marketResolution = resolveMarkets(args, league);
+      const market = marketResolution.single;
       const requestedBooks = normalizeBookList(args.books);
       const preset = getLeagueRankingPreset(league, market);
       const focusBook = requestedBooks[0] || preset.preferredBooks[0];
@@ -1240,6 +1362,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             debug
           })
       });
+
+      // Add market alias info to resultMeta if any aliases were used
+      if (marketResolution.aliasesUsed.length) {
+        response.resultMeta = {
+          ...response.resultMeta,
+          markets_alias_used: marketResolution.aliasesUsed
+        };
+      }
 
       // Filter to only the requested game IDs
       const gameIdSet = new Set(gameIds);
@@ -1322,7 +1452,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     async find_best_price(args = {}) {
       const league = args.league || 'NBA';
-      const market = args.market || 'Moneyline';
+      const marketResolution = resolveMarkets(args, league);
+      const market = marketResolution.single;
       const payload = await client.queryScreenOddsBestComps({
         market,
         league,
@@ -1332,7 +1463,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         is_live: Boolean(args.is_live)
       });
       const rows = extractScreenRows(payload);
-      return findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });
+      const result = findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });
+      if (marketResolution.aliasesUsed.length) {
+        result.markets_alias_used = marketResolution.aliasesUsed;
+      }
+      return result;
     },
 
     async get_started(args = {}) {

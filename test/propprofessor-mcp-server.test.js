@@ -760,7 +760,8 @@ describe('propprofessor MCP server stdio contract', () => {
       'BetOnline',
       'Circa'
     ]);
-    assert.equal(calls.queryScreenOddsBestComps[1].market, 'Total');
+    // 'Total' is resolved to 'Total Rounds' for UFC via market alias
+    assert.equal(calls.queryScreenOddsBestComps[1].market, 'Total Rounds');
     assert.equal(targetBookResult.resultMeta.focusBook, 'DraftKings');
     assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, [
       'DraftKings',

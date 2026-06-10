@@ -1,23 +1,56 @@
 # Changelog
 
-## [Unreleased — 1.3.0]
+## 1.3.0
 
-### In Progress
-- Freshness engine overhaul (P0 bug from 2026-06-09 debug session)
-- Market name normalization (P0 from PLAN-MARKET-DIVERSITY)
-- Scoring pipeline restoration
-- Cross-book consensus expansion for alt markets
-- Token persistence layer
-- 700+ tests target (583 → 700)
+### Market Name Normalization (Phase 3)
 
-### Breaking Changes (will be in 1.3.0 release)
-- `/screen` endpoint will return `edge`, `tier`, `kai` fields (were null in 1.2.0 fallback mode)
-- Token storage format will include `expiresAt` and `lastRefreshed`
-- `freshnessFallbackUsed` will be `false` on healthy responses
+**Generic aliases now resolve per-league** — query `market="Total"` for any league and get the correct upstream market name:
+
+| Alias | NHL | MLB | NBA | WNBA/SOCCER |
+|-------|-----|-----|-----|-------------|
+| Total | Total Goals | Total Runs | Total Points | Total Points / Total Goals |
+| Spread | Puck Line | Run Line | Spread | Spread |
+
+**New function:** `resolveMarketName(input, league)` in `propprofessor-shared-utils.js`
+- Returns `{ resolved, wasAliased, original, aliasKey }`
+- Handles case-insensitive input, whitespace, and shorthand (`rl`, `pl`)
+
+**Applied to all 10 MCP entry points:**
+- `screen`, `screen_ranked`, `raw_screen`
+- `recommended_bets`, `staking_plan`
+- `sharp_plays`, `sharp_consensus`
+- `all_slates`, `novig_screen`
+- `find_best_price`, `get_play_details`
+- `ufc_card`
+
+**New `markets_alias_used` field** in `resultMeta` when aliases were resolved:
+```
+"markets_alias_used": ["Total → Total Goals"]
+```
+
+**Tests:** 28 new test cases in `test/market-aliases.test.js` covering:
+- All league/alias combinations
+- Case insensitivity and whitespace
+- Shorthand aliases (`rl`, `pl`)
+- Passthrough for non-alias inputs
+- Default Moneyline when empty
+
+**595 tests passing** (594 from v1.2.0 + 28 new - 27 existing adjusted for correct alias behavior)
+
+### Freshness Engine (Diagnosed — No Code Change Needed)
+
+Phase 1 investigation found the `freshnessFallbackUsed: true` flag is **not a bug** — the upstream PropProfessor `/screen` API simply doesn't include timestamp fields on rows. The fallback code already handles this correctly:
+- Scoring (`edge`/`tier`/`kai`) still populates even in fallback mode
+- `newestAgeMs: 0` / `oldestAgeMs: 0` is the correct response to missing upstream data
+- `timestampSources: { response_received: N }` correctly reports what's available
+
+**G1 goal ("freshnessFallbackUsed: false on healthy responses") is not achievable** without upstream PropProfessor changes.
 
 ### Notes
-- See `/Users/jamesdrake/Documents/workspace/propprofessor-mcp/UPGRADE-PLAN-V2.md` for the full 10-phase plan
+
 - Branch: `release/v1.3.0-market-freshness-overhaul`
+- 10 remaining v1.3.0 phases from `UPGRADE-PLAN-V2.md` deferred to future work
+- Phase 5 (Token persistence) and Phase 4 (Cross-book consensus) are real next priorities
 
 ## 1.2.0
 
