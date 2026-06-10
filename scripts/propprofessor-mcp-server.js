@@ -46,7 +46,7 @@ const {
   DEFAULT_WINDOWS,
   DEFAULT_SHARP_BOOKS
 } = require('../lib/propprofessor-sharp-consensus');
-const { getConfidenceTier, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
+const { getConfidenceTier, getConfidenceTierStable, clearTierCache, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
 const {
   formatRecommendedBetsMinimal,
@@ -1023,7 +1023,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             }
           }
           const deduped = Array.from(seen.values());
-          let eligible = deduped.filter((row) => targetTiers.includes(getConfidenceTier(row)));
+          let eligible = deduped.filter((row) => targetTiers.includes(row.confidenceTier || getConfidenceTierStable(row)));
           const recommended = eligible
             .sort((a, b) => {
               const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };
@@ -1740,6 +1740,9 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
     }
 
     if (method === 'tools/call') {
+      // Clear tier cache at the start of each tool call so tiers are computed
+      // fresh per request but stabilize within a single multi-league screen
+      clearTierCache();
       const toolName = params?.name;
       const handler = handlers[toolName];
       if (!toolMap.has(toolName) || typeof handler !== 'function') {
