@@ -50,7 +50,33 @@ Phase 1 investigation found the `freshnessFallbackUsed: true` flag is **not a bu
 
 - Branch: `release/v1.3.0-market-freshness-overhaul`
 - 10 remaining v1.3.0 phases from `UPGRADE-PLAN-V2.md` deferred to future work
-- Phase 5 (Token persistence) and Phase 4 (Cross-book consensus) are real next priorities
+- Phase 5 (Token persistence) is the next real priority
+
+## Cross-Book Consensus Expansion (Phase 4)
+
+**Alt markets now get expanded comparison book sets.** Previously, querying Run Line for MLB only compared against the same sharp book set as Moneyline — but Circa, BookMaker, etc. don't consistently post Run Line odds. Now:
+
+| League | Alt Market | Books |
+|--------|-----------|-------|
+| MLB | Run Line | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
+| MLB | Total Runs | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel |
+| NHL | Puck Line | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
+| NBA | Spread | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
+
+**New `consensusStrength` field** on every ranked row:
+
+| Value | Meaning |
+|-------|---------|
+| `strong` | 3+ books agree |
+| `moderate` | 2 books agree |
+| `weak` | 1 book (no consensus) |
+| `none` | 0 books |
+
+**New `computeWeightedConsensus()`** function for sparse book coverage — when only 1-2 books post odds, Pinnacle gets 2x weight as the sharpest source.
+
+**Before:** MLB Run Line avg 1.7 books per selection. **After:** Main Run Line has 11+ books, alt lines have 2+.
+
+**Docs:** `docs/MARKET-BOOK-AVAILABILITY.md` with full availability matrix.
 
 ## 1.2.0
 
