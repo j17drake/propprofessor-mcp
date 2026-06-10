@@ -403,6 +403,7 @@ Run `pp-query doctor` and paste the output in a GitHub issue — that covers 90%
 This is **normal**, not a bug. It means no TIER 1 or TIER 2 plays exist right now. The tool scans Moneyline, Spread, and Total markets across all requested leagues — if nothing passes the confidence threshold, it returns 0 plays honestly.
 
 Try:
+
 - Widen your league filter (add more leagues)
 - Check back later when more games are live
 - Use `screen_ranked` to see what's available at lower tiers
@@ -427,6 +428,7 @@ pp-query login
 Use `compact: true` on screen/recommended tools. Reduces response size ~90%.
 
 For specific plays, use the two-step workflow:
+
 1. `screen_ranked(league, compact=true, fields=["game","selection","odds","edge","tier"])` — fast list
 2. `get_play_details(league, game_ids=[...])` — full detail on selected games only
 

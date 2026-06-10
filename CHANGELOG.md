@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.4.0
+
+### Removed TIER 4 fallback from recommended_bets
+
+When no TIER 1/2 plays exist, `recommended_bets` now returns 0 plays instead of falling back to `sharp_plays` with `strict=false` and `includePasses=true`. The previous fallback surfaced TIER 4 plays, contradicting the "never bet TIER 4" philosophy.
+
+### Fixed tool descriptions
+
+- `sharp_plays` `markets` param description now correctly states default is `["Moneyline", "Spread", "Total"]` (was "default Moneyline")
+- `novig_screen` `markets` param description updated similarly
+- Both tools already scanned all three markets — only the descriptions were wrong
+
+### Navigable server architecture
+
+`propprofessor-mcp-server.js` handlers grouped into domain sections:
+
+- Screening & Ranking (7 handlers)
+- Sharp Movement (2 handlers)
+- Betting (2 handlers)
+- Player Context, UFC, Bet Management, Line Shopping, Meta, Picks, Alerts
+
+Full file split into separate modules deferred to v1.5 — cross-handler dependencies need integration tests first.
+
+### DX improvements
+
+- Added "What's New in v1.4.0" section to README
+- Added expanded troubleshooting section to SETUP.md covering common issues (auth expiry, 0 tools, no bets found, timeouts)
+
 ## 1.3.0
 
 ### Market Name Normalization (Phase 3)

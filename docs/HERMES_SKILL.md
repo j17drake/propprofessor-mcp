@@ -1,7 +1,7 @@
 ---
 name: propprofessor-mcp
 description: 'PropProfessor MCP: sports betting analysis for AI agents. Screens 36+ books, ranks by sharp movement, validates with multi-window consensus. Multi-market (ML/Spread/Total), market aliasing, consensus strength scoring.'
-version: 1.3.0
+version: 1.4.0
 author: James Drake
 tags: [sports-betting, mcp, odds-analysis, sharp-movement]
 ---
