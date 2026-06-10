@@ -1052,26 +1052,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
-      const fallback = { enabled: false };
-      if (total === 0) {
-        try {
-          const fb = await handlers.sharp_plays({
-            ...args,
-            strict: false,
-            includePasses: true,
-            limit: Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10
-          });
-          fallback.enabled = true;
-          fallback.result = fb;
-          fallback.summary =
-            'No recommended_bets found; appended sharp_plays fallback with strict=false and includePasses=true.';
-        } catch (error) {
-          const categorized = categorizeError(error);
-          fallback.enabled = true;
-          fallback.error = categorized.message;
-          fallback.recovery = categorized.recovery;
-        }
-      }
       const response = {
         ok: true,
         totalRecommended: total,
@@ -1093,8 +1073,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             }
           }
           return breakdown;
-        })(),
-        ...(fallback.enabled ? { fallback } : {})
+        })()
       };
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
