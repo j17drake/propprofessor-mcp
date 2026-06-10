@@ -46,7 +46,7 @@ const {
   DEFAULT_WINDOWS,
   DEFAULT_SHARP_BOOKS
 } = require('../lib/propprofessor-sharp-consensus');
-const { getConfidenceTier, getConfidenceTierStable, clearTierCache, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
+const { getConfidenceTier, getConfidenceTierStable, getTierTrajectory, clearTierCache, clearScoreTimeline, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
 const {
   formatRecommendedBetsMinimal,
@@ -456,6 +456,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const requestedBooks = normalizeBookList(args.books);
     const marketResolution = resolveMarkets(args, 'Tennis');
     const marketQuery = normalizeTennisMarketQuery(marketResolution.single);
+
+    // Cache check for tennis screen
+    const canCache = !args.compact && !args.fields && !args.include;
+    const cacheKey = canCache ? buildCacheKey('tennis', { ...args, books: requestedBooks.length ? requestedBooks : ALL_SCREEN_BOOKS, market: marketResolution.single }, 'Tennis') : null;
+    if (cacheKey) {
+      const cached = responseCache.get(cacheKey);
+      if (cached) {
+        return { ...cached, resultMeta: { ...cached.resultMeta, cached: true } };
+      }
+    }
+
     const queryFn =
       typeof client.queryScreenOdds === 'function'
         ? client.queryScreenOdds.bind(client)
@@ -513,6 +524,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ...screenResult.resultMeta,
           markets_alias_used: marketResolution.aliasesUsed
         };
+      }
+      // Store in cache
+      if (cacheKey) {
+        responseCache.set(cacheKey, screenResult);
       }
       return screenResult;
     }
@@ -1470,6 +1485,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async clear_hidden_bets() {
       const result = await client.clearHiddenBets();
       return { ok: true, result };
+    },
+
+    async clear_score_timeline() {
+      clearScoreTimeline();
+      return { ok: true, message: 'Score timeline cache cleared. Tier trajectory data reset.' };
     },
 
     // ─── Line Shopping ──────────────────────────────────────────────

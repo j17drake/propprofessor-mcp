@@ -7,6 +7,7 @@ const {
   getConfidenceTier,
   getConfidenceTierStable,
   clearTierCache,
+  clearScoreTimeline,
   gradeMovementQuality,
   calculateRiskScore,
   getKaiCall,
@@ -36,6 +37,7 @@ function makeRow(overrides = {}) {
 describe('getConfidenceTierStable', () => {
   beforeEach(() => {
     clearTierCache();
+    clearScoreTimeline();
   });
 
   it('returns the same tier as getConfidenceTier for a fresh item', () => {
@@ -126,6 +128,7 @@ describe('getConfidenceTierStable', () => {
 describe('buildRationale uses stable tier', () => {
   beforeEach(() => {
     clearTierCache();
+    clearScoreTimeline();
   });
 
   it('rationale tier matches confidenceTier field when provided', () => {

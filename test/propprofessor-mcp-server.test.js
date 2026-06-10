@@ -253,6 +253,7 @@ describe('propprofessor MCP server stdio contract', () => {
       assert.deepEqual(toolNames, [
         'all_slates',
         'clear_hidden_bets',
+        'clear_score_timeline',
         'ev_candidates',
         'find_best_price',
         'get_alerts',
