@@ -29,6 +29,16 @@ AI Agent → pp-mcp → PropProfessor API → Ranked plays with movement signals
 
 ---
 
+## What's New in v1.4.0
+
+- **No more TIER 4 fallback** — `recommended_bets` returns 0 plays when no TIER 1/2 exist instead of surfacing lower-confidence plays
+- **Corrected tool descriptions** — `sharp_plays` and `novig_screen` market param defaults now match actual behavior (ML+Spread+Total)
+- **Markets transparency** — `recommended_bets` response includes `marketsBreakdown` showing play count by market type
+- **Navigable server code** — 22 handlers grouped into domain sections (Screening, Sharp, Betting, Player, UFC, Picks, etc.)
+- See [CHANGELOG.md](CHANGELOG.md) for full history
+
+---
+
 ## Quick Start
 
 Full walkthrough: **[SETUP.md](SETUP.md)** — covers install, auth setup (3 steps), configs for every MCP client, first commands, and troubleshooting.
