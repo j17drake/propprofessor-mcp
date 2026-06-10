@@ -49,8 +49,10 @@ Phase 1 investigation found the `freshnessFallbackUsed: true` flag is **not a bu
 ### Notes
 
 - Branch: `release/v1.3.0-market-freshness-overhaul`
-- 10 remaining v1.3.0 phases from `UPGRADE-PLAN-V2.md` deferred to future work
-- Phase 5 (Token persistence) is the next real priority
+- Phase 5 (Token persistence) complete
+- Phase 6 (Tool descriptions) complete
+- Phase 7 (Verbosity) complete
+- Phase 8 (Tests) complete — 672 tests
 
 ## Cross-Book Consensus Expansion (Phase 4)
 
