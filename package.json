@@ -8,6 +8,7 @@
   "exports": {
     ".": "./scripts/propprofessor-mcp-server.js",
     "./api": "./lib/propprofessor-api.js",
+    "./auth": "./lib/propprofessor-auth.js",
     "./analysis": "./lib/propprofessor-analysis.js",
     "./mcp-stdio": "./lib/propprofessor-mcp-stdio.js",
     "./ranked-screen": "./lib/propprofessor-mcp-ranked-screen.js",
