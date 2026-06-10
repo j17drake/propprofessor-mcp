@@ -22,18 +22,18 @@ This is a **minor version upgrade (1.2.0 → 1.3.0)** that addresses every issue
 
 ## Goals (Measurable)
 
-| # | Goal | Measurement |
-|---|------|-------------|
-| G1 | `freshnessFallbackUsed: false` on healthy responses | Health check returns no fallback flag |
-| G2 | Edge/tier/kai populated on `/screen` endpoint | Sample query returns non-null values |
-| G3 | All main-line markets queryable via aliases | "Total" resolves to correct per-league name |
-| G4 | Token expiry > 30 min | Health check shows expiresInSeconds > 1800 |
-| G5 | Cross-book consensus on Run Line / Total > 1 | consensusBookCount > 1 for non-ML markets |
-| G6 | 700+ tests passing | `npm test` exit 0 |
-| G7 | Zero lint errors | `npm run lint` exit 0 |
-| G8 | All 26 tools return `markets_queried` in resultMeta | Audit script validates |
-| G9 | All 26 tools handle errors with codes + recovery | All error paths return ErrorCode schema |
-| G10 | Live smoke test green for 7 consecutive days | `smoke:live` script |
+| #   | Goal                                                | Measurement                                 |
+| --- | --------------------------------------------------- | ------------------------------------------- |
+| G1  | `freshnessFallbackUsed: false` on healthy responses | Health check returns no fallback flag       |
+| G2  | Edge/tier/kai populated on `/screen` endpoint       | Sample query returns non-null values        |
+| G3  | All main-line markets queryable via aliases         | "Total" resolves to correct per-league name |
+| G4  | Token expiry > 30 min                               | Health check shows expiresInSeconds > 1800  |
+| G5  | Cross-book consensus on Run Line / Total > 1        | consensusBookCount > 1 for non-ML markets   |
+| G6  | 700+ tests passing                                  | `npm test` exit 0                           |
+| G7  | Zero lint errors                                    | `npm run lint` exit 0                       |
+| G8  | All 26 tools return `markets_queried` in resultMeta | Audit script validates                      |
+| G9  | All 26 tools handle errors with codes + recovery    | All error paths return ErrorCode schema     |
+| G10 | Live smoke test green for 7 consecutive days        | `smoke:live` script                         |
 
 ---
 
@@ -75,19 +75,23 @@ Phase 10: Release + Verification         [FINAL — must complete last]
 ### Tasks
 
 1. **Confirm current branch state:**
+
    ```bash
    cd /Users/jamesdrake/Documents/workspace/propprofessor-mcp
    git status --short
    git log --oneline -5
    ```
+
    Expected: On `fix/novig-screen-research-and-filtering` with 6 modified files in working tree.
 
 2. **Stash current work-in-progress to isolate:**
+
    ```bash
    git stash push -m "v2.0.0-prep: WIP from novig screen branch"
    ```
 
 3. **Create dedicated v1.3.0 branch from main:**
+
    ```bash
    git checkout main
    git pull origin main
@@ -96,16 +100,21 @@ Phase 10: Release + Verification         [FINAL — must complete last]
    ```
 
 4. **Pop WIP onto release branch (if needed for reference):**
+
    ```bash
    git stash pop
    git diff --stat
    ```
+
    Review the 6 modified files. Decide: cherry-pick the relevant commits from `fix/novig-screen-research-and-filtering` or leave WIP for after release.
 
 5. **Document baseline in CHANGELOG.md "Unreleased" section:**
+
    ```markdown
    ## [Unreleased — 1.3.0]
+
    ### In Progress
+
    - Freshness engine overhaul (P0 bug from 2026-06-09)
    - Market name normalization (P0 from PLAN-MARKET-DIVERSITY)
    - Scoring pipeline restoration
@@ -151,10 +160,12 @@ The PropProfessor backend is not receiving real timestamp data from its upstream
    - Look for any response transformation that might be stripping timestamps
 
 3. **Check git history for the bug introduction:**
+
    ```bash
    git log --oneline -- lib/propprofessor-analysis.js
    git log --oneline -- lib/propprofessor-api.js
    ```
+
    Find the commit that introduced the `freshnessFallbackUsed` flag or the scoring short-circuit.
 
 4. **Output:** A diagnostic report at `/Users/jamesdrake/.hermes/propprofessor-freshness-diag.md` with:
@@ -170,6 +181,7 @@ The PropProfessor backend is not receiving real timestamp data from its upstream
    - `lib/propprofessor-analysis.js` — don't gate on freshness, just warn
 
 2. **Add a `parseTimestamp` utility** if not present:
+
    ```js
    // lib/propprofessor-shared-utils.js (new function)
    function parseTimestamp(ts) {
@@ -180,11 +192,12 @@ The PropProfessor backend is not receiving real timestamp data from its upstream
    ```
 
 3. **Modify the freshness computation** to not use zero as default:
+
    ```js
    // lib/propprofessor-screen-utils.js
    // Before:
    newestAgeMs: 0, oldestAgeMs: 0
-   
+
    // After:
    const now = Date.now();
    const newestAgeMs = newestTs ? now - newestTs.getTime() : null;
@@ -233,21 +246,20 @@ The PropProfessor backend is not receiving real timestamp data from its upstream
    - Movement grade: NEEDS freshness/history — must remain gated
 
 3. **Apply the decoupling fix** in `lib/propprofessor-analysis.js`:
+
    ```js
    // Before: gate entire scoring on freshness
    if (row.freshnessFallbackUsed) {
      return { ...row, edge: null, tier: null, kai: null };
    }
-   
+
    // After: gate only movement-dependent fields
    return {
      ...row,
-     edge: computeEdge(row),           // always compute
-     tier: assignTier(row),            // always compute
-     kai: assignKaiCall(row),          // always compute
-     movementGrade: row.freshnessFallbackUsed 
-       ? 'unknown' 
-       : computeMovementGrade(row)     // gate only this
+     edge: computeEdge(row), // always compute
+     tier: assignTier(row), // always compute
+     kai: assignKaiCall(row), // always compute
+     movementGrade: row.freshnessFallbackUsed ? 'unknown' : computeMovementGrade(row) // gate only this
    };
    ```
 
@@ -278,11 +290,12 @@ Each league uses sport-specific market names. The MCP doesn't normalize aliases.
 ### Tasks
 
 1. **Build the alias map** — add to `lib/propprofessor-shared-utils.js`:
+
    ```js
    const MARKET_ALIASES = {
-     total: { 
-       NHL: 'Total Goals', 
-       MLB: 'Total Runs', 
+     total: {
+       NHL: 'Total Goals',
+       MLB: 'Total Runs',
        NBA: 'Total Points',
        WNBA: 'Total Points',
        NCAAB: 'Total Points',
@@ -290,7 +303,7 @@ Each league uses sport-specific market names. The MCP doesn't normalize aliases.
        NFL: 'Total Points',
        TENNIS: 'Total Games',
        UFC: 'Total Rounds',
-       SOCCER: 'Total Goals',
+       SOCCER: 'Total Goals'
      },
      spread: {
        NHL: 'Puck Line',
@@ -300,26 +313,33 @@ Each league uses sport-specific market names. The MCP doesn't normalize aliases.
        NCAAB: 'Spread',
        NCAAF: 'Spread',
        NFL: 'Spread',
-       SOCCER: 'Spread',
+       SOCCER: 'Spread'
      },
      puck_line: { NHL: 'Puck Line' },
      run_line: { MLB: 'Run Line' },
      total_goals: { NHL: 'Total Goals' },
      total_runs: { MLB: 'Total Runs' },
-     total_points: { NBA: 'Total Points', WNBA: 'Total Points', NCAAB: 'Total Points', NCAAF: 'Total Points', NFL: 'Total Points' },
+     total_points: {
+       NBA: 'Total Points',
+       WNBA: 'Total Points',
+       NCAAB: 'Total Points',
+       NCAAF: 'Total Points',
+       NFL: 'Total Points'
+     }
    };
    ```
 
 2. **Create a `resolveMarketName` function:**
+
    ```js
    function resolveMarketName(input, league) {
-     if (!input) return 'Moneyline';  // default
+     if (!input) return 'Moneyline'; // default
      const normalized = String(input).toLowerCase().trim().replace(/\s+/g, '_');
      const alias = MARKET_ALIASES[normalized];
      if (alias) {
        return alias[league] || alias[Object.keys(alias)[0]] || input;
      }
-     return input;  // pass through unchanged
+     return input; // pass through unchanged
    }
    ```
 
@@ -336,6 +356,7 @@ Each league uses sport-specific market names. The MCP doesn't normalize aliases.
    - `get_play_details` handler — line ~1378
 
 4. **Add a warning when an alias is used:**
+
    ```js
    // In resolveMarketName, return both the resolved name and a "wasAliased" flag
    // Tools include this in resultMeta as markets_alias_used: ['total → Total Goals']
@@ -373,6 +394,7 @@ Sharp books (Circa, BetOnline, DraftKings, BetMGM) don't post Run Line or Total 
 ### Investigation tasks (Subagent 1)
 
 1. **Map which books post which markets** per league:
+
    ```bash
    # Use the live API to query each book for each market
    for book in Pinnacle Circa BookMaker BetOnline DraftKings BetMGM; do
@@ -395,22 +417,24 @@ Sharp books (Circa, BetOnline, DraftKings, BetMGM) don't post Run Line or Total 
 ### Fix tasks (Subagent 2)
 
 1. **Expand the comparison book set** for alt markets in `lib/propprofessor-sharp-books.js`:
+
    ```js
    // Add sport-specific book preferences for alt markets
    const ALT_MARKET_BOOKS = {
      MLB: {
        'Run Line': ['Pinnacle', 'Circa', 'BetOnline', 'DraftKings', 'BetMGM'],
-       'Total Runs': ['Pinnacle', 'Circa', 'BetOnline', 'DraftKings'],
+       'Total Runs': ['Pinnacle', 'Circa', 'BetOnline', 'DraftKings']
      },
      NHL: {
        'Puck Line': ['Pinnacle', 'BetOnline', 'Circa', 'Kalshi'],
-       'Total Goals': ['Pinnacle', 'BetOnline', 'Circa', 'Kalshi'],
-     },
+       'Total Goals': ['Pinnacle', 'BetOnline', 'Circa', 'Kalshi']
+     }
      // ... etc
    };
    ```
 
 2. **Update the consensus calculation** to gracefully handle sparse book coverage:
+
    ```js
    // In lib/propprofessor-screen-utils.js
    // If only 1-2 books post, use weighted consensus (more weight to higher-liquidity book)
@@ -461,6 +485,7 @@ Token expires in 196 seconds (3 min). The MCP creates a new auth session on ever
    - If less than 5 min until expiry, refresh proactively
 
 3. **Add a token manager** to `lib/propprofessor-shared-utils.js`:
+
    ```js
    class TokenManager {
      constructor(authFile) { ... }
@@ -475,15 +500,16 @@ Token expires in 196 seconds (3 min). The MCP creates a new auth session on ever
    - Add retry logic: if 401 returned, refresh token and retry once
 
 5. **Update `health_status`** to report token state clearly:
+
    ```js
    return {
      ok: true,
      token: {
        expiresInSeconds: tm.getExpiresIn(),
        expiresAt: tm.getExpiresAt(),
-      lastRefreshed: tm.getLastRefreshed(),
-       refreshCount: tm.getRefreshCount(),
-     },
+       lastRefreshed: tm.getLastRefreshed(),
+       refreshCount: tm.getRefreshCount()
+     }
    };
    ```
 
@@ -518,14 +544,15 @@ Token expires in 196 seconds (3 min). The MCP creates a new auth session on ever
    - Any new fields from Phase 1, 2, 4, 5
 
 3. **Standardize description structure:**
+
    ```
    <one-line summary>
-   
+
    <key behaviors>
    - Defaults to: <list>
    - Override: pass `<param>: <value>`
    - Returns: <field list>
-   
+
    <example call>
    ```
 
@@ -554,6 +581,7 @@ Token expires in 196 seconds (3 min). The MCP creates a new auth session on ever
    - `health_status` — document new token fields
 
 5. **Regenerate OpenAPI spec:**
+
    ```bash
    npm run docs:openapi
    ```
@@ -595,6 +623,7 @@ Token expires in 196 seconds (3 min). The MCP creates a new auth session on ever
    | `scoreBreakdown` | — | — | ✓ |
 
 3. **Add a `toRationale()` function** for `minimal` mode that produces plain English:
+
    ```js
    function toRationale(row) {
      if (row.tier === 'TIER 1' && row.kai === 'BET') {
@@ -643,6 +672,7 @@ Add 30+ contract tests covering every tool's happy path.
 ### Subagent 2: Edge case + error tests
 
 Create `test/error-handling.test.js` with:
+
 - Each error code (AUTH_EXPIRED, BACKEND_DOWN, RATE_LIMITED, etc.)
 - Each recovery instruction is present
 - Empty response handling
@@ -656,6 +686,7 @@ Add 25+ error tests.
 ### Subagent 3: Performance + load tests
 
 Create `test/performance.test.js` with:
+
 - Latency: each tool returns within 5 seconds
 - Cache hit: repeated call within TTL is 10x faster
 - Compact vs full: `compact=true` is 90%+ smaller
@@ -687,18 +718,20 @@ Add 15+ performance tests.
    - Add "Token Management" section
    - Update example queries to use new fields
 
-3. **Update `CHANGELOG.md`** with full v1.3.0 entry:
+2. **Update `CHANGELOG.md`** with full v1.3.0 entry:
 
    ```markdown
    ## [1.3.0] — 2026-06-XX
-   
+
    ### BREAKING CHANGES (minor release with breaking field contract)
+
    - `/screen` endpoint now returns `edge`, `tier`, `kai` fields (were null in 1.2.0 fallback mode)
    - `markets_queried` field moved to top-level response (was nested in resultMeta)
    - Token storage format changed: now includes `expiresAt` and `lastRefreshed`
    - `freshnessFallbackUsed` is now `false` on healthy responses
-   
+
    ### ADDED
+
    - Market name normalization with alias resolution
    - Cross-book consensus for alt markets (Run Line, Puck Line, Total Goals, etc.)
    - `consensusStrength` field on all ranked rows
@@ -706,14 +739,16 @@ Add 15+ performance tests.
    - Token persistence layer with auto-refresh
    - 100+ new tests (583 → 700+)
    - Per-league per-market book availability matrix
-   
+
    ### FIXED
+
    - `freshnessFallbackUsed: true` bug on all responses
    - Scoring engine short-circuiting on missing timestamps
    - Token expiry 196s → 1800s+
    - Cross-book consensus missing for non-Moneyline markets
-   
+
    ### MIGRATION
+
    See `docs/MIGRATION-1.3.md` for upgrade guide.
    ```
 
@@ -732,7 +767,7 @@ Add 15+ performance tests.
    - Add verbosity example
    - Add freshness field explanation
 
-2. **Update `SETUP.md`:**
+6. **Update `SETUP.md`:**
    - Add "Upgrading from 1.x" section
    - Add troubleshooting for freshness fallback
 
@@ -769,14 +804,16 @@ Add 15+ performance tests.
    - [ ] Coverage thresholds met (lines 75%, functions 80%, branches 65%)
    - [ ] `docs/openapi.json` regenerated
 
-3. **Bump version:**
+2. **Bump version:**
+
    ```bash
    # Manual edit (npm version minor would also work but we want CHANGELOG control)
    # Edit package.json: "version": "1.2.0" → "1.3.0"
    npm run check:version
    ```
 
-4. **Create release commit:**
+3. **Create release commit:**
+
    ```bash
    git add -A
    git commit -m "release: v1.3.0 — market freshness overhaul
@@ -792,13 +829,14 @@ Add 15+ performance tests.
    Closes #1, #2, #3, #4, #5, #6, #7, #8, #9"
    ```
 
-5. **Tag the release:**
+4. **Tag the release:**
+
    ```bash
    git tag -a v1.3.0 -m "v1.3.0 — Market Freshness Overhaul"
    git push origin release/v1.3.0-market-freshness-overhaul --tags
    ```
 
-6. **Create GitHub release:**
+5. **Create GitHub release:**
    - Go to https://github.com/j17drake/propprofessor-mcp/releases
    - Create release from `v1.3.0` tag
    - Title: "v1.3.0 — Market Freshness Overhaul"
@@ -834,7 +872,7 @@ Add 15+ performance tests.
 ```
 GOAL: Diagnose the root cause of `freshnessFallbackUsed: true` in the PropProfessor MCP responses.
 
-CONTEXT: 
+CONTEXT:
 - Repo: /Users/jamesdrake/Documents/workspace/propprofessor-mcp
 - Current version: 1.2.0
 - Test count: 583 passing
@@ -842,7 +880,7 @@ CONTEXT:
 - Recent debug session: 2026-06-09 — every /screen response shows freshnessFallbackUsed: true
 - Debug report: /Users/jamesdrake/.hermes/propprofessor-mcp-debug-plan.md
 
-DELIVERABLE: 
+DELIVERABLE:
 Write a diagnostic report at /Users/jamesdrake/.hermes/propprofessor-freshness-diag.md with:
 1. Exact file:line where timestamps are lost or freshness falls back
 2. Whether the upstream feed (via lib/propprofessor-api.js) provides timestamps
@@ -963,34 +1001,34 @@ REPORT TO ME with:
 
 ## Risk Register
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Freshness fix breaks scoring for legacy clients | Medium | High | Feature-flag the fix; keep both paths |
-| Market aliases resolve wrong name | Low | Medium | Comprehensive test coverage; explicit alias map |
-| Token persistence has race condition | Medium | Medium | Use mutex/lock around token refresh |
-| Tests fail on cross-platform (Linux CI) | Low | Low | Run CI before merge |
-| Upstream feed genuinely doesn't send timestamps | High | High | Add fallback that still populates edge/tier from odds alone |
-| `npm test` regressions | Medium | Medium | Run tests after every subagent commit |
-| 700+ test count slips | Medium | Low | 100+ new tests is a stretch goal; 650+ is acceptable |
+| Risk                                            | Likelihood | Impact | Mitigation                                                  |
+| ----------------------------------------------- | ---------- | ------ | ----------------------------------------------------------- |
+| Freshness fix breaks scoring for legacy clients | Medium     | High   | Feature-flag the fix; keep both paths                       |
+| Market aliases resolve wrong name               | Low        | Medium | Comprehensive test coverage; explicit alias map             |
+| Token persistence has race condition            | Medium     | Medium | Use mutex/lock around token refresh                         |
+| Tests fail on cross-platform (Linux CI)         | Low        | Low    | Run CI before merge                                         |
+| Upstream feed genuinely doesn't send timestamps | High       | High   | Add fallback that still populates edge/tier from odds alone |
+| `npm test` regressions                          | Medium     | Medium | Run tests after every subagent commit                       |
+| 700+ test count slips                           | Medium     | Low    | 100+ new tests is a stretch goal; 650+ is acceptable        |
 
 ---
 
 ## Timeline Estimate
 
-| Phase | Effort | Parallelism | Calendar Time |
-|-------|--------|-------------|---------------|
-| 0 | 30 min | 0 | 30 min |
-| 1 | 4-6 hrs | 2 subagents | 3 hrs |
-| 2 | 3-4 hrs | 1 subagent | 4 hrs |
-| 3 | 2-3 hrs | 1 subagent | 3 hrs |
-| 4 | 4-5 hrs | 2 subagents | 3 hrs |
-| 5 | 2-3 hrs | 1 subagent | 3 hrs |
-| 6 | 2 hrs | 1 subagent | 2 hrs |
-| 7 | 3 hrs | 1 subagent | 3 hrs |
-| 8 | 4-6 hrs | 3 subagents | 3 hrs |
-| 9 | 2 hrs | 1 subagent | 2 hrs |
-| 10 | 1-2 hrs | 0 | 2 hrs |
-| **Total** | **28-36 hrs** | — | **~28 hrs** |
+| Phase     | Effort        | Parallelism | Calendar Time |
+| --------- | ------------- | ----------- | ------------- |
+| 0         | 30 min        | 0           | 30 min        |
+| 1         | 4-6 hrs       | 2 subagents | 3 hrs         |
+| 2         | 3-4 hrs       | 1 subagent  | 4 hrs         |
+| 3         | 2-3 hrs       | 1 subagent  | 3 hrs         |
+| 4         | 4-5 hrs       | 2 subagents | 3 hrs         |
+| 5         | 2-3 hrs       | 1 subagent  | 3 hrs         |
+| 6         | 2 hrs         | 1 subagent  | 2 hrs         |
+| 7         | 3 hrs         | 1 subagent  | 3 hrs         |
+| 8         | 4-6 hrs       | 3 subagents | 3 hrs         |
+| 9         | 2 hrs         | 1 subagent  | 2 hrs         |
+| 10        | 1-2 hrs       | 0           | 2 hrs         |
+| **Total** | **28-36 hrs** | —           | **~28 hrs**   |
 
 With 3 parallel subagents at peak: **~28 hours calendar time** = **3.5 working days**.
 
@@ -1045,7 +1083,9 @@ docs/openapi.json                                 (Phase 6, 9) — REGENERATED
 **Total files:** 25 (5 new, 20 modified)
 
 ---
+
 ---
+
 ## Decisions (Confirmed 2026-06-09)
 
 1. ✅ **Branch created immediately** — `release/v1.3.0-market-freshness-overhaul` from main

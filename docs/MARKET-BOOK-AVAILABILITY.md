@@ -11,53 +11,53 @@
 
 ### MLB
 
-| Market | Books | Avg book count |
-|--------|-------|----------------|
-| Moneyline | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~5.5 |
-| Run Line | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | 2-14 (varies by line) |
-| Total Runs | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | 2-14 (varies by line) |
+| Market     | Books                                                              | Avg book count        |
+| ---------- | ------------------------------------------------------------------ | --------------------- |
+| Moneyline  | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~5.5                  |
+| Run Line   | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | 2-14 (varies by line) |
+| Total Runs | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel            | 2-14 (varies by line) |
 
 ### NBA
 
-| Market | Books | Avg book count |
-|--------|-------|----------------|
-| Moneyline | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~6.0 |
-| Spread | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~6.0 |
-| Total Points | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | 1-6 (varies by line) |
+| Market       | Books                                                              | Avg book count       |
+| ------------ | ------------------------------------------------------------------ | -------------------- |
+| Moneyline    | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~6.0                 |
+| Spread       | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~6.0                 |
+| Total Points | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel            | 1-6 (varies by line) |
 
 ### NHL
 
-| Market | Books | Avg book count |
-|--------|-------|----------------|
-| Moneyline | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~5.5 |
-| Puck Line | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | 2-14 (varies by line) |
-| Total Goals | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | 2-14 (varies by line) |
+| Market      | Books                                                              | Avg book count        |
+| ----------- | ------------------------------------------------------------------ | --------------------- |
+| Moneyline   | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | ~5.5                  |
+| Puck Line   | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker | 2-14 (varies by line) |
+| Total Goals | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel            | 2-14 (varies by line) |
 
 ### WNBA
 
-| Market | Books | Avg book count |
-|--------|-------|----------------|
-| Spread | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~4.0 |
-| Total Points | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~4.0 |
+| Market       | Books                                                   | Avg book count |
+| ------------ | ------------------------------------------------------- | -------------- |
+| Spread       | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~4.0           |
+| Total Points | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~4.0           |
 
 ### Soccer
 
-| Market | Books | Avg book count |
-|--------|-------|----------------|
-| Moneyline | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~5.5 |
-| Spread | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~5.5 |
-| Total Goals | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~5.5 |
+| Market      | Books                                                   | Avg book count |
+| ----------- | ------------------------------------------------------- | -------------- |
+| Moneyline   | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~5.5           |
+| Spread      | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~5.5           |
+| Total Goals | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel | ~5.5           |
 
 ## consensusStrength field
 
 Each ranked row now includes a `consensusStrength` field:
 
-| Value | Meaning | Risk implication |
-|-------|---------|-----------------|
-| `strong` | 3+ books agree | Low risk — validated cross-book |
-| `moderate` | 2 books agree | Medium risk — limited validation |
-| `weak` | 1 book (no consensus) | High risk — single source |
-| `none` | 0 books | No validation available |
+| Value      | Meaning               | Risk implication                 |
+| ---------- | --------------------- | -------------------------------- |
+| `strong`   | 3+ books agree        | Low risk — validated cross-book  |
+| `moderate` | 2 books agree         | Medium risk — limited validation |
+| `weak`     | 1 book (no consensus) | High risk — single source        |
+| `none`     | 0 books               | No validation available          |
 
 The `consensusBookCount` field (backward-compatible) still shows the raw number. `consensusStrength` is a human-readable classification of that number.
 

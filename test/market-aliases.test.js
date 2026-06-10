@@ -1,9 +1,6 @@
 'use strict';
 
-const {
-  MARKET_ALIASES,
-  resolveMarketName
-} = require('../lib/propprofessor-shared-utils');
+const { MARKET_ALIASES, resolveMarketName } = require('../lib/propprofessor-shared-utils');
 
 let passCount = 0;
 let failCount = 0;
@@ -36,7 +33,10 @@ console.log('\n=== MARKET_ALIASES tests ===');
 // Test MARKET_ALIASES structure exists
 assert(MARKET_ALIASES !== undefined && typeof MARKET_ALIASES === 'object', 'MARKET_ALIASES is defined');
 assert(MARKET_ALIASES.total !== undefined && typeof MARKET_ALIASES.total === 'object', 'MARKET_ALIASES.total exists');
-assert(MARKET_ALIASES.spread !== undefined && typeof MARKET_ALIASES.spread === 'object', 'MARKET_ALIASES.spread exists');
+assert(
+  MARKET_ALIASES.spread !== undefined && typeof MARKET_ALIASES.spread === 'object',
+  'MARKET_ALIASES.spread exists'
+);
 assert(MARKET_ALIASES.puck_line !== undefined, 'MARKET_ALIASES.puck_line exists');
 assert(MARKET_ALIASES.run_line !== undefined, 'MARKET_ALIASES.run_line exists');
 assert(MARKET_ALIASES.total_goals !== undefined, 'MARKET_ALIASES.total_goals exists');

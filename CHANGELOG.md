@@ -6,16 +6,18 @@
 
 **Generic aliases now resolve per-league** — query `market="Total"` for any league and get the correct upstream market name:
 
-| Alias | NHL | MLB | NBA | WNBA/SOCCER |
-|-------|-----|-----|-----|-------------|
-| Total | Total Goals | Total Runs | Total Points | Total Points / Total Goals |
-| Spread | Puck Line | Run Line | Spread | Spread |
+| Alias  | NHL         | MLB        | NBA          | WNBA/SOCCER                |
+| ------ | ----------- | ---------- | ------------ | -------------------------- |
+| Total  | Total Goals | Total Runs | Total Points | Total Points / Total Goals |
+| Spread | Puck Line   | Run Line   | Spread       | Spread                     |
 
 **New function:** `resolveMarketName(input, league)` in `propprofessor-shared-utils.js`
+
 - Returns `{ resolved, wasAliased, original, aliasKey }`
 - Handles case-insensitive input, whitespace, and shorthand (`rl`, `pl`)
 
 **Applied to all 10 MCP entry points:**
+
 - `screen`, `screen_ranked`, `raw_screen`
 - `recommended_bets`, `staking_plan`
 - `sharp_plays`, `sharp_consensus`
@@ -24,11 +26,13 @@
 - `ufc_card`
 
 **New `markets_alias_used` field** in `resultMeta` when aliases were resolved:
+
 ```
 "markets_alias_used": ["Total → Total Goals"]
 ```
 
 **Tests:** 28 new test cases in `test/market-aliases.test.js` covering:
+
 - All league/alias combinations
 - Case insensitivity and whitespace
 - Shorthand aliases (`rl`, `pl`)
@@ -40,6 +44,7 @@
 ### Freshness Engine (Diagnosed — No Code Change Needed)
 
 Phase 1 investigation found the `freshnessFallbackUsed: true` flag is **not a bug** — the upstream PropProfessor `/screen` API simply doesn't include timestamp fields on rows. The fallback code already handles this correctly:
+
 - Scoring (`edge`/`tier`/`kai`) still populates even in fallback mode
 - `newestAgeMs: 0` / `oldestAgeMs: 0` is the correct response to missing upstream data
 - `timestampSources: { response_received: N }` correctly reports what's available
@@ -68,21 +73,21 @@ Makes it transparent when Spread/Total have fewer plays due to upstream data qua
 
 **Alt markets now get expanded comparison book sets.** Previously, querying Run Line for MLB only compared against the same sharp book set as Moneyline — but Circa, BookMaker, etc. don't consistently post Run Line odds. Now:
 
-| League | Alt Market | Books |
-|--------|-----------|-------|
-| MLB | Run Line | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
-| MLB | Total Runs | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel |
-| NHL | Puck Line | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
-| NBA | Spread | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
+| League | Alt Market | Books                                                              |
+| ------ | ---------- | ------------------------------------------------------------------ |
+| MLB    | Run Line   | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
+| MLB    | Total Runs | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel            |
+| NHL    | Puck Line  | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
+| NBA    | Spread     | Pinnacle, Circa, BetOnline, DraftKings, BetMGM, FanDuel, BookMaker |
 
 **New `consensusStrength` field** on every ranked row:
 
-| Value | Meaning |
-|-------|---------|
-| `strong` | 3+ books agree |
-| `moderate` | 2 books agree |
-| `weak` | 1 book (no consensus) |
-| `none` | 0 books |
+| Value      | Meaning               |
+| ---------- | --------------------- |
+| `strong`   | 3+ books agree        |
+| `moderate` | 2 books agree         |
+| `weak`     | 1 book (no consensus) |
+| `none`     | 0 books               |
 
 **New `computeWeightedConsensus()`** function for sparse book coverage — when only 1-2 books post odds, Pinnacle gets 2x weight as the sharpest source.
 

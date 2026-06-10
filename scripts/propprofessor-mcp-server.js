@@ -630,10 +630,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         eventDate,
         count,
         // Include aliases from the UFC card's own resolution
-        markets_alias_used: [
-          ...(rankedResponse.resultMeta?.markets_alias_used || []),
-          ...marketResolution.aliasesUsed
-        ],
+        markets_alias_used: [...(rankedResponse.resultMeta?.markets_alias_used || []), ...marketResolution.aliasesUsed],
         shortlist: {
           ...shortlist,
           count
@@ -839,7 +836,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const resolvedMarketsByLeague = {};
       for (const league of leagues) {
         const marketResolution = resolveMarkets({ markets }, league);
-        resolvedMarketsByLeague[league] = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
+        resolvedMarketsByLeague[league] = marketResolution.array.length
+          ? marketResolution.array
+          : [marketResolution.single];
         allAliasesUsed.push(...marketResolution.aliasesUsed);
       }
 
@@ -959,8 +958,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const resolvedMarketsByLeague = {};
       const defaultMarkets = ['Moneyline', 'Spread', 'Total'];
       for (const league of leagues) {
-        const marketResolution = resolveMarkets({ markets: args.markets, market: args.market }, league, defaultMarkets[0]);
-        resolvedMarketsByLeague[league] = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
+        const marketResolution = resolveMarkets(
+          { markets: args.markets, market: args.market },
+          league,
+          defaultMarkets[0]
+        );
+        resolvedMarketsByLeague[league] = marketResolution.array.length
+          ? marketResolution.array
+          : [marketResolution.single];
         allAliasesUsed.push(...marketResolution.aliasesUsed);
       }
       // Use the first league's resolved markets as the default "markets" for response

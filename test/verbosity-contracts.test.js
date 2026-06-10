@@ -46,7 +46,15 @@ const SAMPLE_RECOMMENDED_RESPONSE = {
     {
       league: 'MLB',
       count: 1,
-      plays: [{ ...SAMPLE_RANKED_ROW, game: 'Yankees vs Red Sox', participant: 'Yankees', selection: 'Yankees', market: 'Spread' }]
+      plays: [
+        {
+          ...SAMPLE_RANKED_ROW,
+          game: 'Yankees vs Red Sox',
+          participant: 'Yankees',
+          selection: 'Yankees',
+          market: 'Spread'
+        }
+      ]
     }
   ]
 };

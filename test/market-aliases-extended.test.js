@@ -3,15 +3,9 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-  MARKET_ALIASES,
-  resolveMarketName
-} = require('../lib/propprofessor-shared-utils');
+const { MARKET_ALIASES, resolveMarketName } = require('../lib/propprofessor-shared-utils');
 
-const {
-  getAltMarketBooks,
-  getSharpBookComparisonSet
-} = require('../lib/propprofessor-sharp-books');
+const { getAltMarketBooks, getSharpBookComparisonSet } = require('../lib/propprofessor-sharp-books');
 
 describe('MARKET_ALIASES completeness', () => {
   it('has entries for total, spread, and common aliases', () => {

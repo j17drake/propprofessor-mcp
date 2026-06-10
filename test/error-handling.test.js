@@ -3,11 +3,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-  classifyPropProfessorHttpError,
-  createPropProfessorClient,
-  isAuthValid
-} = require('../lib/propprofessor-api');
+const { classifyPropProfessorHttpError, createPropProfessorClient, isAuthValid } = require('../lib/propprofessor-api');
 
 describe('classifyPropProfessorHttpError', () => {
   it('classifies 401 as auth error, retryable', () => {
@@ -95,9 +91,12 @@ describe('HTTP retry logic', () => {
     const os = require('os');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-test-'));
     const authFile = path.join(dir, 'auth.json');
-    fs.writeFileSync(authFile, JSON.stringify({
-      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'test-cookie' }]
-    }));
+    fs.writeFileSync(
+      authFile,
+      JSON.stringify({
+        cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'test-cookie' }]
+      })
+    );
 
     const calls = [];
     const client = createPropProfessorClient({
@@ -142,9 +141,12 @@ describe('isAuthValid', () => {
   });
 
   it('returns true for valid auth state with PropProfessor cookie', () => {
-    assert.equal(isAuthValid({
-      cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }]
-    }), true);
+    assert.equal(
+      isAuthValid({
+        cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'abc' }]
+      }),
+      true
+    );
   });
 
   it('returns false for empty cookies array', () => {
@@ -152,9 +154,12 @@ describe('isAuthValid', () => {
   });
 
   it('returns false for cookies with wrong domain', () => {
-    assert.equal(isAuthValid({
-      cookies: [{ domain: '.google.com', name: 'session', value: 'abc' }]
-    }), false);
+    assert.equal(
+      isAuthValid({
+        cookies: [{ domain: '.google.com', name: 'session', value: 'abc' }]
+      }),
+      false
+    );
   });
 
   it('returns false for non-object input', () => {
