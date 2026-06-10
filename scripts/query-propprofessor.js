@@ -133,12 +133,17 @@ function buildDoctorReport(healthResult) {
   const node = getNodeVersionStatus();
   const auth = inspectAuthSetup();
   const endpointOk = Boolean(healthResult?.ok);
+  const sessionExpiry = auth.sessionExpiry;
 
   let nextStep = 'Ready to add this server to your MCP client.';
   if (!node.ok) {
     nextStep = 'Install Node.js 18 or newer, then rerun `pp-query doctor`.';
   } else if (!auth.ok) {
     nextStep = `Save your PropProfessor browser session to ${auth.defaultUserAuthFile} or set AUTH_FILE, then rerun \`pp-query doctor\`.`;
+  } else if (sessionExpiry && sessionExpiry.status === 'expired') {
+    nextStep = `Session expired. Run \`pp-query login\` to re-authenticate.`;
+  } else if (sessionExpiry && sessionExpiry.status === 'critical') {
+    nextStep = `Session expires in ${sessionExpiry.daysRemaining} day(s). Run \`pp-query login\` before it expires.`;
   } else if (!endpointOk) {
     nextStep =
       'Your auth file was found, but the live health check failed. Refresh your browser session and rerun `pp-query doctor`.';
@@ -158,7 +163,11 @@ function buildDoctorReport(healthResult) {
     summary: {
       node: node.ok ? 'ok' : 'error',
       auth: auth.ok ? 'ok' : 'error',
-      endpoint: endpointOk ? 'ok' : 'error'
+      endpoint: endpointOk ? 'ok' : 'error',
+      session: sessionExpiry ? sessionExpiry.status : 'unknown',
+      sessionExpiresAt: sessionExpiry?.sessionExpiry || null,
+      sessionDaysRemaining: sessionExpiry?.daysRemaining || null,
+      sessionWarning: sessionExpiry?.warning || null
     },
     nextStep
   };

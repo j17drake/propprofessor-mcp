@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const { createPropProfessorClient, isAuthValid, resolveAuthFile, readAuthState } = require('../lib/propprofessor-api');
+const { createPropProfessorClient, getCookieExpiryInfo, isAuthValid, resolveAuthFile, readAuthState } = require('../lib/propprofessor-api');
 const {
   normalizeTennisMarketQuery,
   rankTennisScreenRows,
@@ -1396,10 +1396,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
 
       const authValid = isAuthValid(authState);
+      const expiryInfo = getCookieExpiryInfo(authState);
       const authSection = {
         valid: authValid,
         file: authValid ? authFile : null,
-        message: authValid ? 'Auth is valid' : 'Auth missing or expired. Run: pp-query login'
+        message: authValid ? 'Auth is valid' : 'Auth missing or expired. Run: pp-query login',
+        session: {
+          status: expiryInfo.status,
+          expiresAt: expiryInfo.sessionExpiry,
+          daysRemaining: expiryInfo.daysRemaining,
+          warning: expiryInfo.warning
+        }
       };
 
       if (!authValid) {

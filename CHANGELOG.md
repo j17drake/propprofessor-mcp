@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.1
+
+### Auth session expiry detection
+
+Session cookie (`__Secure-next-auth.session-token`) TTL is now parsed from `auth.json` and surfaced everywhere:
+
+- **`health_status` MCP tool** — returns `auth.session` with `status`, `expiresAt`, `daysRemaining`, and `warning`
+- **`pp-query doctor`** — `summary` now includes `session`, `sessionExpiresAt`, `sessionDaysRemaining`, `sessionWarning`; next-step guidance changes based on expiry status
+- **`inspectAuthSetup()`** — new `sessionExpiry` field with full cookie analysis
+- **`getCookieExpiryInfo()`** — new exported function, reusable across CLI and MCP
+
+Status levels: `ok` (>7d), `warning` (3–7d), `critical` (≤3d), `expired` (≤0d).
+
+### Auth watchdog cron script
+
+`scripts/pp-auth-watchdog.js` — standalone script for Hermes cron (`no_agent: true`). Silent when healthy, outputs a warning when session is expiring or expired. No tokens consumed.
+
+### Tests
+
+8 new tests for `getCookieExpiryInfo` covering ok/warning/critical/expired/no_auth/no_session_token/browser_session_only/allCookieExpiries. Total: 682 passing.
+
 ## 1.4.0
 
 ### Removed TIER 4 fallback from recommended_bets

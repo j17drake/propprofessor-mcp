@@ -72,3 +72,101 @@ describe('propprofessor API auth file resolution', () => {
     }
   });
 });
+
+describe('getCookieExpiryInfo', () => {
+  const { getCookieExpiryInfo } = require('../lib/propprofessor-api');
+
+  function makeAuth(sessionTokenExpiry) {
+    return {
+      cookies: [
+        {
+          name: '__Secure-next-auth.session-token',
+          value: 'tok_abc123',
+          domain: 'app.propprofessor.com',
+          expires: sessionTokenExpiry,
+          session: false
+        },
+        {
+          name: 'intercom-session-om1bixtq',
+          value: 'ic_val',
+          domain: '.propprofessor.com',
+          expires: sessionTokenExpiry + 86400 * 365,
+          session: false
+        }
+      ]
+    };
+  }
+
+  it('returns ok status when session has >7 days remaining', () => {
+    const nowSec = Date.now() / 1000;
+    const expiry = nowSec + 86400 * 20; // 20 days from now
+    const info = getCookieExpiryInfo(makeAuth(expiry), () => nowSec * 1000);
+    assert.equal(info.status, 'ok');
+    assert.equal(info.warning, null);
+    assert.ok(info.daysRemaining > 19);
+    assert.ok(info.daysRemaining < 21);
+  });
+
+  it('returns warning status when session has 3-7 days remaining', () => {
+    const nowSec = Date.now() / 1000;
+    const expiry = nowSec + 86400 * 5; // 5 days
+    const info = getCookieExpiryInfo(makeAuth(expiry), () => nowSec * 1000);
+    assert.equal(info.status, 'warning');
+    assert.match(info.warning, /Consider re-login/);
+    assert.ok(info.daysRemaining >= 4.9 && info.daysRemaining <= 5.1);
+  });
+
+  it('returns critical status when session has <=3 days remaining', () => {
+    const nowSec = Date.now() / 1000;
+    const expiry = nowSec + 86400 * 2; // 2 days
+    const info = getCookieExpiryInfo(makeAuth(expiry), () => nowSec * 1000);
+    assert.equal(info.status, 'critical');
+    assert.match(info.warning, /pp-query login soon/);
+  });
+
+  it('returns expired status when session has <=0 days remaining', () => {
+    const nowSec = Date.now() / 1000;
+    const expiry = nowSec - 86400 * 3; // expired 3 days ago
+    const info = getCookieExpiryInfo(makeAuth(expiry), () => nowSec * 1000);
+    assert.equal(info.status, 'expired');
+    assert.match(info.warning, /expired.*day.*ago/);
+    assert.ok(info.daysRemaining < 0);
+  });
+
+  it('returns no_auth when auth is null', () => {
+    const info = getCookieExpiryInfo(null, Date.now);
+    assert.equal(info.status, 'no_auth');
+    assert.equal(info.sessionExpiry, null);
+  });
+
+  it('returns no_session_token when session cookie is missing', () => {
+    const auth = {
+      cookies: [
+        { name: 'intercom-session-x', value: 'v', domain: '.propprofessor.com', expires: 9999999999, session: false }
+      ]
+    };
+    const info = getCookieExpiryInfo(auth, Date.now);
+    assert.equal(info.status, 'no_session_token');
+  });
+
+  it('returns browser_session_only when only session cookies exist (expires -1)', () => {
+    const auth = {
+      cookies: [
+        { name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1, session: true }
+      ]
+    };
+    const info = getCookieExpiryInfo(auth, Date.now);
+    assert.equal(info.status, 'browser_session_only');
+  });
+
+  it('includes allCookieExpiries with per-cookie breakdown', () => {
+    const nowSec = Date.now() / 1000;
+    const expiry = nowSec + 86400 * 15;
+    const info = getCookieExpiryInfo(makeAuth(expiry), () => nowSec * 1000);
+    assert.ok(Array.isArray(info.allCookieExpiries));
+    assert.equal(info.allCookieExpiries.length, 2); // session token + intercom
+    assert.ok(info.allCookieExpiries[0].name);
+    assert.ok(info.allCookieExpiries[0].expires);
+    assert.ok(typeof info.allCookieExpiries[0].daysRemaining === 'number');
+  });
+});
