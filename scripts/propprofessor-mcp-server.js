@@ -663,6 +663,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   //   clear_hidden_bets      ← clear_hidden_bets (unchanged)
   //   find_best_price        ← find_best_price (unchanged)
   const handlers = {
+    // ─── Screening & Ranking ────────────────────────────────────────
     async ev_candidates(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
       if (!leagues) {
@@ -797,6 +798,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return runSportScreen(args);
     },
 
+    // ─── Sharp Movement ─────────────────────────────────────────────
     async sharp_plays(args = {}) {
       const response = await runSharpPlays(args, {
         queryLeagueScreen: runLeagueScreen,
@@ -948,6 +950,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // ─── Betting ────────────────────────────────────────────────────
     async recommended_bets(args = {}) {
       const leagues =
         Array.isArray(args.leagues) && args.leagues.length
@@ -1133,6 +1136,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // ─── Player Context ─────────────────────────────────────────────
     async player_context(args = {}) {
       const player = typeof args.player === 'string' ? args.player.trim() : '';
       if (!player) {
@@ -1203,6 +1207,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // ─── Screening & Ranking (continued) ────────────────────────────
     async all_slates(args = {}) {
       const DEFAULT_LEAGUES = ['NBA', 'MLB', 'NHL', 'TENNIS', 'WNBA', 'Soccer', 'UFC'];
       const leagues =
@@ -1311,6 +1316,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // ─── UFC ────────────────────────────────────────────────────────
     async ufc_card(args = {}) {
       return runUfcCard(args);
     },
@@ -1413,6 +1419,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // ─── Bet Management ─────────────────────────────────────────────
     async get_hidden_bets() {
       const result = await client.getHiddenBets();
       return { ok: true, result };
@@ -1444,6 +1451,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return { ok: true, result };
     },
 
+    // ─── Line Shopping ──────────────────────────────────────────────
     async find_best_price(args = {}) {
       const league = args.league || 'NBA';
       const marketResolution = resolveMarkets(args, league);
@@ -1464,6 +1472,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return result;
     },
 
+    // ─── Meta ──────────────────────────────────────────────────────
     async get_started(args = {}) {
       const userType = args.user_type || 'intermediate';
 
@@ -1516,6 +1525,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return workflows[userType] || workflows.intermediate;
     },
 
+    // ─── Picks ─────────────────────────────────────────────────────
     async log_pick(args = {}) {
       if (!args.game || !args.league || !args.market || !args.selection || !Number.isFinite(args.odds)) {
         const error = new Error('game, league, market, selection, and odds are required');
@@ -1557,6 +1567,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return getPickStats({ days: args.days });
     },
 
+    // ─── Alerts ─────────────────────────────────────────────────────
     async get_alerts(args = {}) {
       const leagues =
         Array.isArray(args.leagues) && args.leagues.length ? args.leagues : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
