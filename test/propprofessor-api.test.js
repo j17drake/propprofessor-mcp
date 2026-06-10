@@ -1322,3 +1322,130 @@ describe('createPropProfessorClient', () => {
     }
   });
 });
+
+describe('token refresh mutex', () => {
+  it('only calls fetchAccessToken once when multiple concurrent getAccessToken calls happen', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-mutex-'));
+    const authFile = path.join(dir, 'auth.json');
+    fs.writeFileSync(authFile, JSON.stringify({
+      cookies: [{ name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }]
+    }), 'utf8');
+
+    let fetchCount = 0;
+    const fakeGotScraping = async () => {
+      fetchCount += 1;
+      await new Promise((r) => setTimeout(r, 200));
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ token: 'fresh_token', exp: Math.floor(Date.now() / 1000) + 3600 })
+      };
+    };
+
+    try {
+      const client = createPropProfessorClient({
+        authFile,
+        gotScrapingImpl: fakeGotScraping,
+        fetchImpl: async () => ({ ok: true, status: 200, text: async () => '{}', json: async () => ({}) })
+      });
+
+      // Fire 5 concurrent requests — each will need a token
+      const results = await Promise.all([
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken()
+      ]);
+
+      // All should get the same token
+      for (const result of results) {
+        assert.equal(result.token, 'fresh_token');
+      }
+
+      // But fetchAccessToken should only have been called ONCE
+      assert.equal(fetchCount, 1, `Expected 1 fetchAccessToken call, got ${fetchCount}`);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('allows a new refresh after the previous one completes', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-mutex-2-'));
+    const authFile = path.join(dir, 'auth.json');
+    fs.writeFileSync(authFile, JSON.stringify({
+      cookies: [{ name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }]
+    }), 'utf8');
+
+    let fetchCount = 0;
+    const fakeGotScraping = async () => {
+      fetchCount += 1;
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ token: `token_${fetchCount}`, exp: Math.floor(Date.now() / 1000) + 1 })
+      };
+    };
+
+    try {
+      const client = createPropProfessorClient({
+        authFile,
+        gotScrapingImpl: fakeGotScraping,
+        fetchImpl: async () => ({ ok: true, status: 200, text: async () => '{}', json: async () => ({}) })
+      });
+
+      const t1 = await client.getAccessToken();
+      assert.equal(t1.token, 'token_1');
+      assert.equal(fetchCount, 1);
+
+      await new Promise((r) => setTimeout(r, 1500));
+
+      const t2 = await client.getAccessToken();
+      assert.equal(t2.token, 'token_2');
+      assert.equal(fetchCount, 2);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('concurrent calls after invalidation all wait for the same refresh', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-mutex-3-'));
+    const authFile = path.join(dir, 'auth.json');
+    fs.writeFileSync(authFile, JSON.stringify({
+      cookies: [{ name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }]
+    }), 'utf8');
+
+    let fetchCount = 0;
+    const fakeGotScraping = async () => {
+      fetchCount += 1;
+      await new Promise((r) => setTimeout(r, 150));
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ token: `refreshed_${fetchCount}`, exp: Math.floor(Date.now() / 1000) + 3600 })
+      };
+    };
+
+    try {
+      const client = createPropProfessorClient({
+        authFile,
+        gotScrapingImpl: fakeGotScraping,
+        fetchImpl: async () => ({ ok: true, status: 200, text: async () => '{"ok":true}', json: async () => ({ ok: true }) })
+      });
+
+      await client.getAccessToken();
+      assert.equal(fetchCount, 1);
+
+      // Fire concurrent requests — all should wait for the same refresh
+      const [t1, t2, t3] = await Promise.all([
+        client.getAccessToken(),
+        client.getAccessToken(),
+        client.getAccessToken()
+      ]);
+
+      // Token is still valid (hasn't expired), so no new refresh should happen
+      assert.equal(fetchCount, 1);
+      assert.equal(t1.token, t2.token);
+      assert.equal(t2.token, t3.token);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

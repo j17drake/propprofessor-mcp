@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.5.0
+
+### Token refresh mutex
+
+Concurrent requests that trigger 401s now share a single token refresh instead of each independently calling `fetchAccessToken`. The `tokenRefreshPromise` singleton in `createPropProfessorClient` ensures only one refresh happens at a time — subsequent callers wait for the same promise.
+
+- 3 new tests: concurrent refresh dedup, refresh-after-expiry, concurrent invalidation wait
+- Reduces unnecessary API calls to PropProfessor's token endpoint under load
+
+### Synthetic backtest validation
+
+`scripts/backtest-synthetic.js` — runs the full ranking pipeline (extract → hydrate → rank → tier) against synthetic scenarios with known outcomes. Reports per-tier hit rates and validates tier differentiation.
+
+**Results (500 scenarios):**
+- TIER 1: 55.9% hit rate (borderline — target is >60%)
+- TIER 1 vs TIER 3 gap: +6.9pp — system differentiates quality
+- TIER 4 > TIER 2: red flag — risk flags need tuning
+
+**Files:**
+- `scripts/backtest-synthetic.js` — scenario generator + backtest runner + reporting
+- `test/backtest-synthetic.test.js` — 6 tests for scenario generation and backtest execution
+
+### Test count
+
+717 tests total, 717 passing.
+
 ## 1.4.2
 
 ### Fixture-based handler integration tests
