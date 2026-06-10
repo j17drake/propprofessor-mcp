@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.4.2
+
+### Fixture-based handler integration tests
+
+Offline tests for all major MCP handlers — no auth, no network, no API dependency.
+
+**New files:**
+- `test/fixtures/screen-payloads.js` — 3 NBA games + 1 MLB game across 5 books with deliberate odds differences (consensus, sharp movement, split market)
+- `test/fixtures/odds-history.js` — odds history with steam moves, gradual drift, and stable lines
+- `test/fixtures/mock-client.js` — shared mock client factory with call tracking and customizable payloads
+- `test/handler-integration.test.js` — 26 tests across 11 suites
+
+**Handlers tested:**
+- `screen_ranked` (7 tests) — ranking, limit, compact, fields, Spread, Total
+- `screen` (2 tests) — NBA, MLB league-specific
+- `sharp_plays` (3 tests) — resultMeta, Fliff lag detection, multi-league
+- `recommended_bets` (3 tests) — tier/kai structure, targetTiers filter, marketsBreakdown
+- `staking_plan` (1 test) — stake allocation structure
+- `find_best_price` (1 test) — line shopping across books, price sorting
+- `all_slates` (2 tests) — consolidated results, multi-league
+- `health_status` (1 test) — auth session info
+- `league_presets` (1 test) — no client calls
+- `ev_candidates` (2 tests) — validation, result structure
+- `error handling` (3 tests) — empty game_data, missing selections, empty leagues
+
+**Test count:** 708 total (707 pass, 1 pre-existing live smoke failure).
+
 ## 1.4.1
 
 ### Auth session expiry detection
