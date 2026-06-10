@@ -36,16 +36,17 @@ const SAMPLE_RECOMMENDED_RESPONSE = {
   ok: true,
   totalRecommended: 2,
   markets_queried: ['Moneyline', 'Spread'],
+  marketsBreakdown: { Moneyline: 1, Spread: 1 },
   leagues: [
     {
       league: 'NBA',
       count: 1,
-      plays: [{ ...SAMPLE_RANKED_ROW, game: 'Lakers vs Celtics' }]
+      plays: [{ ...SAMPLE_RANKED_ROW, game: 'Lakers vs Celtics', market: 'Moneyline' }]
     },
     {
       league: 'MLB',
       count: 1,
-      plays: [{ ...SAMPLE_RANKED_ROW, game: 'Yankees vs Red Sox', participant: 'Yankees', selection: 'Yankees' }]
+      plays: [{ ...SAMPLE_RANKED_ROW, game: 'Yankees vs Red Sox', participant: 'Yankees', selection: 'Yankees', market: 'Spread' }]
     }
   ]
 };
@@ -155,6 +156,16 @@ describe('formatRecommendedBetsStandard', () => {
   it('formats plays within leagues', () => {
     const result = formatRecommendedBetsStandard(SAMPLE_RECOMMENDED_RESPONSE);
     assert.ok(result.leagues[0].plays[0].selection);
+  });
+
+  it('preserves marketsBreakdown', () => {
+    const result = formatRecommendedBetsStandard(SAMPLE_RECOMMENDED_RESPONSE);
+    assert.deepEqual(result.marketsBreakdown, { Moneyline: 1, Spread: 1 });
+  });
+
+  it('preserves markets_queried', () => {
+    const result = formatRecommendedBetsStandard(SAMPLE_RECOMMENDED_RESPONSE);
+    assert.deepEqual(result.markets_queried, ['Moneyline', 'Spread']);
   });
 });
 

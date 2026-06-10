@@ -1079,6 +1079,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           : 'No TIER 1 or TIER 2 plays found across requested leagues',
         tierFilter: targetTiers,
         markets_alias_used: allAliasesUsed,
+        marketsBreakdown: (() => {
+          const breakdown = {};
+          for (const leagueData of allRecommended) {
+            for (const play of leagueData.plays || []) {
+              const m = play.market || 'unknown';
+              breakdown[m] = (breakdown[m] || 0) + 1;
+            }
+          }
+          return breakdown;
+        })(),
         ...(fallback.enabled ? { fallback } : {})
       };
       // Apply verbosity formatting

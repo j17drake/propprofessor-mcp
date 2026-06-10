@@ -4,12 +4,12 @@
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-594%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-674%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-84%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Lean, fast odds analysis engine for AI agents. **26 tools, 594 tests, all performance features active.**
+Lean, fast odds analysis engine for AI agents. **26 tools, 674 tests, all performance features active.**
 
 Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection. Built for [Model Context Protocol](https://modelcontextprotocol.io) clients.
 
@@ -132,7 +132,7 @@ Optional token compression for smaller context usage: install `caveman-shrink` g
 
 ### Claude Desktop / Cursor / Cline / Zed
 
-See [CONFIG.md](CONFIG.md) for client-specific configs. The server runs via:
+See [SETUP.md](SETUP.md) for client-specific configs. The server runs via:
 
 ```json
 {
@@ -334,7 +334,7 @@ Pre-configured in `lib/propprofessor-sharp-books.js`:
 
 ## For Maintainers
 
-- **Tests**: `npm test` (583 passing, includes live API integration tests)
+- **Tests**: `npm test` (674 passing, includes live API integration tests)
 - **Live smoke**: `npm run smoke:live` (requires `auth.json`)
 - **Lint**: `npm run lint`
 - **Format**: `npm run format:check`

@@ -1,7 +1,7 @@
 ---
 name: propprofessor-mcp
-description: 'PropProfessor MCP: sports betting analysis for AI agents. Screens 36+ books, ranks by sharp movement, validates with multi-window consensus.'
-version: 1.1.0
+description: 'PropProfessor MCP: sports betting analysis for AI agents. Screens 36+ books, ranks by sharp movement, validates with multi-window consensus. Multi-market (ML/Spread/Total), market aliasing, consensus strength scoring.'
+version: 1.3.0
 author: James Drake
 tags: [sports-betting, mcp, odds-analysis, sharp-movement]
 ---
@@ -60,11 +60,23 @@ Player/injury/news risk from `player_context`. 1-3 = clean, 4-6 = monitor, 7-10 
 **Movement Grade (A–D)**
 How many sharp books moved supportive across the lookback window. A = broad sharp support, D = no support or contradictory. Grade A/B with TIER 1-2 is the sweet spot.
 
+**Multi-Market Defaults**
+
+`recommended_bets`, `sharp_plays`, and `staking_plan` scan Moneyline, Spread, and Total by default. Pass `markets: ["Spread"]` to narrow. Market names are auto-aliased per league (e.g. "Total" → "Total Goals" for NHL, "Run Line" for MLB).
+
+**Consensus Strength**
+
+Each ranked row includes `consensusStrength`: `strong` (3+ books agree), `moderate` (2), `weak` (1), `none` (0). Use this to calibrate confidence — strong consensus + green movement = best signal.
+
 **Verbosity Levels**
 
 - `minimal` — essentials only (game, selection, odds, tier). For casual users.
 - `standard` — adds edge, movement grade, kai call. Default.
 - `full` — includes line history, score breakdown, full odds maps. For sharp users and debugging.
+
+**Token Persistence**
+
+Auth tokens are cached to `~/.propprofessor/token-cache.json`. Reduces login frequency. If tools return auth errors, tell user to run `pp-query login`.
 
 ## Common Pitfalls
 
@@ -78,6 +90,6 @@ How many sharp books moved supportive across the lookback window. A = broad shar
 ## Resources
 
 - [`AGENT_PROMPT.md`](./AGENT_PROMPT.md) — full agent prompt with tool-by-tool guidance
-- [`README.md`](../README.md) — setup, install, configuration
-- [`AUTH.md`](./AUTH.md) — authentication flow and token refresh
-- [`CONFIG.md`](./CONFIG.md) — config file reference and env vars
+- [`SETUP.md`](../SETUP.md) — setup, install, auth, MCP client configs
+- [`MARKET-BOOK-AVAILABILITY.md`](./MARKET-BOOK-AVAILABILITY.md) — which books post which markets
+- [`CHANGELOG.md`](../CHANGELOG.md) — version history

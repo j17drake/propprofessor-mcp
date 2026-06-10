@@ -52,7 +52,17 @@ Phase 1 investigation found the `freshnessFallbackUsed: true` flag is **not a bu
 - Phase 5 (Token persistence) complete
 - Phase 6 (Tool descriptions) complete
 - Phase 7 (Verbosity) complete
-- Phase 8 (Tests) complete — 672 tests
+- Phase 8 (Tests) complete — 674 tests
+
+### marketsBreakdown in recommended_bets
+
+**New `marketsBreakdown` field** in `recommended_bets` response showing play count by market type:
+
+```json
+"marketsBreakdown": { "Moneyline": 3, "Spread": 1, "Total": 0 }
+```
+
+Makes it transparent when Spread/Total have fewer plays due to upstream data quality, rather than appearing as a moneyline-only tool.
 
 ## Cross-Book Consensus Expansion (Phase 4)
 
