@@ -2,7 +2,6 @@
 
 const {
   MARKET_ALIASES,
-  _aliasLeagueKey,
   resolveMarketName
 } = require('../lib/propprofessor-shared-utils');
 

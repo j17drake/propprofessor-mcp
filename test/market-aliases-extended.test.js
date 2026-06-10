@@ -10,8 +10,7 @@ const {
 
 const {
   getAltMarketBooks,
-  getSharpBookComparisonSet,
-  ALT_MARKET_BOOKS
+  getSharpBookComparisonSet
 } = require('../lib/propprofessor-sharp-books');
 
 describe('MARKET_ALIASES completeness', () => {
