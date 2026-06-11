@@ -4,12 +4,12 @@
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-674%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-84%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-773%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Lean, fast odds analysis engine for AI agents. **26 tools, 674 tests, all performance features active.**
+Lean, fast odds analysis engine for AI agents. **26 tools, 773 tests, all performance features active.**
 
 Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection. Built for [Model Context Protocol](https://modelcontextprotocol.io) clients.
 
@@ -28,6 +28,16 @@ AI Agent → pp-mcp → PropProfessor API → Ranked plays with movement signals
 5. **Stake** — Fractional Kelly sizing with CLV-adjusted multipliers
 
 ---
+
+## What's New in v1.5.1
+
+- **TIER 4 > TIER 2 inversion fixed** — `insufficient_history` no longer triggers RED status in `gradeMovementQuality`. Missing history data isn't an adverse signal, but the old logic treated it as one, burying ~50% of plays as TIER 4. Backtest of 3,000 scenarios: TIER 4 hit rate was 50.6% (above TIER 2's 47.8%) → now 48.6% < 53.2%. Tier ordering is clean: TIER 1/2 > TIER 3 > TIER 4.
+- **Improved synthetic backtest generator** — three distinct scenario types with real edge conditions: `sharp_move` (35%, sharp books moved, target book stale → TIER 1/2), `stable_no_edge` (35%, all books agree, no edge → TIER 3/4), `adverse` (30%, sharp books moving against the pick → TIER 4). Gives more accurate tier-validation signal.
+
+## What's New in v1.5.0
+
+- **Token refresh mutex** — concurrent 401s now share a single token refresh via the `tokenRefreshPromise` singleton in `createPropProfessorClient`. 3 new tests cover dedup, refresh-after-expiry, and concurrent invalidation wait. Cuts redundant calls to PropProfessor's token endpoint under load.
+- **Synthetic backtest validation** — `scripts/backtest-synthetic.js` runs the full ranking pipeline (extract → hydrate → rank → tier) against 500 synthetic scenarios with known outcomes. Reports per-tier hit rates and validates tier differentiation. TIER 1: 55.9% hit rate; TIER 1 vs TIER 3 gap: +6.9pp.
 
 ## What's New in v1.4.0
 
@@ -344,7 +354,7 @@ Pre-configured in `lib/propprofessor-sharp-books.js`:
 
 ## For Maintainers
 
-- **Tests**: `npm test` (674 passing, includes live API integration tests)
+- **Tests**: `npm test` (773 passing, includes live API integration tests)
 - **Live smoke**: `npm run smoke:live` (requires `auth.json`)
 - **Lint**: `npm run lint`
 - **Format**: `npm run format:check`
