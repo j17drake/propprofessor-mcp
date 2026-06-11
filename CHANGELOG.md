@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.6.0
+
+### Pivot: sharp-money signal feed, not betting oracle
+
+**The core finding from v1.5.5:** the synthetic backtest reliably shows the algorithm is finding coordinated sharp-money movement correctly (TIER 4 ≤ TIER 2 inversion holds, tier ordering is correct), but it does **not** reliably predict outcomes (TIER 1 hit rate is ~50% on a 580-play sample). The honest product positioning is a **sharp-money signal feed** — telling you _what sharp books are doing_ so you can decide what to bet, not telling you _what will happen_.
+
+This release is a positioning + messaging change, not an algorithm change. The ranking pipeline, risk score, tier system, kaiCall semantics, and tool surface are unchanged. What changes is how the README and tool descriptions frame the system.
+
+### Docs
+
+- **README hero and intro reframed** — from "turns your AI agent into a sharp / tell you what to bet" to "shows you what the sharp money is doing / surface the sharp moves and let you decide". Added an explicit "Honest scope" callout that the system is a signal feed, not a betting oracle.
+- **"The numbers" section reframed** — replaced "TIER 1 hit rate target: >60%" with measurement of _signal quality_ (tier ordering, steam move detection, line lag detection) rather than _predictive power_. The "what this means in practice" callout makes it explicit: trust the signal, not the outcome prediction.
+- **"What you can ask your agent" prompts reframed** — replaced "Find me moneyline value on Lakers" with "What are tonight's strongest coordinated sharp moves across NBA and NHL?" and similar observation-focused prompts. The optional bet-tracking prompts are explicitly marked as optional.
+- **"All 27 tools" section reframed** — user-type categories renamed from "casual/intermediate/sharp bettors" to "quick situational checks / deeper signal analysis / full raw data and research" (about _data depth_, not betting style). The "Betting" category is renamed to "Flagged Plays". `staking_plan` description now reads "for picks you decide to place" instead of just "Fractional Kelly sizing".
+- **"See it in action" example reframed** — example prompt and lead text updated to emphasize signal quality, not action. The output JSON is unchanged because it's accurate — the framing around it is what changed.
+
+### Tool definitions
+
+- `recommended_bets` description updated — explicitly states the tier/kaiCall are quality ratings on the movement data, NOT predictions about outcomes. Use this as your "what is sharp money doing right now" tool.
+- `get_started` description updated — clarifies that "casual/intermediate/sharp" labels are about data depth, not betting style.
+
+### Stats
+
+- 775 tests passing (unchanged)
+- 0 open issues
+- 0 open PRs
+- Tool count: 27 (verified consistent across definitions, OpenAPI spec, and README by `check:claims`)
+- Algorithm: unchanged. TIER 1 hit rate, risk-scoring weights, tier assignment table, and kaiCall semantics are identical to v1.5.5.
+
 ## 1.5.5
 
 ### Bug fix

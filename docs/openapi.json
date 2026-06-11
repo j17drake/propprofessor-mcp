@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "PropProfessor MCP API",
-    "version": "1.5.2",
+    "version": "1.5.5",
     "description": "Lean, fast odds analysis engine for AI agents. Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection.\n\nSee the README for setup instructions and tool guides by user type.",
     "contact": {
       "name": "James Drake",
@@ -1917,7 +1917,7 @@
     },
     "/tools/get_started": {
       "post": {
-        "summary": "Get recommended workflow based on user type. Call this first to understand which tools to use for casual, intermediate, or sharp bettors.",
+        "summary": "Get the recommended workflow based on use case. Call this first to understand which tools to use for quick situational checks, deeper signal analysis, or full raw data research. The \"casual\"/\"intermediate\"/\"sharp\" labels are about *data depth*, not about betting style — every level surfaces the same underlying signal feed, just with more or less aggregation.",
         "operationId": "get_started",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -3197,7 +3197,7 @@
     },
     "/tools/recommended_bets": {
       "post": {
-        "summary": "Return only the highest-confidence plays across requested leagues, ranked by confidence. Each row includes movementGrade, riskScore (1-10), kaiCall (BET/CONSIDER/PASS), confidenceTier (TIER 1-4), consensusStrength (strong/moderate/weak/none), and a human-readable rationale string. Generic market names (e.g. \"Total\", \"Spread\") are auto-resolved per league. When aliases are resolved, `responseMeta.markets_alias_used` is set. Use this as your main what-to-bet-today tool. Defaults to scanning Moneyline, Spread, and Total markets. Pass `markets` to override.",
+        "summary": "Return only the highest-quality movement signals across requested leagues, ranked by signal strength. Each row includes movementGrade, riskScore (1-10), kaiCall (BET/CONSIDER/PASS), confidenceTier (TIER 1-4), consensusStrength (strong/moderate/weak/none), and a human-readable rationale string. The tier and kaiCall are quality ratings on the movement data (do sharp books really agree? is there a real line lag?), NOT predictions about which side will win. Generic market names (e.g. \"Total\", \"Spread\") are auto-resolved per league. When aliases are resolved, `responseMeta.markets_alias_used` is set. Use this as your main \"what is sharp money doing right now\" tool. Defaults to scanning Moneyline, Spread, and Total markets. Pass `markets` to override.",
         "operationId": "recommended_bets",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {

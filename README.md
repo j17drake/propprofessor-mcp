@@ -1,21 +1,23 @@
 # PropProfessor MCP
 
-> An MCP server that turns your AI agent into a sharp. 27 tools that screen 36 sportsbooks, rank plays by sharp movement + consensus edge, and tell you what to bet — with the math shown.
+> An MCP server that shows you what the sharp money is doing. 27 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-775%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 27 tools to screen odds, detect sharp money, line-shop, size stakes, and track your record. It needs a [PropProfessor](https://propprofessor.com) account to work.
+Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 27 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
+
+**Honest scope:** PropProfessor MCP is a **sharp-money signal feed**, not a betting oracle. The ranking pipeline reliably detects _what sharp books are doing_ (line moves, consensus, steam, independent sharp confirmation) — it does **not** reliably predict _which side will win_. The TIER 1/2/3/4 system is a quality rating on the signal strength, not a confidence claim about outcomes. Use it as a tool to inform your own handicapping, not to outsource your decisions.
 
 ---
 
 ## See it in action
 
-Ask your agent: _"Find me the best NBA moneyline plays right now, with the math shown."_
+Ask your agent: _"Show me the strongest coordinated sharp-money signals on tonight's NBA slate."_
 
 ```json
 {
@@ -53,57 +55,66 @@ Ask your agent: _"Find me the best NBA moneyline plays right now, with the math 
 }
 ```
 
-That's the output your agent gets. The `tier` is the confidence call. The `riskScore` is 1–10. The `rationale` tells you why.
+That's the output your agent gets. The `tier` is the **signal quality rating** (1 = highest signal strength, 4 = no real signal). The `riskScore` is 1–10 (lower = cleaner). The `rationale` tells you _what sharp books are doing_ — not what will happen. The `kaiCall` and tier are quality assessments of the movement data, not predictions about outcomes. Use them to decide what to investigate further; the call on whether to act is yours.
 
 ---
 
 ## The numbers
 
-This is the proof. The tier system gets validated against synthetic scenarios where the outcome is known, plus real-world backtests as the daily snapshot cron collects resolved data.
+The ranking pipeline is validated against synthetic scenarios where the movement signals and the outcomes are both known, plus real-world snapshots as the daily cron collects resolved data. The numbers below measure **signal quality** (does the system correctly identify what sharp money is doing?) — not predictive power (which side wins). Predictive claims have been removed from this README; see the [methodology section](#how-the-ranking-works) for the full math.
 
-| What we measure                          | Result                                                     |
-| ---------------------------------------- | ---------------------------------------------------------- |
-| Tier ordering (does TIER 1 beat TIER 4?) | **Yes** — TIER 4 has lowest hit rate, TIER 1 highest       |
-| TIER 1 vs TIER 3 hit rate gap            | **+0.3 to +3.1pp** — system differentiates weakly          |
-| TIER 1 hit rate (synthetic)              | **~50%** (target: >60%) — algorithm needs work, see v1.6.0 |
-| TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2      |
-| Tests                                    | **775 passing**                                            |
-| Coverage                                 | **82% statements, 88% functions**                          |
+| What we measure                          | Result                                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
+| Tier ordering (does TIER 1 beat TIER 4?) | **Yes** — TIER 4 has the lowest hit rate, TIER 1 the highest                  |
+| TIER 1 vs TIER 3 hit rate gap            | **+0.3 to +3.1pp** — system differentiates weakly                             |
+| TIER 1 hit rate (synthetic)              | **~50%** — the system flags real movement but doesn't beat chance on outcomes |
+| TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2                         |
+| Steam move detection                     | Coordinated sharp moves across 3+ books within a 90-min window                |
+| Line lag detection                       | Target-book price divergence vs sharp consensus (avg 12-25pt gap)             |
+| Tests                                    | **775 passing**                                                               |
+| Coverage                                 | **82% statements, 88% functions**                                             |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
+
+**What this means in practice:** when the system flags a TIER 1 play, you can trust that:
+
+- Multiple sharp books are moving in a coordinated direction (not noise)
+- The target book is meaningfully stale (positive edge was real at one point)
+- The risk factors (steam, consensus, execution quality) all line up
+
+What you **can't** trust from the system alone: that the side it flags will win. The signal is reliable; the outcome prediction is not. Your job is to take the signal and decide.
 
 ---
 
 ## What you can ask your agent
 
-A few real prompts, by bettor scenario:
+A few real prompts, by use case:
 
-**Pre-game**
+**Sharp money movement**
 
-- "What are tonight's TIER 1 plays across NBA and NHL?"
-- "Find me moneyline value on Lakers right now."
-- "Show me spread plays where sharp books have moved."
+- "What are tonight's strongest coordinated sharp moves across NBA and NHL?"
+- "Show me spread plays where sharp books have moved together."
+- "Where are sharp books and the public disagreeing the most right now?"
+- "Is there a steam move on the Cowboys game in the last hour?"
 
-**Line shopping**
+**Line shopping and lag detection**
 
-- "Where's the best price on Warriors +3.5?"
-- "Line-shop my top 3 picks and tell me where to actually bet."
-
-**Validation**
-
-- "Has there been steam movement on the Cowboys game in the last hour?"
+- "Where is the price lag between target books and sharp books biggest right now?"
+- "Line-shop my top 3 flagged plays and tell me where the price is best."
 - "Show me consensus across Pinnacle, Circa, and BookMaker for tonight's MLB slate."
 
-**Sizing and tracking**
+**Signal validation and context**
 
-- "Size my bankroll for these plays."
-- "Log this pick — Warriors +3.5 at -110, 1% bankroll."
+- "Show me the rationale for why this play was flagged TIER 1."
+- "Any injury flags on the Lakers backcourt tonight?"
+- "Check player context for the top 3 flagged plays tonight."
+
+**Tracking your own work (optional)**
+
+- "Log this pick — Warriors +3.5 at -110."
 - "What's my P&L this week?"
 
-**Player context**
-
-- "Any injury flags on the Lakers backcourt tonight?"
-- "Check player context for my top 3 recommended plays."
+The first three sections are the data tool's core. The last section is optional bet-tracking — it works if you want it, but the system isn't telling you to place any of those bets.
 
 ---
 
@@ -168,60 +179,60 @@ Replace the path with wherever you cloned the repo. Token compression (smaller c
 
 ## All 27 tools (reference)
 
-### For casual bettors (just tell me what to bet)
+### For quick situational checks (the 5-minute scan)
 
-| Tool                                     | What it does                          |
-| ---------------------------------------- | ------------------------------------- |
-| `get_started(user_type: "casual")`       | Returns the casual workflow (3 tools) |
-| `recommended_bets(verbosity: "minimal")` | Top picks in plain English            |
-| `player_context`                         | Injury risk check on specific plays   |
-| `get_pick_stats`                         | Your win rate + P&L                   |
-| `log_pick` / `resolve_pick`              | Track your bets                       |
-| `health_status`                          | "Is the system up?"                   |
+|| Tool | What it does |
+|| ---------------------------------------- | --------------------------------------------------------- |
+|| `get_started(user_type: "casual")` | Returns the casual workflow (3 tools) |
+|| `recommended_bets(verbosity: "minimal")` | Top flagged movements in plain English |
+|| `player_context` | Injury/availability check on specific plays |
+|| `get_pick_stats` | Your win rate + P&L (only meaningful if you've logged picks) |
+|| `log_pick` / `resolve_pick` | Track your own bet outcomes (optional) |
+|| `health_status` | "Is the system up?" |
 
-### For intermediate bettors (show me the edge)
+### For deeper signal analysis (what sharp books are doing)
 
 Everything in casual, plus:
 
-| Tool                                                                | What it does                                      |
-| ------------------------------------------------------------------- | ------------------------------------------------- |
-| `recommended_bets(verbosity: "standard")`                           | Structured plays with edge, tier, risk, rationale |
-| `find_best_price`                                                   | Line-shop across all books for the best price     |
-| `league_presets`                                                    | Sport-specific ranking weights                    |
-| `novig_screen`                                                      | NoVigApp-specific screen                          |
-| `hide_bet` / `unhide_bet` / `clear_hidden_bets` / `get_hidden_bets` | Manage bet visibility                             |
-| `get_pick_history`                                                  | View logged picks                                 |
+|| Tool | What it does |
+|| ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+|| `recommended_bets(verbosity: "standard")` | Flagged plays with tier, risk score, movement rationale |
+|| `find_best_price` | Line-shop across all books for the best price |
+|| `league_presets` | Sport-specific ranking weights |
+|| `novig_screen` | NoVigApp-specific screen |
+|| `hide_bet` / `unhide_bet` / `clear_hidden_bets` / `get_hidden_bets` | Manage flagged-play visibility |
+|| `get_pick_history` | View logged picks |
 
-### For sharp bettors (full control)
+### For full raw data and research (complete control over the signal)
 
 Everything above, plus:
 
-| Tool                               | What it does                                                                            |
-| ---------------------------------- | --------------------------------------------------------------------------------------- |
-| `screen_ranked(verbosity: "full")` | Complete ranked data with movement signals                                              |
-| `sharp_consensus`                  | Multi-window sharp movement (1h–48h)                                                    |
-| `sharp_plays`                      | Plays with **independent sharp confirmation** across Pinnacle/Circa/BookMaker/BetOnline |
-| `get_play_details`                 | Line history for specific games                                                         |
-| `staking_plan`                     | Fractional Kelly sizing (TIER 1: 2%, TIER 2: 1% of bankroll)                            |
-| `screen_raw`                       | Raw odds payload, no ranking                                                            |
-| `ev_candidates`                    | Fast +EV discovery (validate on `/screen` after)                                        |
-| `all_slates`                       | Consolidated ranked list across multiple leagues                                        |
-| `screen`                           | League-specific screen (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF)    |
-| `get_alerts`                       | Line movement alerts                                                                    |
+|| Tool | What it does |
+|| ---------------------------------- | --------------------------------------------------------------------------------------- |
+|| `screen_ranked(verbosity: "full")` | Complete ranked data with movement signals |
+|| `sharp_consensus` | Multi-window sharp movement (1h–48h) |
+|| `sharp_plays` | Plays with **independent sharp confirmation** across Pinnacle/Circa/BookMaker/BetOnline |
+|| `get_play_details` | Line history for specific games |
+|| `staking_plan` | Fractional Kelly sizing for picks you decide to place (TIER 1: 2%, TIER 2: 1% of bankroll) |
+|| `screen_raw` | Raw odds payload, no ranking — for when you want to do your own analysis |
+|| `ev_candidates` | Fast +EV discovery (validate on `/screen` after) |
+|| `all_slates` | Consolidated ranked list across multiple leagues |
+|| `screen` | League-specific screen (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF) |
+|| `get_alerts` | Line movement alerts |
 
 ### Tool guide by category
 
-| Category                | Tools                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Screening & Ranking** | `screen_ranked`, `screen`, `screen_raw`, `all_slates`, `get_play_details`                              |
-| **Sharp Movement**      | `sharp_plays`, `sharp_consensus`                                                                       |
-| **Betting**             | `recommended_bets`, `staking_plan`, `ev_candidates`                                                    |
-| **Line Shopping**       | `find_best_price`                                                                                      |
-| **Player Context**      | `player_context`                                                                                       |
-| **UFC**                 | `ufc_card`                                                                                             |
-| **Bet Management**      | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets`                                       |
-| **Picks & Tracking**    | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts`, `clear_score_timeline` |
-| **Meta**                | `get_started`, `health_status`, `league_presets`                                                       |
+|| Category | Tools |
+|| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+|| **Screening & Ranking** | `screen_ranked`, `screen`, `screen_raw`, `all_slates`, `get_play_details` |
+|| **Sharp Movement** | `sharp_plays`, `sharp_consensus` |
+|| **Flagged Plays** | `recommended_bets`, `staking_plan`, `ev_candidates` |
+|| **Line Shopping** | `find_best_price` |
+|| **Player Context** | `player_context` |
+|| **UFC** | `ufc_card` |
+|| **Bet Management** | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets` |
+|| **Picks & Tracking** | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts`, `clear_score_timeline` |
+|| **Meta** | `get_started`, `health_status`, `league_presets` |
 
 Every tool accepts a `verbosity` param (`"minimal"` / `"standard"` / `"full"`) and a `compact: true` flag to shrink responses by ~90%. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for response-size tuning.
 
