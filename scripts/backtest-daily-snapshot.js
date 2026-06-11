@@ -13,6 +13,8 @@
 
 const { takeSnapshot } = require('./backtest');
 
+const SUPPORTED_LEAGUES = new Set(['NBA', 'MLB', 'NHL', 'NFL', 'WNBA', 'UFC', 'TENNIS', 'SOCCER', 'NCAAB', 'NCAAF']);
+
 const SNAPSHOTS = [
   { league: 'NBA', market: 'Moneyline' },
   { league: 'MLB', market: 'Moneyline' },
@@ -29,6 +31,17 @@ async function main() {
   const errors = [];
 
   for (const { league, market } of SNAPSHOTS) {
+    // Guard: skip unsupported leagues
+    if (!SUPPORTED_LEAGUES.has(league.toUpperCase())) {
+      console.log = origLog;
+      console.warn(
+        `[backtest-daily-snapshot] Skipping unsupported league: ${league} ` +
+          `(supported: ${[...SUPPORTED_LEAGUES].join(', ')})`
+      );
+      console.log = (...args) => captured.push(args.join(' '));
+      continue;
+    }
+
     try {
       const result = await takeSnapshot({ league, market });
       results.push({ league, market, ...result });
@@ -63,4 +76,8 @@ async function main() {
   process.exit(0);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { SUPPORTED_LEAGUES };
