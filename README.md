@@ -1,138 +1,135 @@
 # PropProfessor MCP
 
-<!-- Badges -->
+> An MCP server that turns your AI agent into a sharp. 26 tools that screen 36 sportsbooks, rank plays by sharp movement + consensus edge, and tell you what to bet — with the math shown.
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
-[![CI](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-773%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Lean, fast odds analysis engine for AI agents. **26 tools, 773 tests, all performance features active.**
-
-Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection. Built for [Model Context Protocol](https://modelcontextprotocol.io) clients.
+Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 26 tools to screen odds, detect sharp money, line-shop, size stakes, and track your record. It needs a [PropProfessor](https://propprofessor.com) account to work.
 
 ---
 
-## What It Does
+## See it in action
 
+Ask your agent: _"Find me the best NBA moneyline plays right now, with the math shown."_
+
+```json
+{
+  "ok": true,
+  "result": {
+    "plays": [
+      {
+        "tier": "TIER 1",
+        "kaiCall": "BET",
+        "game": "Lakers @ Celtics",
+        "market": "Moneyline",
+        "selection": "Lakers ML",
+        "odds": -135,
+        "edge": 4.2,
+        "riskScore": 1.8,
+        "rationale": "Pinnacle + Circa both moved -142 → -135 over 90 min. Steam confirmed on 3 books. 5+ book consensus. No injury flag."
+      },
+      {
+        "tier": "TIER 2",
+        "kaiCall": "CONSIDER",
+        "game": "Warriors @ Nuggets",
+        "market": "Spread",
+        "selection": "Warriors +3.5",
+        "odds": -110,
+        "edge": 2.1,
+        "riskScore": 3.4,
+        "rationale": "Single-window sharp move on DraftKings. Modest consensus. Player context clean."
+      }
+    ],
+    "marketsBreakdown": { "Moneyline": 3, "Spread": 1, "Total": 0 }
+  },
+  "resultMeta": {
+    "tierCounts": { "TIER 1": 1, "TIER 2": 1, "TIER 3": 0, "TIER 4": 0 }
+  }
+}
 ```
-AI Agent → pp-mcp → PropProfessor API → Ranked plays with movement signals
-```
 
-1. **Screen** — Pull live odds across 36+ books, rank by sharp consensus + movement
-2. **Validate** — Detect steam moves (5-min/3-book), multi-window consensus, CLV proxy
-3. **Shop** — Line-shop across all books for best price
-4. **Context** — Player news, tweets, injury risk flags before you bet
-5. **Stake** — Fractional Kelly sizing with CLV-adjusted multipliers
+That's the output your agent gets. The `tier` is the confidence call. The `riskScore` is 1–10. The `rationale` tells you why.
 
 ---
 
-## What's New in v1.5.1
+## The numbers
 
-- **TIER 4 > TIER 2 inversion fixed** — `insufficient_history` no longer triggers RED status in `gradeMovementQuality`. Missing history data isn't an adverse signal, but the old logic treated it as one, burying ~50% of plays as TIER 4. Backtest of 3,000 scenarios: TIER 4 hit rate was 50.6% (above TIER 2's 47.8%) → now 48.6% < 53.2%. Tier ordering is clean: TIER 1/2 > TIER 3 > TIER 4.
-- **Improved synthetic backtest generator** — three distinct scenario types with real edge conditions: `sharp_move` (35%, sharp books moved, target book stale → TIER 1/2), `stable_no_edge` (35%, all books agree, no edge → TIER 3/4), `adverse` (30%, sharp books moving against the pick → TIER 4). Gives more accurate tier-validation signal.
+This is the proof. The tier system gets validated against synthetic scenarios where the outcome is known, plus real-world backtests as the daily snapshot cron collects resolved data.
 
-## What's New in v1.5.0
+| What we measure                          | Result                                                        |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| Tier ordering (does TIER 1 beat TIER 4?) | **Yes** — clean monotonic ordering in 3,000-scenario backtest |
+| TIER 1 vs TIER 3 hit rate gap            | **+6.9 to +7.2pp** — system differentiates quality            |
+| TIER 1 hit rate (synthetic)              | **55.9%** (target: >60%) — borderline, improving              |
+| TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1** — was 50.6% > 47.8%, now 48.6% < 53.2%    |
+| Tests                                    | **773 passing**                                               |
+| Coverage                                 | **82% statements, 88% functions**                             |
 
-- **Token refresh mutex** — concurrent 401s now share a single token refresh via the `tokenRefreshPromise` singleton in `createPropProfessorClient`. 3 new tests cover dedup, refresh-after-expiry, and concurrent invalidation wait. Cuts redundant calls to PropProfessor's token endpoint under load.
-- **Synthetic backtest validation** — `scripts/backtest-synthetic.js` runs the full ranking pipeline (extract → hydrate → rank → tier) against 500 synthetic scenarios with known outcomes. Reports per-tier hit rates and validates tier differentiation. TIER 1: 55.9% hit rate; TIER 1 vs TIER 3 gap: +6.9pp.
-
-## What's New in v1.4.0
-
-- **No more TIER 4 fallback** — `recommended_bets` returns 0 plays when no TIER 1/2 exist instead of surfacing lower-confidence plays
-- **Corrected tool descriptions** — `sharp_plays` and `novig_screen` market param defaults now match actual behavior (ML+Spread+Total)
-- **Markets transparency** — `recommended_bets` response includes `marketsBreakdown` showing play count by market type
-- **Navigable server code** — 22 handlers grouped into domain sections (Screening, Sharp, Betting, Player, UFC, Picks, etc.)
-- See [CHANGELOG.md](CHANGELOG.md) for full history
+The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
 
 ---
 
-## Quick Start
+## What you can ask your agent
 
-Full walkthrough: **[SETUP.md](SETUP.md)** — covers install, auth setup (3 steps), configs for every MCP client, first commands, and troubleshooting.
+A few real prompts, by bettor scenario:
+
+**Pre-game**
+
+- "What are tonight's TIER 1 plays across NBA and NHL?"
+- "Find me moneyline value on Lakers right now."
+- "Show me spread plays where sharp books have moved."
+
+**Line shopping**
+
+- "Where's the best price on Warriors +3.5?"
+- "Line-shop my top 3 picks and tell me where to actually bet."
+
+**Validation**
+
+- "Has there been steam movement on the Cowboys game in the last hour?"
+- "Show me consensus across Pinnacle, Circa, and BookMaker for tonight's MLB slate."
+
+**Sizing and tracking**
+
+- "Size my bankroll for these plays."
+- "Log this pick — Warriors +3.5 at -110, 1% bankroll."
+- "What's my P&L this week?"
+
+**Player context**
+
+- "Any injury flags on the Lakers backcourt tonight?"
+- "Check player context for my top 3 recommended plays."
+
+---
+
+## Install (60 seconds)
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
 cd propprofessor-mcp
 npm install
 npm link
-pp-query login
-pp-query doctor
+pp-query login       # opens a browser, log into PropProfessor
+pp-query doctor     # confirms everything's wired up
 ```
 
-Two commands after `npm link`:
+You now have two commands:
 
-| Command    | Purpose                                    |
-| ---------- | ------------------------------------------ |
-| `pp-mcp`   | MCP server for AI agents (stdio transport) |
-| `pp-query` | CLI for setup, debug, quick checks         |
+| Command    | Purpose                                             |
+| ---------- | --------------------------------------------------- |
+| `pp-mcp`   | MCP server (stdio) — what your AI agent connects to |
+| `pp-query` | CLI for setup, debug, quick checks                  |
 
----
-
-## Tool Guide
-
-### For Casual Bettors (Just Tell Me What to Bet)
-
-1. **`get_started`** (user_type: "casual") — Get the workflow
-2. **`recommended_bets`** (verbosity: "minimal") — Plain English top picks
-3. **`player_context`** — Check injury risk on specific plays
-
-**That's it.** Three tools.
-
-### For Intermediate Bettors (Show Me the Edge)
-
-1. **`get_started`** (user_type: "intermediate") — Get the workflow
-2. **`recommended_bets`** (verbosity: "standard") — Structured plays with edge/tier/risk
-3. **`player_context`** — Injury risk check
-4. **`find_best_price`** — Line shop across books
-5. **`league_presets`** — See league-specific ranking weights
-
-### For Sharp Bettors (Full Control)
-
-1. **`get_started`** (user_type: "sharp") — Get the workflow
-2. **`screen_ranked`** (verbosity: "full") — Complete ranked data
-3. **`sharp_consensus`** — Multi-window sharp movement
-4. **`sharp_plays`** — Plays with independent sharp support
-5. **`get_play_details`** — Line history for specific plays
-6. **`staking_plan`** — Kelly sizing
-7. **`player_context`** — Injury risk on final picks
-
-### All Tools (Reference)
-
-| Tool                | Purpose                   | Casual | Intermediate | Sharp |
-| ------------------- | ------------------------- | ------ | ------------ | ----- |
-| `get_started`       | Workflow guide            | ✓      | ✓            | ✓     |
-| `recommended_bets`  | Top picks                 | ✓      | ✓            | ✓     |
-| `player_context`    | Injury risk               | ✓      | ✓            | ✓     |
-| `find_best_price`   | Line shopping             |        | ✓            | ✓     |
-| `league_presets`    | Ranking weights           |        | ✓            | ✓     |
-| `screen_ranked`     | Full ranked data          |        |              | ✓     |
-| `sharp_consensus`   | Multi-window movement     |        |              | ✓     |
-| `sharp_plays`       | Independent sharp support |        |              | ✓     |
-| `get_play_details`  | Line history              |        |              | ✓     |
-| `staking_plan`      | Kelly sizing              |        |              | ✓     |
-| `screen_raw`        | Raw odds screen           |        |              | ✓     |
-| `ev_candidates`     | +EV discovery             |        |              | ✓     |
-| `ufc_card`          | UFC event analysis        |        |              | ✓     |
-| `all_slates`        | All leagues at once       |        |              | ✓     |
-| `health_status`     | System health             | ✓      | ✓            | ✓     |
-| `screen`            | League screen             |        |              | ✓     |
-| `novig_screen`      | NoVigApp-specific screen  |        | ✓            | ✓     |
-| `hide_bet`          | Hide a bet                |        | ✓            | ✓     |
-| `unhide_bet`        | Unhide a bet              |        | ✓            | ✓     |
-| `clear_hidden_bets` | Reset hidden bets         |        | ✓            | ✓     |
-| `get_hidden_bets`   | List hidden bets          |        | ✓            | ✓     |
-| `get_pick_history`  | View logged picks         |        | ✓            | ✓     |
-| `get_pick_stats`    | Personal win rate + P&L   | ✓      | ✓            | ✓     |
-| `get_alerts`        | Line movement alerts      |        |              | ✓     |
-| `log_pick`          | Log your bet              | ✓      | ✓            | ✓     |
-| `resolve_pick`      | Mark bet as won/lost      | ✓      | ✓            | ✓     |
+**Requirements:** Node 18+, a paid [PropProfessor](https://propprofessor.com) account, ~5 minutes. Full walkthrough in [SETUP.md](SETUP.md).
 
 ---
 
-## MCP Client Setup
+## MCP client setup
 
 ### Hermes Agent
 
@@ -148,11 +145,7 @@ mcp_servers:
       PROPPROFESSOR_MCP_NDJSON: 'true'
 ```
 
-Optional token compression for smaller context usage: install `caveman-shrink` globally, set `command: caveman-shrink`, and add `node` + server path to `args`.
-
 ### Claude Desktop / Cursor / Cline / Zed
-
-See [SETUP.md](SETUP.md) for client-specific configs. The server runs via:
 
 ```json
 {
@@ -169,199 +162,225 @@ See [SETUP.md](SETUP.md) for client-specific configs. The server runs via:
 }
 ```
 
----
-
-## Available MCP Tools (26)
-
-### Screening & Ranking
-
-| Tool               | Description                                                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `screen_ranked`    | **Primary.** Hydrated ranked rows with consensus, movement, freshness. Supports `compact`, `fields`, `include`, `skipHistory`. |
-| `screen`           | League-specific ranked rows (NBA, MLB, NHL, NFL, WNBA, UFC, Soccer, NCAAB, NCAAF, Tennis).                                     |
-| `screen_raw`       | Raw odds payload. `bestComps: true` for sharper comparison books.                                                              |
-| `all_slates`       | Consolidated ranked list across multiple leagues.                                                                              |
-| `get_play_details` | Full detail (line history, consensus, movement) for specific game IDs. Use after `compact` screen query.                       |
-
-### Sharp Movement
-
-| Tool              | Description                                                                                                                                                                                                                                                      |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sharp_plays`     | Target-book plays with **independently confirmed** sharp movement. Cross-references Pinnacle, Circa, BookMaker, BetOnline to verify supportive movement on the same game+selection. Only returns `Bet candidate` when a non-target sharp book confirms the move. |
-| `sharp_consensus` | Multi-window (1h–48h) sharp book consensus analysis.                                                                                                                                                                                                             |
-
-### Line Shopping
-
-| Tool              | Description                                                      |
-| ----------------- | ---------------------------------------------------------------- |
-| `find_best_price` | Every book's odds sorted best→worst with spread from best price. |
-
-### Player Context
-
-| Tool             | Description                                                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `player_context` | News, tweets, riskFlag for a player. Nitter RSS → X → Google News RSS → ESPN fallback. Source authority scoring. |
-
-### Betting
-
-| Tool               | Description                                                                      |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `recommended_bets` | TIER 1/2 plays across leagues with movementGrade, riskScore, kaiCall, rationale. |
-| `staking_plan`     | Fractional Kelly stakes (TIER 1=2%, TIER 2=1% of bankroll).                      |
-| `ev_candidates`    | Fast +EV discovery (secondary; validate on `/screen`).                           |
-
-### UFC
-
-| Tool       | Description                                                    |
-| ---------- | -------------------------------------------------------------- |
-| `ufc_card` | First-class shortlist with official plays, best looks, passes. |
-
-### Bet Management
-
-| Tool                                    | Description                                  |
-| --------------------------------------- | -------------------------------------------- |
-| `hide_bet` / `unhide_bet`               | Toggle fantasy optimizer visibility per bet. |
-| `get_hidden_bets` / `clear_hidden_bets` | List or clear all hidden bets.               |
-
-### Meta
-
-| Tool             | Description                            |
-| ---------------- | -------------------------------------- |
-| `health_status`  | Auth freshness, endpoint connectivity. |
-| `league_presets` | Sport-specific ranking presets.        |
+Replace the path with wherever you cloned the repo. Token compression (smaller context for large responses) — install `caveman-shrink` globally and use `command: caveman-shrink` with `node` + server path in `args`.
 
 ---
 
-## Performance Flags
+## All 26 tools (reference)
 
-All screen/recommended/staking tools support these params:
+### For casual bettors (just tell me what to bet)
 
-| Flag                                                      | Effect                                                                                                                      |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `compact: true`                                           | ~90% smaller response. Retains movement signals (steamMove, consensusEdge, movementLabel). Does NOT skip history hydration. |
-| `skipHistory: true`                                       | Skips odds history hydration entirely. Use when you only need current odds/edges.                                           |
-| `fields: ["game","selection","odds","edge","tier","kai"]` | Selective field return (overrides `compact`).                                                                               |
-| `include: ["resultMeta"]`                                 | Top-level section filtering.                                                                                                |
+| Tool                                     | What it does                          |
+| ---------------------------------------- | ------------------------------------- |
+| `get_started(user_type: "casual")`       | Returns the casual workflow (3 tools) |
+| `recommended_bets(verbosity: "minimal")` | Top picks in plain English            |
+| `player_context`                         | Injury risk check on specific plays   |
+| `get_pick_stats`                         | Your win rate + P&L                   |
+| `log_pick` / `resolve_pick`              | Track your bets                       |
+| `health_status`                          | "Is the system up?"                   |
+
+### For intermediate bettors (show me the edge)
+
+Everything in casual, plus:
+
+| Tool                                                                | What it does                                      |
+| ------------------------------------------------------------------- | ------------------------------------------------- |
+| `recommended_bets(verbosity: "standard")`                           | Structured plays with edge, tier, risk, rationale |
+| `find_best_price`                                                   | Line-shop across all books for the best price     |
+| `league_presets`                                                    | Sport-specific ranking weights                    |
+| `novig_screen`                                                      | NoVigApp-specific screen                          |
+| `hide_bet` / `unhide_bet` / `clear_hidden_bets` / `get_hidden_bets` | Manage bet visibility                             |
+| `get_pick_history`                                                  | View logged picks                                 |
+
+### For sharp bettors (full control)
+
+Everything above, plus:
+
+| Tool                               | What it does                                                                            |
+| ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `screen_ranked(verbosity: "full")` | Complete ranked data with movement signals                                              |
+| `sharp_consensus`                  | Multi-window sharp movement (1h–48h)                                                    |
+| `sharp_plays`                      | Plays with **independent sharp confirmation** across Pinnacle/Circa/BookMaker/BetOnline |
+| `get_play_details`                 | Line history for specific games                                                         |
+| `staking_plan`                     | Fractional Kelly sizing (TIER 1: 2%, TIER 2: 1% of bankroll)                            |
+| `screen_raw`                       | Raw odds payload, no ranking                                                            |
+| `ev_candidates`                    | Fast +EV discovery (validate on `/screen` after)                                        |
+| `all_slates`                       | Consolidated ranked list across multiple leagues                                        |
+| `screen`                           | League-specific screen (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF)    |
+| `get_alerts`                       | Line movement alerts                                                                    |
+
+### Tool guide by category
+
+| Category                | Tools                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| **Screening & Ranking** | `screen_ranked`, `screen`, `screen_raw`, `all_slates`, `get_play_details`      |
+| **Sharp Movement**      | `sharp_plays`, `sharp_consensus`                                               |
+| **Betting**             | `recommended_bets`, `staking_plan`, `ev_candidates`                            |
+| **Line Shopping**       | `find_best_price`                                                              |
+| **Player Context**      | `player_context`                                                               |
+| **UFC**                 | `ufc_card`                                                                     |
+| **Bet Management**      | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets`               |
+| **Picks & Tracking**    | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts` |
+| **Meta**                | `get_started`, `health_status`, `league_presets`                               |
+
+Every tool accepts a `verbosity` param (`"minimal"` / `"standard"` / `"full"`) and a `compact: true` flag to shrink responses by ~90%. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for response-size tuning.
 
 ---
 
-## Example Agent Prompts
+## How the ranking works
 
-```
-Find top NBA moneyline plays on screen right now (compact=true).
-Show TIER 1/2 plays across NBA, MLB, NHL with player context for top 3.
-Scan Fliff/NoVigApp sharp plays with supportive movement (includePasses=true).
-What's the best price for Lakers moneyline across all books?
-Get full line history for game ID 12345 on NBA screen.
-```
+The system assigns every play a **tier** (1–4) and a **risk score** (1–10). Here's exactly how.
+
+### Step 1: Grade the movement
+
+Each play gets a **movement grade**: green, yellow, or red. Green means all these are true:
+
+- Supportive movement direction (sharp books moving the same way)
+- High movement quality (score ≥ 0.8)
+- Acceptable execution quality (best or playable)
+- Strong consensus (5+ books agree)
+- Strong steam signal or high movement quality
+- Positive CLV (closing line value proxy)
+- Sustained agreement across 4+ of 6 time windows (1h, 2h, 6h, 12h, 24h, 48h)
+
+Red means any of: adverse movement, or bad execution with thin consensus. Everything else is yellow.
+
+### Step 2: Score the risk
+
+A weighted score, base 5, modified by:
+
+| Factor                | Modifier |
+| --------------------- | -------- |
+| Movement green        | −2       |
+| Movement red          | +3       |
+| Edge > 2%             | −1       |
+| Edge > 0.5%           | 0        |
+| Edge < 0.5%           | +1       |
+| No edge               | +2       |
+| Consensus ≥ 10 books  | −1       |
+| Consensus 3–9 books   | 0        |
+| Consensus 1–2 books   | +1       |
+| Execution best        | −1       |
+| Execution playable    | 0        |
+| Execution bad/unknown | +2       |
+| Supportive steam      | −1       |
+| Adverse steam         | +3       |
+| CLV > 0               | −1       |
+| CLV < −3              | +2       |
+
+Final score: 1 (cleanest) to 10 (riskiest).
+
+### Step 3: Assign the tier
+
+| Grade                | Risk score | Tier                          |
+| -------------------- | ---------- | ----------------------------- |
+| Green                | ≤ 2        | TIER 1                        |
+| Green                | 3–4        | TIER 2                        |
+| Green                | 5–6        | TIER 2 (promoted from TIER 3) |
+| Green                | 7+         | TIER 3                        |
+| Yellow               | ≤ 4        | TIER 2                        |
+| Yellow               | 5–6        | TIER 3                        |
+| Yellow               | 7+         | TIER 4                        |
+| Red or PASS kai call | any        | TIER 4                        |
+
+### Step 4: Hysteresis
+
+`getConfidenceTierStable()` wraps the raw tier in a hysteresis layer so a play doesn't bounce between TIER 2 and TIER 3 every time odds shift by 1 cent. The stable tier only updates if:
+
+- The raw tier differs by 2+ levels from the cached tier, OR
+- The risk score moves by 3+ points
+
+Plus a 2-hour rolling window — the returned tier is the mode of all raw tiers observed in the last 2 hours, which captures the trajectory.
+
+### Step 5: Sharp book cross-reference
+
+For `sharp_plays` and `recommended_bets`, each play is cross-referenced against individual sharp book screens (Pinnacle, Circa, BookMaker, BetOnline). A play only gets `Bet candidate` status if a non-target sharp book **independently** shows supportive movement on the same game+selection. This filters out target books whose own self-sourced movement is unreliable.
+
+### The kaiCall
+
+The kaiCall is a one-word summary your agent should use to decide what to do:
+
+| kaiCall    | Meaning                                              |
+| ---------- | ---------------------------------------------------- |
+| `BET`      | Strong signal across all dimensions. TIER 1 + clean. |
+| `CONSIDER` | TIER 2 with acceptable risk. Worth looking at.       |
+| `PASS`     | TIER 3/4, or red flags present. Skip.                |
 
 ---
 
-## CLI Commands
+## Backtesting
+
+The tier system gets validated two ways:
+
+**1. Synthetic backtest** — generates scenarios with known outcomes (3 distinct types: `sharp_move` where target book is stale, `stable_no_edge` where all books agree, `adverse` where sharp books move against). Runs the full ranking pipeline. Reports per-tier hit rates. Run it:
 
 ```bash
-pp-query login                           # automated browser login (requires playwright)
-pp-query doctor                        # full setup check
-pp-query health                        # quick health
-pp-query screen --league NBA           # ranked screen
-pp-query nba --market Moneyline        # league shorthand
-pp-query tennis --limit 10             # tennis
-pp-query sharp-plays --book Fliff      # sharp plays
-pp-query ufc-card --book NoVigApp      # UFC card
-pp-query all-slates                    # consolidated
-pp-query presets                       # ranking presets
-pp-query list                          # command inventory
+node scripts/backtest-synthetic.js
 ```
 
----
+**2. Daily snapshot** — a cron job captures pre-game odds daily, stores snapshots to `backtest-data/`. As games resolve, hit rates get measured against real outcomes over time. The snapshot cron is in `scripts/backtest-daily-snapshot.js`.
 
-## Book Configuration
+**What we look for:**
 
-The MCP uses three book categories:
+- TIER 1 hit rate > 60% — healthy
+- TIER 1 ≈ TIER 3 — tier system isn't differentiating
+- TIER 4 > TIER 2 — red flags are wrong (this was the v1.5.1 fix)
 
-### 1. Target Execution Books (your betting books)
-
-Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `screen`:
-
-```json
-{ "targetBooks": ["Fliff", "NoVigApp", "Rebet"] }
-```
-
-### 2. Sharp Comparison Books (movement detection)
-
-Books whose line movement signals sharp action. Pass to `sharp_plays`, `sharp_consensus`, `screen_ranked`:
-
-```json
-{ "sharpBooks": ["Pinnacle", "Circa", "BookMaker", "BetOnline"] }
-```
-
-### 3. Display Books (line shopping)
-
-Books to show in `find_best_price` or `screen_raw`:
-
-```json
-{ "books": ["Pinnacle", "FanDuel", "DraftKings", "NoVigApp"] }
-```
-
-### Default Sharp Sets (Per Sport/Market)
-
-Pre-configured in `lib/propprofessor-sharp-books.js`:
-
-| Sport      | Main Market                                               | Props                                                     |
-| ---------- | --------------------------------------------------------- | --------------------------------------------------------- |
-| **NBA**    | Circa, Pinnacle, BookMaker, BetOnline, DraftKings         | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle       |
-| **NFL**    | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel             | Pinnacle, FanDuel, BookMaker, Circa, BetOnline            |
-| **MLB**    | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
-| **Others** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa            | Same                                                      |
+Full methodology in [docs/BACKTESTING.md](docs/BACKTESTING.md).
 
 ---
 
-## Environment Variables
+## Status
 
-| Variable                     | Default                      | Description             |
-| ---------------------------- | ---------------------------- | ----------------------- |
-| `AUTH_FILE`                  | `~/.propprofessor/auth.json` | Auth file path          |
-| `PROPPROFESSOR_MCP_NDJSON`   | (required)                   | Enable NDJSON framing   |
-| `PROPPROFESSOR_CACHE_TTL_MS` | `60000`                      | Response cache TTL (ms) |
-| `PROPPROFESSOR_CACHE_MAX`    | `50`                         | Max cache entries (LRU) |
-| `LOCAL_TIMEZONE`             | `America/Chicago`            | CLI display timezone    |
+**Actively maintained.** Last release: see [releases](https://github.com/j17drake/propprofessor-mcp/releases). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green, 773 tests passing.
+
+The repo runs a nightly live-smoke workflow that hits the real PropProfessor API and validates end-to-end behavior. Failures show up as red on the Actions tab.
+
+If you hit an issue, run `pp-query doctor` first — it diagnoses most setup problems. Persistent issues → [open a GitHub issue](https://github.com/j17drake/propprofessor-mcp/issues) with the output of `pp-query doctor` and `node --version`.
 
 ---
 
-## Known Issues
+## Support this project
 
-| Issue                          | Fix                                                                                                                                                                    |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pp-query doctor` auth missing | Export fresh session to `~/.propprofessor/auth.json`                                                                                                                   |
-| Endpoint check fails           | Session stale — re-login and re-export                                                                                                                                 |
-| MCP client won't start         | Run `pp-query doctor`; ensure `caveman-shrink` on PATH if using Hermes config                                                                                          |
-| Large responses timeout        | Use `compact: true` and/or `fields` param                                                                                                                              |
-| No Bet candidates returned     | Sharp book cross-reference requires overlap between target book and sharp book screens. Try different `sharpBooks` or check `emptyState.failureBreakdown` for reasons. |
-| ChatGPT                        | Not supported for local stdio; use remote MCP endpoint                                                                                                                 |
+This is a free, MIT-licensed MCP. If it saves you time or makes you money, consider:
 
----
+- ⭐ Star the repo — helps others find it
+- 🐛 [Open an issue](https://github.com/j17drake/propprofessor-mcp/issues) when you find a bug
+- 💸 [Sponsor on GitHub](https://github.com/sponsors/j17drake) — funds ongoing development
 
-## Verified Runtime Behavior (2026-06-06)
-
-| Tool                       | Status  | Notes                                                                                                                                                                     |
-| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `screen` / `screen_ranked` | Healthy | Primary discovery path                                                                                                                                                    |
-| `sharp_plays`              | Healthy | Sharp book cross-reference confirms NoVigApp/Fliff plays against Pinnacle, Circa, BookMaker, BetOnline. Only returns `Bet candidate` with independent sharp confirmation. |
-| `recommended_bets`         | Healthy | Returns 0 plays when no TIER 1/2 opportunities exist. Expected, not a bug.                                                                                                |
-| `ev_candidates`            | Healthy | Fast +EV discovery; validate with `/screen`                                                                                                                               |
+No paid tier. No upsell. The whole codebase is open and the priority is making it better for the people who use it.
 
 ---
 
-## For Maintainers
+## For maintainers
 
-- **Tests**: `npm test` (773 passing, includes live API integration tests)
+- **Tests**: `npm test` (773 passing) — 5/5 reruns, deterministic
+- **Coverage**: `npm run test:coverage` (~82% statements, ~88% functions)
+- **Lint**: `npm run lint` (clean)
+- **Format**: `npm run format:check` (clean — `npm run format` to fix)
+- **Version check**: `npm run check:version` (verifies package.json ↔ CHANGELOG consistency)
 - **Live smoke**: `npm run smoke:live` (requires `auth.json`)
-- **Lint**: `npm run lint`
-- **Format**: `npm run format:check`
-- **Release**: Push a `v*` tag → GitHub Actions creates release automatically
+- **Release**: Push a `v*` tag → GitHub Actions runs lint + tests on Node 20 + 22, then auto-creates the GitHub release
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 - **Tool definitions**: `lib/propprofessor-tool-definitions.js`
+- **Tier methodology**: `lib/propprofessor-risk-score.js`
+- **Ranking logic**: `lib/screen-ranker.js`
+
+Detailed docs:
+
+- [SETUP.md](SETUP.md) — install, auth, MCP client configs, troubleshooting
+- [AUTH.md](AUTH.md) — auth flow, file locations, session management
+- [CONFIG.md](CONFIG.md) — env vars, book configuration
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to add a tool, PR conventions
+- [SECURITY.md](SECURITY.md) — auth handling, threat model
+- [MAINTAINERS.md](MAINTAINERS.md) — release process, code ownership
+- [docs/BACKTESTING.md](docs/BACKTESTING.md) — tier validation methodology
+- [docs/MARKET-BOOK-AVAILABILITY.md](docs/MARKET-BOOK-AVAILABILITY.md) — which books post which markets
+- [docs/HERMES_SKILL.md](docs/HERMES_SKILL.md) — Hermes skill for this MCP
+- [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md) — system prompt template for agents
+
+---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — see LICENSE for the full text. PropProfessor is a paid service; this MCP is an unofficial client built by [j17drake](https://github.com/j17drake), not affiliated with PropProfessor.

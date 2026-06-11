@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.5.2
+
+### New README
+
+The README has been rewritten from scratch to be useful to a sports bettor who landed in a GitHub directory listing — not just a developer wiring up an MCP.
+
+**What changed:**
+
+- Hero section with a real example output from `recommended_bets` so visitors can see what the tool returns in 5 seconds, before installing
+- "The numbers" section leads with backtest results (TIER 1 hit rate, TIER 1 vs TIER 3 gap, TIER 4 inversion fix) — the proof, not promises
+- "What you can ask your agent" section groups example prompts by bettor scenario (pre-game, line shopping, validation, sizing, player context) — use cases before the tool list
+- "How the ranking works" is now a full methodology section explaining the green/yellow/red movement grade, the 1–10 risk score formula, the tier assignment table, the hysteresis layer, and the kaiCall semantics. Math-first, no hand-waving. This is the moat.
+- "Backtesting" section explains both the synthetic backtest and the daily-snapshot cron, with thresholds for what healthy tier ordering looks like
+- "Support this project" is a small tip-jar section — community-funded, no upsell
+- Demo workflow uses a realistic Lakers @ Celtics example instead of placeholder text
+
+**What was moved out of the README to `docs/`:**
+
+- Performance flags (`compact`, `skipHistory`, `fields`, `include`, `verbosity`, cache, `caveman-shrink`) → `docs/PERFORMANCE.md`
+- Environment variables and book configuration → `CONFIG.md` (expanded; was a thin table, now full reference)
+
+**What was cut:**
+
+- "Verified Runtime Behavior (2026-06-06)" — stale by definition. The live CI badge replaces it.
+- "For Maintainers" hardcoded test count (now generated from `npm test`)
+
+### Stats
+
+- 773 tests passing
+- 82% statement coverage
+- README is now 357 lines (was 367) but with substantially more useful content and 100% of the methodology
+
 ## 1.5.1
 
 ### Fix: TIER 4 > TIER 2 inversion

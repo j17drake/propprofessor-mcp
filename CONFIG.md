@@ -1,202 +1,77 @@
-# PropProfessor MCP Config Guide
+# Configuration
 
-Works with local `stdio` MCP clients. Requires `PROPPROFESSOR_MCP_NDJSON=true` for AI agent compatibility.
+Environment variables and book configuration for the PropProfessor MCP.
 
-## Prerequisites
+## Environment Variables
 
-```bash
-cd /path/to/propprofessor-mcp
-npm install
-npm link
-pp-query install-auth --source /path/to/auth.json
-pp-query doctor
+| Variable                     | Default                      | Description                                                       |
+| ---------------------------- | ---------------------------- | ----------------------------------------------------------------- |
+| `AUTH_FILE`                  | `~/.propprofessor/auth.json` | Path to the auth file (cookies + tokens)                          |
+| `PROPPROFESSOR_MCP_NDJSON`   | (required)                   | Set to `'true'` to enable NDJSON framing (required for stdio MCP) |
+| `PROPPROFESSOR_CACHE_TTL_MS` | `60000`                      | Response cache TTL in milliseconds                                |
+| `PROPPROFESSOR_CACHE_MAX`    | `50`                         | Max cache entries (LRU eviction)                                  |
+| `LOCAL_TIMEZONE`             | `America/Chicago`            | Display timezone for CLI output                                   |
+| `PROPPROFESSOR_DEBUG`        | (unset)                      | Set to any value to enable debug logging to stderr                |
+| `NITTER_BASE`                | `http://localhost:8080`      | Nitter instance for `player_context` tweet lookup                 |
+
+## Book configuration
+
+The MCP uses three book categories. These are passed as parameters to specific tools.
+
+### 1. Target execution books (your betting books)
+
+Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `screen`:
+
+```json
+{ "targetBooks": ["Fliff", "NoVigApp", "Rebet"] }
 ```
 
-`pp-query doctor` must pass before configuring any client.
+### 2. Sharp comparison books (movement detection)
 
-## Required Environment Variables
+Books whose line movement signals sharp action. Pass to `sharp_plays`, `sharp_consensus`, `screen_ranked`:
 
-| Variable                     | Required | Description                                                   |
-| ---------------------------- | -------- | ------------------------------------------------------------- |
-| `PROPPROFESSOR_MCP_NDJSON`   | **Yes**  | `true` — enables NDJSON framing for async tool calls          |
-| `AUTH_FILE`                  | **Yes**  | Path to auth file (e.g., `/path/to/.propprofessor/auth.json`) |
-| `PROPPROFESSOR_CACHE_TTL_MS` | No       | Cache TTL ms (default 60000)                                  |
-| `PROPPROFESSOR_CACHE_MAX`    | No       | Max cache entries (default 50)                                |
+```json
+{ "sharpBooks": ["Pinnacle", "Circa", "BookMaker", "BetOnline"] }
+```
 
----
+### 3. Display books (line shopping)
 
-## Hermes Agent (Recommended)
+Books to show in `find_best_price` or `screen_raw`:
+
+```json
+{ "books": ["Pinnacle", "FanDuel", "DraftKings", "NoVigApp"] }
+```
+
+### Default sharp sets (per sport/market)
+
+Pre-configured in `lib/propprofessor-sharp-books.js`:
+
+| Sport                               | Main market                                               | Props                                                     |
+| ----------------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| **NBA**                             | Circa, Pinnacle, BookMaker, BetOnline, DraftKings         | FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle       |
+| **NFL**                             | Circa, Pinnacle, BookMaker, NoVigApp, FanDuel             | Pinnacle, FanDuel, BookMaker, Circa, BetOnline            |
+| **MLB**                             | Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM | Circa, FanDuel, PropBuilder, Pinnacle, DraftKings, Bet365 |
+| **NHL**                             | Pinnacle, Circa, BookMaker, BetOnline, DraftKings         | (same as main)                                            |
+| **Soccer, UFC, NCAAB, NCAAF, WNBA** | Pinnacle, Polymarket, Kalshi, BetOnline, Circa            | (same as main)                                            |
+
+## Token compression
+
+For agents that hit context-window limits:
+
+1. Install `caveman-shrink` globally: `npm install -g caveman-shrink`
+2. Use it as the command wrapper in your MCP client config:
 
 ```yaml
-# ~/.hermes/config.yaml
 mcp_servers:
   propprofessor:
+    command: caveman-shrink
     args:
       - node
       - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
-    command: caveman-shrink
     enabled: true
     env:
       AUTH_FILE: /path/to/.propprofessor/auth.json
       PROPPROFESSOR_MCP_NDJSON: 'true'
 ```
 
-**Requires**: `npm install -g caveman-shrink`
-
-Reload: `hermes mcp reload` → `hermes mcp test propprofessor`
-
----
-
-## Claude Desktop
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "caveman-shrink",
-      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_MCP_NDJSON": "true",
-        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
-      }
-    }
-  }
-}
-```
-
-**Or without caveman-shrink**:
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "node",
-      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_MCP_NDJSON": "true",
-        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
-      }
-    }
-  }
-}
-```
-
-First prompt: `Check whether the PropProfessor MCP connection is healthy.`
-
----
-
-## Cursor
-
-`.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "caveman-shrink",
-      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_MCP_NDJSON": "true",
-        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
-      }
-    }
-  }
-}
-```
-
----
-
-## Cline
-
-`cline_mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "caveman-shrink",
-      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_MCP_NDJSON": "true",
-        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
-      },
-      "disabled": false
-    }
-  }
-}
-```
-
----
-
-## ChatGPT
-
-**Not supported** for local stdio. This repo is designed for local MCP clients (Hermes, Claude Desktop, Cursor, Cline). ChatGPT requires remote MCP endpoints. Use a local client instead.
-
----
-
-## Generic Local MCP Client
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "caveman-shrink",
-      "args": ["node", "/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "PROPPROFESSOR_MCP_NDJSON": "true",
-        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
-      }
-    }
-  }
-}
-```
-
----
-
-## Auth Lookup Order
-
-1. `AUTH_FILE` env var
-2. `~/.propprofessor/auth.json`
-3. `auth.json` in repo root
-
----
-
-## Debug Checklist
-
-1. `pp-query doctor` — passes?
-2. Auth file at `~/.propprofessor/auth.json` or `AUTH_FILE` set?
-3. `PROPPROFESSOR_MCP_NDJSON=true` in client env?
-4. `caveman-shrink` on PATH if using it?
-5. Client restarted after config change?
-6. Direct `node` path if `pp-mcp`/`caveman-shrink` not found?
-
----
-
-## Book Configuration Reference
-
-The tools accept three book parameters per-request (not via env vars):
-
-| Param                  | Purpose                                       | Example Tools                                           |
-| ---------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| `targetBooks` / `book` | Your execution books (Fliff, NoVigApp, Rebet) | `sharp_plays`, `recommended_bets`, `screen`, `ufc_card` |
-| `sharpBooks`           | Sharp comparison books for movement detection | `sharp_plays`, `sharp_consensus`, `screen_ranked`       |
-| `books`                | Display filter for line shopping / raw screen | `find_best_price`, `screen_raw`, `screen`               |
-
-**Default sharp sets** (used when you don't pass `sharpBooks`):
-
-- NBA main: Circa, Pinnacle, BookMaker, BetOnline, DraftKings
-- NBA props: FanDuel, BookMaker, PropBuilder, NoVigApp, Pinnacle
-- NFL main: Circa, Pinnacle, BookMaker, NoVigApp, FanDuel
-- MLB main: Pinnacle, Circa, BookMaker, BetOnline, DraftKings, BetMGM
-- Others: Pinnacle, Polymarket, Kalshi, BetOnline, Circa
-
-**CLI shortcuts**:
-
-```bash
-pp-query sharp-plays --book Fliff          # single target
-pp-query sharp-plays --books Fliff,NoVigApp  # multiple
-pp-query sharp-plays --sharp-books Pinnacle,Circa
-pp-query screen --league NBA --books Pinnacle,FanDuel
-```
-
-For **persistent custom defaults**, edit `lib/propprofessor-sharp-books.js` constant arrays (`NBA_MAIN_MARKET_SHARP_BOOKS`, etc.).
+Typically cuts token usage 30–50% on large responses with minimal loss of meaning.
