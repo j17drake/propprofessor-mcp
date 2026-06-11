@@ -61,14 +61,14 @@ That's the output your agent gets. The `tier` is the confidence call. The `riskS
 
 This is the proof. The tier system gets validated against synthetic scenarios where the outcome is known, plus real-world backtests as the daily snapshot cron collects resolved data.
 
-| What we measure                          | Result                                                        |
-| ---------------------------------------- | ------------------------------------------------------------- |
-| Tier ordering (does TIER 1 beat TIER 4?) | **Yes** — TIER 4 has lowest hit rate, TIER 1 highest          |
-| TIER 1 vs TIER 3 hit rate gap            | **+0.3 to +3.1pp** — system differentiates weakly              |
-| TIER 1 hit rate (synthetic)              | **~50%** (target: >60%) — algorithm needs work, see v1.6.0    |
-| TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2         |
-| Tests                                    | **775 passing**                                               |
-| Coverage                                 | **82% statements, 88% functions**                             |
+| What we measure                          | Result                                                     |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| Tier ordering (does TIER 1 beat TIER 4?) | **Yes** — TIER 4 has lowest hit rate, TIER 1 highest       |
+| TIER 1 vs TIER 3 hit rate gap            | **+0.3 to +3.1pp** — system differentiates weakly          |
+| TIER 1 hit rate (synthetic)              | **~50%** (target: >60%) — algorithm needs work, see v1.6.0 |
+| TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2      |
+| Tests                                    | **775 passing**                                            |
+| Coverage                                 | **82% statements, 88% functions**                          |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
 
