@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.7.0
+
+### Refactor
+
+Lib organization, part 1 of 2. Structural cleanup with no user-facing behavior changes. The algorithm, tier system, and tool surface are unchanged.
+
+- **Tennis files merged** — `lib/propprofessor-tennis-times.js` and `lib/propprofessor-tennis-names.js` → `lib/propprofessor-tennis.js`. Both files were tennis-specific helpers (player name resolution, ESPN-backed match time correction) that were needlessly split. The merged file has a single `module.exports` exposing the union of the old APIs: `PLAYER_NAMES`, `resolvePlayerName`, `getNameSlug`, `correctTennisTimes`, `fetchEspnMatches`, `nameSimilarity`, `formatCentralTime`, `isPlaceholderTime`. All import sites updated.
+
+### Stats
+
+- 784 tests passing (unchanged)
+- 23 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged)
+- TIER 4 ≤ TIER 2 inversion: still holds
+- Lib files: 32 → 31
+
 ## 1.6.3
 
 ### Refactor
