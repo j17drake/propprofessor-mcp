@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.2
+
+### Bug fix
+
+Response-layer cleanup. Three high-impact issues found in the June 11, 2026 code+response audit. The algorithm, tier system, and tool surface are unchanged — only how the data is shaped before it leaves the server.
+
+- **CLI `--verbosity` is now wired through to the MCP handler** (`scripts/query-propprofessor.js`). Before: `--verbosity minimal` was silently dropped on the floor for the `sharp-plays` command, so the CLI always returned the raw 144KB payload regardless of the flag. After: `--verbosity minimal|standard|full` works end-to-end. The MCP server (line 861) was already wired correctly — this is CLI-only.
+- **Response rows are now compacted at extraction** — null, empty-string, empty-array, and empty-object fields are stripped before the formatter runs. Applied to `sharp-plays`, `screen_ranked` (via `buildRankedScreenResponse`), and `find_best_price` (`allPrices`). The new `compactRow` helper lives in `lib/propprofessor-shared-utils.js`. Response payload drops ~96% for typical sharp-plays output (144KB → ~5KB for 3 plays). Empty fields were noise; the data users actually want is unchanged.
+- **`selections.null` and `defaultKey: "null"` string leaks fixed at extraction** — PropProfessor's API uses the literal string `"null"` as a key to mean "no sub-market" (moneyline, spread, total). Before: that string leaked through to consumers as a real key. After: `normalizeRow` lifts `selections.null.*` to top level for non-prop markets and drops `defaultKey: "null"`. Player-prop selections (which use real player names as keys) are untouched.
+
+### Stats
+
+- 788 tests passing (was 775, +13)
+- 27 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (was ~50% on smaller sample — within noise)
+- TIER 4 ≤ TIER 2 inversion: still holds (49.7% ≤ 49.9%)
+
 ## 1.6.1
 
 ### Docs
