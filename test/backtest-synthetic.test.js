@@ -77,11 +77,33 @@ describe('synthetic backtest', () => {
       tierCounts[tier] = data.wins + data.losses;
     }
 
-    // TIER 4 should have the most plays (most rows are not top-tier)
-    // TIER 1 should have the fewest (only the best)
-    // At minimum, the system should produce plays in multiple tiers
-    const tiersWithPlays = Object.values(tierCounts).filter((c) => c > 0).length;
-    assert.ok(tiersWithPlays >= 2, `Expected plays in at least 2 tiers, got ${tiersWithPlays}`);
+    // All four tiers should have plays — guards against the "99% TIER 4" failure
+    // mode that v1.5.4's check:claims script caught. The scenario mix (15/25/30/30
+    // across strong_sharp_move/sharp_move/stable_no_edge/adverse) + per-scenario
+    // cache reset should produce a non-degenerate distribution.
+    for (const tier of ['TIER 1', 'TIER 2', 'TIER 3', 'TIER 4']) {
+      assert.ok(
+        tierCounts[tier] > 0,
+        `Expected at least one play in ${tier}, got ${tierCounts[tier]}. ` +
+          'Backtest may have regressed to the "99% TIER 4" pre-fix failure mode.'
+      );
+    }
+  });
+
+  it('runBacktest produces enough TIER 1 plays for a meaningful hit rate', () => {
+    // The v1.5.3 README claimed 55.9% TIER 1 hit rate, but it was based on
+    // 3-5 plays — noise. The v1.5.4 fix (more books + strong_sharp_move
+    // scenarios + per-scenario cache reset) should produce at least 100 TIER 1
+    // plays per 3000 scenarios, making the hit rate statistically meaningful.
+    const { results } = runBacktest({ scenarios: 3000 });
+    const t1 = results['TIER 1'] || { wins: 0, losses: 0 };
+    const t1Total = t1.wins + t1.losses;
+
+    assert.ok(
+      t1Total >= 100,
+      `Expected at least 100 TIER 1 plays per 3000 scenarios for a meaningful hit rate, got ${t1Total}. ` +
+        'Backtest distribution has collapsed — check the scenario mix and cache reset logic.'
+    );
   });
 
   it('runBacktest produces no errors on 100 scenarios', () => {

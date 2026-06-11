@@ -16,10 +16,10 @@
  *      (README: "TIER 4 > TIER 2 inversion | Fixed in v1.5.1")
  *
  * The TIER 1 hit rate is reported as informational only — the synthetic
- * backtest produces a tiny TIER 1 sample (<10 plays) which is too small
- * for a hit rate claim to be statistically meaningful. The README's
- * "55.9% TIER 1 hit rate" should be reviewed manually when the backtest
- * is updated.
+ * backtest's TIER 1 sample is checked for minimum size (100 plays for
+ * statistical meaning), but the actual hit rate is not asserted against a
+ * specific README number. The README's "X% TIER 1 hit rate" should be
+ * re-validated manually when the algorithm changes.
  *
  * Usage:
  *   node scripts/check-claims.js              # full check (runs npm test, ~5s)
@@ -227,8 +227,24 @@ try {
     );
   }
 
+  // Minimum TIER 1 sample size for the README's hit rate claim to be
+  // statistically meaningful. Below this threshold the hit rate is just noise
+  // on a 3-5 play sample, and any claim of "TIER 1 hit rate is X%" is
+  // unsupportable. 100 plays gives a ~10pp margin at 95% confidence, which
+  // is enough to detect whether the algorithm is meaningfully better than
+  // random.
+  const MIN_TIER_1_SAMPLE = 100;
+  if (t1Total < MIN_TIER_1_SAMPLE) {
+    fail(
+      `TIER 1 sample too small (${t1Total} plays) for the README's hit rate claim to be statistically meaningful. ` +
+        `Need at least ${MIN_TIER_1_SAMPLE}. The scenario mix or cache reset logic has regressed.`
+    );
+  } else {
+    ok(`TIER 1 sample (${t1Total} plays) is large enough for a meaningful hit rate claim`);
+  }
+
   // Note about TIER 1 hit rate
-  if (t1Total > 0 && t1Total < 10) {
+  if (t1Total < 10) {
     console.log(`\n  info  TIER 1 sample (${t1Total} plays) is too small for a meaningful hit rate claim.`);
     console.log(`  info  The README's "TIER 1 hit rate" number is not auto-verified — review manually.`);
   }

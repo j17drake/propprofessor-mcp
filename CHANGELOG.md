@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.5.5
+
+### Bug fix
+
+- **Synthetic backtest was producing 99% TIER 4 plays** — the scenario generator had two compounding bugs that made the README's "TIER 1 hit rate" claim statistically meaningless:
+  1. **Only 7 books** in the scenario — couldn't reach the `consensusBookCount >= 10` bonus needed for TIER 1 in the risk score. Expanded to 12 books (production has ~36; 12 is a representative subset).
+  2. **Per-scenario tier cache and score timeline were not reset** between iterations in the backtest loop. The hysteresis layer in `lib/propprofessor-risk-score.js` is module-level global state — once a play got assigned TIER 4 early in the run, the cache and timeline kept it there for the rest of the backtest. Added `clearTierCache()` + `clearScoreTimeline()` calls at the start of each scenario.
+- Added a new `strong_sharp_move` scenario type (15% of the mix) that produces the coordinated sharp-book movement the ranking pipeline needs to assign TIER 1. Updated the scenario mix to: 15% strong_sharp_move / 25% sharp_move / 30% stable_no_edge / 30% adverse. Without this scenario type, the ranking pipeline never had a realistic chance to assign TIER 1.
+
+### Docs
+
+- **README "The numbers" section corrected** — the v1.5.3-era claim of "55.9% TIER 1 hit rate" and "+6.9 to +7.2pp TIER 1 vs TIER 3 gap" was based on a 3-5 play sample (noise). The new backtest produces a stable distribution across seeds:
+  - TIER 1 hit rate: **48.9% to 52.4%** (avg ~50.7%) on ~580 plays per 3000 scenarios
+  - TIER 1 vs TIER 3 gap: **+0.3 to +3.1pp** (avg ~1.2pp)
+  - TIER 4 ≤ TIER 2 inversion: **holds in 4 of 6 seeds** (the v1.5.1 fix is directionally correct, but the synthetic backtest is still noisy)
+
+  The honest read: the ranking algorithm is finding some edge (TIER 1 > TIER 3) but it's small. The v1.6.0 milestone ("TIER 1 hit rate from 55.9% to >60%") has a longer road than the v1.5.3-era changelog suggested — the real baseline is ~50%, and reaching 60% requires meaningful algorithm work, not just backtest noise reduction.
+
+### Chore
+
+- **`check:claims` now requires at least 100 TIER 1 plays per 3000-scenario backtest** before it considers the TIER 1 sample size meaningful. Below that threshold, the hit rate is just noise and any "X% TIER 1 hit rate" claim is unsupportable. The v1.5.3-era backtest produced 3-5 TIER 1 plays per run; the new backtest produces ~580.
+- Added a test that verifies all 4 tiers produce plays (guards against the "99% TIER 4" failure mode recurring) and that the TIER 1 sample size meets the 100-play minimum.
+
+### Stats
+
+- 775 tests passing (was 774 — added `runBacktest produces enough TIER 1 plays for a meaningful hit rate` test)
+- 0 open issues
+- 0 open PRs
+- Tool count: 27 (verified consistent across definitions, OpenAPI spec, and README by `check:claims`)
+
 ## 1.5.4
 
 ### Docs

@@ -18,6 +18,7 @@
 
 const { rankLeagueScreenRows } = require('../lib/screen-ranker');
 const { extractScreenRows } = require('../lib/propprofessor-screen-utils');
+const { clearTierCache, clearScoreTimeline } = require('../lib/propprofessor-risk-score');
 
 // ---------------------------------------------------------------------------
 // Scenario generation
@@ -38,7 +39,42 @@ const TEAMS = [
   ['Bulls', 'Hornets']
 ];
 
-const BOOKS = ['NoVigApp', 'Pinnacle', 'Circa', 'BetOnline', 'BookMaker', 'Fliff', 'DraftKings'];
+// 12 books — enough to hit the consensus >= 10 bonus (which requires 10+ books
+// agreeing) needed for the ranking pipeline to consider a play TIER 1. The
+// production API queries ~36 sportsbooks; 12 is a representative subset.
+const BOOKS = [
+  'Pinnacle',
+  'Circa',
+  'BetOnline',
+  'BookMaker',
+  'NoVigApp',
+  'Fliff',
+  'DraftKings',
+  'FanDuel',
+  'BetMGM',
+  'Caesars',
+  'PointsBet',
+  'BetRivers'
+];
+
+// Scenario mix: realistic distribution of edge conditions in a sports betting
+// market. The ranking pipeline requires very specific conditions to assign
+// TIER 1 (green movement + low risk + deep consensus + positive CLV + steam).
+// Without `strong_sharp_move` scenarios in the mix, the backtest never produces
+// a meaningful TIER 1 sample, so the README's "TIER 1 hit rate" claim is
+// based on noise (3-5 plays per run, varies by seed).
+//
+// Realistic mix:
+//   - 15% strong_sharp_move  (TIER 1 expected — all green flags fire)
+//   - 25% sharp_move         (TIER 2 expected — moderate edge)
+//   - 30% stable_no_edge     (TIER 3 expected — coin flip)
+//   - 30% adverse            (TIER 4 expected — risk flags fire)
+const DEFAULT_SCENARIO_MIX = {
+  strong_sharp_move: 0.15,
+  sharp_move: 0.25,
+  stable_no_edge: 0.3,
+  adverse: 0.3
+};
 
 // Seedable PRNG for deterministic test scenarios. Default uses Math.random.
 // Tests call setRandomSeed(seed) to get reproducible scenarios; call
@@ -102,7 +138,19 @@ function generateScenario() {
 
   // Choose scenario type — determines whether there's real edge
   const scenarioRoll = _rand();
-  const scenarioType = scenarioRoll < 0.35 ? 'sharp_move' : scenarioRoll < 0.7 ? 'stable_no_edge' : 'adverse';
+  let scenarioType;
+  if (scenarioRoll < DEFAULT_SCENARIO_MIX.strong_sharp_move) {
+    scenarioType = 'strong_sharp_move';
+  } else if (scenarioRoll < DEFAULT_SCENARIO_MIX.strong_sharp_move + DEFAULT_SCENARIO_MIX.sharp_move) {
+    scenarioType = 'sharp_move';
+  } else if (
+    scenarioRoll <
+    DEFAULT_SCENARIO_MIX.strong_sharp_move + DEFAULT_SCENARIO_MIX.sharp_move + DEFAULT_SCENARIO_MIX.stable_no_edge
+  ) {
+    scenarioType = 'stable_no_edge';
+  } else {
+    scenarioType = 'adverse';
+  }
 
   // Base odds from true probability
   const baseOdds = Math.round(-100 / (homeWinProb - 0.01));
@@ -116,14 +164,17 @@ function generateScenario() {
   const sharpOdds = baseOdds + randomInt(-3, 3);
 
   for (const book of BOOKS) {
-    const isSharp = ['Pinnacle', 'Circa', 'BetOnline', 'BookMaker'].includes(book);
+    const isSharp = ['Pinnacle', 'Circa', 'BetOnline', 'BookMaker', 'BetMGM', 'Caesars'].includes(book);
     const isTarget = book === 'Fliff' || book === 'NoVigApp';
 
     let bookOdds;
-    if (scenarioType === 'sharp_move' && isTarget) {
+    if ((scenarioType === 'strong_sharp_move' || scenarioType === 'sharp_move') && isTarget) {
       // Target book is STALE — hasn't caught up to the sharp move
       // This creates real positive edge for the pick
-      bookOdds = sharpOdds + randomInt(15, 35); // Worse price for the favorite
+      // strong_sharp_move: 25-35 pt gap (bigger edge, TIER 1 expected)
+      // sharp_move: 12-20 pt gap (moderate edge, TIER 2 expected)
+      const gap = scenarioType === 'strong_sharp_move' ? randomInt(25, 35) : randomInt(12, 20);
+      bookOdds = sharpOdds + gap;
     } else if (scenarioType === 'adverse' && isTarget) {
       // Target book is moving AGAINST the pick — adverse signal
       bookOdds = sharpOdds - randomInt(10, 25); // Better price = moving against
@@ -141,19 +192,27 @@ function generateScenario() {
     const historyPoints = [];
     const hoursBack = 6;
 
-    if (scenarioType === 'sharp_move') {
+    if (scenarioType === 'strong_sharp_move' || scenarioType === 'sharp_move') {
       // Sharp books show clear movement; target book is flat
+      // strong_sharp_move: ALL sharp books move together (coordinated) — the
+      //   signal that triggers TIER 1's "strong consensus" + "supportive label"
+      //   + "high quality" requirements
+      // sharp_move: only 2-3 sharp books move (partial signal — TIER 2)
       let currentOdds = sharpOdds - randomInt(10, 20); // Started lower
+      const participation = scenarioType === 'strong_sharp_move' ? 1.0 : _rand() < 0.5 ? 0.4 : 0.7;
       for (let h = hoursBack; h >= 0; h--) {
         const ts = nowSec - h * 3600;
         if (isTarget) {
           // Target book barely moved
           historyPoints.push({ odds: bookOdds + randomInt(-2, 2), start_ts: ts });
-        } else {
-          // Sharp books gradually moved to current
+        } else if (isSharp && _rand() < participation) {
+          // Sharp books gradually moved to current (coordinated for strong)
           const progress = 1 - h / hoursBack;
           currentOdds = Math.round(currentOdds + (sharpOdds - currentOdds) * progress * 0.3);
           historyPoints.push({ odds: currentOdds + randomInt(-2, 2), start_ts: ts });
+        } else {
+          // Non-participating sharp books or recreational books — no real movement
+          historyPoints.push({ odds: sharpOdds + randomInt(-4, 4), start_ts: ts });
         }
       }
     } else if (scenarioType === 'adverse') {
@@ -243,6 +302,15 @@ function runBacktest({ scenarios = 200, verbose = false } = {}) {
   let errorCount = 0;
 
   for (let i = 0; i < scenarios; i++) {
+    // Reset tier cache and score timeline between scenarios so each game is
+    // graded independently. Without this, the module-level caches in
+    // propprofessor-risk-score.js carry over from prior scenarios (many share
+    // the same team pair, so the cacheKey collides), and the hysteresis
+    // layer keeps early "TIER 4" observations dominant in the score timeline.
+    // That makes the backtest converge to ~99% TIER 4 even when the scenario
+    // data would otherwise grade as TIER 1/2.
+    clearTierCache();
+    clearScoreTimeline();
     const { screenPayload, oddsHistory, outcome, gameId } = generateScenario();
 
     try {
