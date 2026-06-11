@@ -27,6 +27,14 @@ describe('query-propprofessor CLI parsing', () => {
     assert.equal(camel.opts.lookbackHours, '8');
   });
 
+  it('accepts --verbosity flag and short alias -v', () => {
+    const long = parseArgs(['node', 'query', 'sharp-plays', '--verbosity', 'minimal']);
+    assert.equal(long.opts.verbosity, 'minimal');
+
+    const short = parseArgs(['node', 'query', 'sharp-plays', '-v', 'full']);
+    assert.equal(short.opts.verbosity, 'full');
+  });
+
   it('accepts debug flags', () => {
     const enabled = parseArgs(['node', 'query', 'screen', '--debug']);
     assert.equal(enabled.opts.debug, true);
