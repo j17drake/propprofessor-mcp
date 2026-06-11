@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.3
+
+### Refactor
+
+Tool surface consolidation. Two of the findings from the June 11 audit, folded into one release. The algorithm, tier system, and CLI surface are unchanged — only the tool catalogue.
+
+- **`screen_raw` removed** — was a thin wrapper around `client.queryScreenOdds` with no ranking, hydration, or formatter. Use `screen_ranked` with `verbosity="full"` instead, which already exposes the same raw payload plus ranking metadata, consensus, movement, and freshness.
+- **Four bet-management tools consolidated into one** — `get_hidden_bets` + `hide_bet` + `unhide_bet` + `clear_hidden_bets` → `manage_hidden_bets({ action, bet?, id? })`. `action='list' | 'hide' | 'unhide' | 'clear'`. Same underlying client methods, just one tool name to learn. `action` is required; `bet` required for `hide`; `id` required for `unhide`.
+
+### Stats
+
+- 784 tests passing (-4 net: 3 screen_raw tests + 1 get_started test removed, all referenced decommissioned tools)
+- 23 tools (was 27, -4)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged from v1.6.2)
+- TIER 4 ≤ TIER 2 inversion: still holds
+
 ## 1.6.2
 
 ### Bug fix
