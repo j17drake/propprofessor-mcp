@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.6.1
+
+### Docs
+
+Pre-directory-submission polish. No code changes — the algorithm, tools, and tests are all unchanged from v1.6.0.
+
+- **Repo description updated** — from "Standalone PropProfessor MCP server and query client" to "MCP server that surfaces sharp-money movement across 36 sportsbooks — signal feed, not betting oracle." This is what `mcp.so`, `awesome-mcp`, and other directory listings display as the first-glance summary.
+- **Mermaid architecture diagram added** in the README — shows the data flow from 36 sportsbooks → PropProfessor API → ranking pipeline → 27 MCP tools → your AI agent. Renders natively in GitHub; makes the value prop visual in 5 seconds for directory visitors.
+- **"How the ranking works" section trimmed** — the 5-step methodology (movement grading, risk score weights, tier table, hysteresis, sharp book cross-reference) moved to [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md). The README now has a 1-paragraph summary + link. Reduces README from 397 → 389 lines, makes the visible content more scannable.
+- **FAQ section added** — answers the 5 questions directory visitors ask first: "Does this tell me what to bet?" (no, it surfaces signals), "Do I need an account?" (yes, paid PropProfessor), "What books does it cover?" (36), "Is it free?" (code is MIT, data is paid), "Can I run it without an MCP client?" (yes, `pp-query` CLI).
+
+### Verified working (no fix shipped)
+
+- `npm install` clean
+- `pp-query health` returns valid auth token against live PropProfessor API
+- Server boots cleanly (1.5s startup, no errors)
+- `node scripts/backtest-synthetic.js` produces expected distribution (575 TIER 1 plays per 3000-scenario run, TIER 4 ≤ TIER 2 holds)
+
+### Stats
+
+- 775 tests passing (unchanged)
+- 0 open issues
+- 0 open PRs
+- Tool count: 27 (unchanged)
+- Algorithm: unchanged
+
 ## 1.6.0
 
 ### Pivot: sharp-money signal feed, not betting oracle

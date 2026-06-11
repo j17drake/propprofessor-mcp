@@ -84,6 +84,45 @@ The tier system isn't magic. It's a transparent scoring formula that combines mo
 
 What you **can't** trust from the system alone: that the side it flags will win. The signal is reliable; the outcome prediction is not. Your job is to take the signal and decide.
 
+### How it fits together
+
+```mermaid
+flowchart LR
+    subgraph BOOKS["36 sportsbooks"]
+        B1[Pinnacle]
+        B2[Circa]
+        B3[BookMaker]
+        B4[BetOnline]
+        B5[NoVigApp]
+        B6[Fliff]
+        BN[...30 more]
+    end
+
+    API[PropProfessor API]
+
+    subgraph PIPE["Ranking pipeline"]
+        E[Extract odds]
+        H[Hydrate with line history]
+        R[Rank by movement + consensus]
+        T[Tier + risk score]
+    end
+
+    subgraph OUTPUT["27 tools exposed via MCP"]
+        RB[recommended_bets]
+        SP[sharp_plays]
+        SC[sharp_consensus]
+        SR[screen_ranked]
+        OTH[...23 more]
+    end
+
+    CLIENT[Your AI agent<br/>Claude / Cursor / Cline / Hermes]
+
+    BOOKS --> API --> PIPE --> OUTPUT --> CLIENT
+    CLIENT -. "you decide what to bet" .- BOOKS
+```
+
+The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 27 tools. The betting decision stays with the human.
+
 ---
 
 ## What you can ask your agent
@@ -240,82 +279,9 @@ Every tool accepts a `verbosity` param (`"minimal"` / `"standard"` / `"full"`) a
 
 ## How the ranking works
 
-The system assigns every play a **tier** (1–4) and a **risk score** (1–10). Here's exactly how.
+The pipeline runs in 5 steps for every play: **grade the movement** (green/yellow/red), **score the risk** (1–10 from weighted factors), **assign the tier** (lookup table), **apply hysteresis** (prevent tier thrashing on small odds moves), **cross-reference sharp books** (verify target-book moves independently). The returned tier + kaiCall are quality ratings on the signal, not predictions.
 
-### Step 1: Grade the movement
-
-Each play gets a **movement grade**: green, yellow, or red. Green means all these are true:
-
-- Supportive movement direction (sharp books moving the same way)
-- High movement quality (score ≥ 0.8)
-- Acceptable execution quality (best or playable)
-- Strong consensus (5+ books agree)
-- Strong steam signal or high movement quality
-- Positive CLV (closing line value proxy)
-- Sustained agreement across 4+ of 6 time windows (1h, 2h, 6h, 12h, 24h, 48h)
-
-Red means any of: adverse movement, or bad execution with thin consensus. Everything else is yellow.
-
-### Step 2: Score the risk
-
-A weighted score, base 5, modified by:
-
-| Factor                | Modifier |
-| --------------------- | -------- |
-| Movement green        | −2       |
-| Movement red          | +3       |
-| Edge > 2%             | −1       |
-| Edge > 0.5%           | 0        |
-| Edge < 0.5%           | +1       |
-| No edge               | +2       |
-| Consensus ≥ 10 books  | −1       |
-| Consensus 3–9 books   | 0        |
-| Consensus 1–2 books   | +1       |
-| Execution best        | −1       |
-| Execution playable    | 0        |
-| Execution bad/unknown | +2       |
-| Supportive steam      | −1       |
-| Adverse steam         | +3       |
-| CLV > 0               | −1       |
-| CLV < −3              | +2       |
-
-Final score: 1 (cleanest) to 10 (riskiest).
-
-### Step 3: Assign the tier
-
-| Grade                | Risk score | Tier                          |
-| -------------------- | ---------- | ----------------------------- |
-| Green                | ≤ 2        | TIER 1                        |
-| Green                | 3–4        | TIER 2                        |
-| Green                | 5–6        | TIER 2 (promoted from TIER 3) |
-| Green                | 7+         | TIER 3                        |
-| Yellow               | ≤ 4        | TIER 2                        |
-| Yellow               | 5–6        | TIER 3                        |
-| Yellow               | 7+         | TIER 4                        |
-| Red or PASS kai call | any        | TIER 4                        |
-
-### Step 4: Hysteresis
-
-`getConfidenceTierStable()` wraps the raw tier in a hysteresis layer so a play doesn't bounce between TIER 2 and TIER 3 every time odds shift by 1 cent. The stable tier only updates if:
-
-- The raw tier differs by 2+ levels from the cached tier, OR
-- The risk score moves by 3+ points
-
-Plus a 2-hour rolling window — the returned tier is the mode of all raw tiers observed in the last 2 hours, which captures the trajectory.
-
-### Step 5: Sharp book cross-reference
-
-For `sharp_plays` and `recommended_bets`, each play is cross-referenced against individual sharp book screens (Pinnacle, Circa, BookMaker, BetOnline). A play only gets `Bet candidate` status if a non-target sharp book **independently** shows supportive movement on the same game+selection. This filters out target books whose own self-sourced movement is unreliable.
-
-### The kaiCall
-
-The kaiCall is a one-word summary your agent should use to decide what to do:
-
-| kaiCall    | Meaning                                              |
-| ---------- | ---------------------------------------------------- |
-| `BET`      | Strong signal across all dimensions. TIER 1 + clean. |
-| `CONSIDER` | TIER 2 with acceptable risk. Worth looking at.       |
-| `PASS`     | TIER 3/4, or red flags present. Skip.                |
+Full math, weight tables, and the tier assignment lookup in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 
 ---
 
@@ -338,6 +304,31 @@ node scripts/backtest-synthetic.js
 - TIER 4 > TIER 2 — red flags are wrong (this was the v1.5.1 fix)
 
 Full methodology in [docs/BACKTESTING.md](docs/BACKTESTING.md).
+
+---
+
+## FAQ
+
+**Does this tell me what to bet?**
+No. PropProfessor MCP surfaces _what sharp books are doing_ — line moves, consensus, steam, line lag. It does not predict outcomes. The TIER 1 hit rate is ~50% on a 580-play synthetic sample. Use the system to inform your handicapping, not to outsource your decisions.
+
+**Do I need a PropProfessor account?**
+Yes. Live data requires a paid PropProfessor subscription — the tool queries their API for odds + line history. Without an account, `pp-query login` will redirect you to sign up at [propprofessor.com](https://propprofessor.com).
+
+**What books does it cover?**
+36 sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, and NCAAF. The sharpest non-target books used for cross-reference are Pinnacle, Circa, BookMaker, and BetOnline. The tier system requires 10+ books to be present to consider a play TIER 1 (the consensus bonus).
+
+**Is it free?**
+The code is MIT-licensed. The data requires a paid PropProfessor subscription. There is no "Pro tier" of the MCP itself.
+
+**Can I run it without an MCP client?**
+Yes. `pp-query` is a standalone CLI for quick queries. `node scripts/backtest-synthetic.js` runs the synthetic backtest. See the [docs/](docs/) directory for additional tooling.
+
+**What about real outcomes over time?**
+The nightly live-smoke workflow collects snapshots of pre-game odds; as games resolve, the system measures actual TIER-by-tier hit rates. See [docs/BACKTESTING.md](docs/BACKTESTING.md) for the methodology.
+
+**What if I find a bug?**
+Run `pp-query doctor` first — it diagnoses most setup problems. If the issue persists, [open a GitHub issue](https://github.com/j17drake/propprofessor-mcp/issues) with the output of `pp-query doctor` and `node --version`.
 
 ---
 
@@ -385,6 +376,7 @@ Detailed docs:
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to add a tool, PR conventions
 - [SECURITY.md](SECURITY.md) — auth handling, threat model
 - [MAINTAINERS.md](MAINTAINERS.md) — release process, code ownership
+- [docs/METHODOLOGY.md](docs/METHODOLOGY.md) — full ranking methodology (movement grading, risk score weights, tier table)
 - [docs/BACKTESTING.md](docs/BACKTESTING.md) — tier validation methodology
 - [docs/MARKET-BOOK-AVAILABILITY.md](docs/MARKET-BOOK-AVAILABILITY.md) — which books post which markets
 - [docs/HERMES_SKILL.md](docs/HERMES_SKILL.md) — Hermes skill for this MCP
