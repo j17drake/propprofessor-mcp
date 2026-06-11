@@ -97,6 +97,7 @@ function buildHelpText() {
     '  --books NoVigApp,Polymarket',
     '  --lookback-hours 6',
     '  --limit 10',
+    '  --verbosity minimal|standard|full  # response size: minimal ~1KB, standard ~10KB, full raw',
     '',
     'Auth file lookup order:',
     '  1. AUTH_FILE',
@@ -197,6 +198,9 @@ function parseArgs(argv) {
       i += 1;
     } else if (arg === '--limit') {
       opts.limit = next;
+      i += 1;
+    } else if (arg === '--verbosity' || arg === '-v') {
+      opts.verbosity = next;
       i += 1;
     } else if (arg === '--max-age-ms' || arg === '--maxAgeMs') {
       opts.maxAgeMs = next;
@@ -581,7 +585,8 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : undefined,
       lookbackHours,
       debug,
-      is_live: Boolean(opts.live)
+      is_live: Boolean(opts.live),
+      verbosity: opts.verbosity || 'standard'
     });
     emitJson(logger, result);
     return;
