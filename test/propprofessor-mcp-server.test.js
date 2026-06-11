@@ -272,7 +272,6 @@ describe('propprofessor MCP server stdio contract', () => {
         'resolve_pick',
         'screen',
         'screen_ranked',
-        'screen_raw',
         'sharp_consensus',
         'sharp_plays',
         'staking_plan',
@@ -321,11 +320,11 @@ describe('propprofessor MCP server stdio contract', () => {
   it('returns server not initialized for tools/call before initialize', async () => {
     const server = createMcpServer({
       handlers: {
-        screen_raw: async () => ({ ok: true })
+        screen_ranked: async () => ({ ok: true })
       },
       toolDefinitions: [
         {
-          name: 'screen_raw',
+          name: 'screen_ranked',
           inputSchema: { type: 'object', properties: {}, additionalProperties: false }
         }
       ]
@@ -335,7 +334,7 @@ describe('propprofessor MCP server stdio contract', () => {
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/call',
-      params: { name: 'screen_raw', arguments: {} }
+      params: { name: 'screen_ranked', arguments: {} }
     });
 
     assert.equal(response.error.code, -32002);
@@ -471,30 +470,7 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(messages, []);
   });
 
-  it('screen_raw returns the raw screen payload', async () => {
-    const payload = { ok: true, rows: [{ id: 'raw-row' }] };
-    const { client, calls } = createRankedScreenClientStub({ rawPayload: payload });
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.screen_raw({
-      league: 'NBA',
-      market: 'Moneyline',
-      books: ['Pinnacle'],
-      participants: ['Lakers'],
-      games: ['game-1']
-    });
-
-    assert.equal(calls.queryScreenOdds.length, 1);
-    assert.deepEqual(calls.queryScreenOdds[0], {
-      market: 'Moneyline',
-      league: 'NBA',
-      games: ['game-1'],
-      participants: ['Lakers'],
-      books: ['Pinnacle'],
-      is_live: false
-    });
-    assert.deepEqual(result, { ok: true, result: payload });
-  });
+  // NOTE: screen_raw tests removed — tool deprecated in v1.6.3, folded into screen_ranked.
 
   // NOTE: query_fantasy_picks test removed — handler not implemented (no fantasy subscription).
   // Re-add when the fantasy tool is wired up. See SKILL.md references/fantasy-surface-guidance.md.
@@ -580,20 +556,7 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.ok(Object.prototype.hasOwnProperty.call(result.result[0], 'rankingProvenance'));
   });
 
-  it('screen_raw (bestComps) returns derived sharp-book metadata for NBA props', async () => {
-    const handlers = createMcpHandlers({
-      client: {
-        queryScreenOdds: async (filters) => ({ ok: true, filters }),
-        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
-        queryOddsHistory: async () => ({})
-      }
-    });
-
-    const result = await handlers.screen_raw({ league: 'NBA', market: 'Player Points', bestComps: true });
-    assert.equal(result.ok, true);
-    assert.deepEqual(result.comparisonBooks, ['FanDuel', 'BookMaker', 'PropBuilder', 'NoVigApp', 'Pinnacle']);
-    assert.equal(result.sharpBookResearch.key, 'nba_props');
-  });
+  // NOTE: screen_raw (bestComps) test removed — tool deprecated in v1.6.3.
 
   it('league presets expose sharpMainMarkets and sharpProps labels', async () => {
     const handlers = createMcpHandlers({
@@ -1247,20 +1210,7 @@ describe('propprofessor MCP server stdio contract', () => {
     }
   });
 
-  it('screen_raw (bestComps) returns derived sharp-book metadata for MLB props', async () => {
-    const handlers = createMcpHandlers({
-      client: {
-        queryScreenOdds: async (filters) => ({ ok: true, filters }),
-        queryScreenOddsBestComps: async (filters) => ({ ok: true, filters }),
-        queryOddsHistory: async () => ({})
-      }
-    });
-
-    const result = await handlers.screen_raw({ league: 'MLB', market: 'Player Strikeouts', bestComps: true });
-    assert.equal(result.ok, true);
-    assert.deepEqual(result.comparisonBooks, ['Circa', 'FanDuel', 'PropBuilder', 'Pinnacle', 'DraftKings', 'Bet365']);
-    assert.equal(result.sharpBookResearch.key, 'mlb_props');
-  });
+  // NOTE: screen_raw (bestComps) MLB test removed — tool deprecated in v1.6.3.
 
   it('screen(Soccer) sends the backend-supported Soccer league casing', async () => {
     const calls = [];

@@ -771,35 +771,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return baseResult;
     },
 
-    async screen_raw(args = {}) {
-      const league = args.league || 'NBA';
-      const marketResolution = resolveMarkets(args, league);
-      const market = marketResolution.single;
-      const useBestComps = Boolean(args.bestComps);
-      const queryFn = useBestComps ? client.queryScreenOddsBestComps.bind(client) : client.queryScreenOdds.bind(client);
-      const payload = await queryFn({
-        market,
-        league,
-        games: Array.isArray(args.games) ? args.games : [],
-        participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : useBestComps ? undefined : [],
-        is_live: Boolean(args.is_live)
-      });
-      const result = { ok: true, result: payload };
-      if (useBestComps) {
-        result.comparisonBooks = getSharpBookComparisonSet({
-          league,
-          market,
-          requestedBooks: Array.isArray(args.books) ? args.books : undefined
-        });
-        result.sharpBookResearch = getSharpBookContext({ league, market });
-      }
-      if (marketResolution.aliasesUsed.length) {
-        result.markets_alias_used = marketResolution.aliasesUsed;
-      }
-      return result;
-    },
-
     async screen_ranked(args = {}) {
       const requestedBooks = normalizeBookList(args.books);
       const league = args.league || 'NBA';
@@ -1551,7 +1522,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             'If they want more detail on a specific play, call player_context to check injury risk.'
           ],
           tools_to_use: ['recommended_bets', 'player_context'],
-          avoid: ['screen_raw', 'sharp_consensus', 'ev_candidates']
+          avoid: ['sharp_consensus', 'ev_candidates']
         },
         intermediate: {
           summary: 'For bettors who understand edge and tier but want guidance.',
@@ -1563,7 +1534,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             'Optionally call find_best_price to line shop.'
           ],
           tools_to_use: ['recommended_bets', 'player_context', 'find_best_price', 'league_presets'],
-          avoid: ['screen_raw', 'sharp_consensus']
+          avoid: ['sharp_consensus']
         },
         sharp: {
           summary: 'For sharp bettors who want full control and movement data.',

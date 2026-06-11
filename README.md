@@ -1,15 +1,15 @@
 # PropProfessor MCP
 
-> An MCP server that shows you what the sharp money is doing. 27 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
+> An MCP server that shows you what the sharp money is doing. 26 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-788%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-784%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 27 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
+Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 26 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
 
 **Honest scope:** PropProfessor MCP is a **sharp-money signal feed**, not a betting oracle. The ranking pipeline reliably detects _what sharp books are doing_ (line moves, consensus, steam, independent sharp confirmation) — it does **not** reliably predict _which side will win_. The TIER 1/2/3/4 system is a quality rating on the signal strength, not a confidence claim about outcomes. Use it as a tool to inform your own handicapping, not to outsource your decisions.
 
@@ -71,7 +71,7 @@ The ranking pipeline is validated against synthetic scenarios where the movement
 | TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2                         |
 | Steam move detection                     | Coordinated sharp moves across 3+ books within a 90-min window                |
 | Line lag detection                       | Target-book price divergence vs sharp consensus (avg 12-25pt gap)             |
-| Tests                                    | **788 passing**                                                               |
+| Tests                                    | **784 passing**                                                               |
 | Coverage                                 | **82% statements, 88% functions**                                             |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
@@ -107,7 +107,7 @@ flowchart LR
         T[Tier + risk score]
     end
 
-    subgraph OUTPUT["27 tools exposed via MCP"]
+    subgraph OUTPUT["26 tools exposed via MCP"]
         RB[recommended_bets]
         SP[sharp_plays]
         SC[sharp_consensus]
@@ -121,7 +121,7 @@ flowchart LR
     CLIENT -. "you decide what to bet" .- BOOKS
 ```
 
-The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 27 tools. The betting decision stays with the human.
+The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 26 tools. The betting decision stays with the human.
 
 ---
 
@@ -216,7 +216,7 @@ Replace the path with wherever you cloned the repo. Token compression (smaller c
 
 ---
 
-## All 27 tools (reference)
+## All 26 tools (reference)
 
 ### For quick situational checks (the 5-minute scan)
 
@@ -253,25 +253,24 @@ Everything above, plus:
 || `sharp_plays` | Plays with **independent sharp confirmation** across Pinnacle/Circa/BookMaker/BetOnline |
 || `get_play_details` | Line history for specific games |
 || `staking_plan` | Fractional Kelly sizing for picks you decide to place (TIER 1: 2%, TIER 2: 1% of bankroll) |
-|| `screen_raw` | Raw odds payload, no ranking — for when you want to do your own analysis |
-|| `ev_candidates` | Fast +EV discovery (validate on `/screen` after) |
-|| `all_slates` | Consolidated ranked list across multiple leagues |
-|| `screen` | League-specific screen (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF) |
-|| `get_alerts` | Line movement alerts |
+| `ev_candidates` | Fast +EV discovery (validate on `/screen` after) |
+| `all_slates` | Consolidated ranked list across multiple leagues |
+| `screen` | League-specific screen (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF) |
+| `get_alerts` | Line movement alerts |
 
 ### Tool guide by category
 
-|| Category | Tools |
-|| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-|| **Screening & Ranking** | `screen_ranked`, `screen`, `screen_raw`, `all_slates`, `get_play_details` |
-|| **Sharp Movement** | `sharp_plays`, `sharp_consensus` |
-|| **Flagged Plays** | `recommended_bets`, `staking_plan`, `ev_candidates` |
-|| **Line Shopping** | `find_best_price` |
-|| **Player Context** | `player_context` |
-|| **UFC** | `ufc_card` |
-|| **Bet Management** | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets` |
-|| **Picks & Tracking** | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts`, `clear_score_timeline` |
-|| **Meta** | `get_started`, `health_status`, `league_presets` |
+| Category                | Tools                                                       |
+| ----------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Screening & Ranking** | `screen_ranked`, `screen`, `all_slates`, `get_play_details` |
+|                         | **Sharp Movement**                                          | `sharp_plays`, `sharp_consensus`                                                                       |
+|                         | **Flagged Plays**                                           | `recommended_bets`, `staking_plan`, `ev_candidates`                                                    |
+|                         | **Line Shopping**                                           | `find_best_price`                                                                                      |
+|                         | **Player Context**                                          | `player_context`                                                                                       |
+|                         | **UFC**                                                     | `ufc_card`                                                                                             |
+|                         | **Bet Management**                                          | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets`                                       |
+|                         | **Picks & Tracking**                                        | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts`, `clear_score_timeline` |
+|                         | **Meta**                                                    | `get_started`, `health_status`, `league_presets`                                                       |
 
 Every tool accepts a `verbosity` param (`"minimal"` / `"standard"` / `"full"`) and a `compact: true` flag to shrink responses by ~90%. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for response-size tuning.
 
@@ -334,7 +333,7 @@ Run `pp-query doctor` first — it diagnoses most setup problems. If the issue p
 
 ## Status
 
-**Actively maintained.** Last release: see [releases](https://github.com/j17drake/propprofessor-mcp/releases). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green, 788 tests passing.
+**Actively maintained.** Last release: see [releases](https://github.com/j17drake/propprofessor-mcp/releases). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green, 784 tests passing.
 
 The repo runs a nightly live-smoke workflow that hits the real PropProfessor API and validates end-to-end behavior. Failures show up as red on the Actions tab.
 
@@ -356,7 +355,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 
 ## For maintainers
 
-- **Tests**: `npm test` (788 passing) — 5/5 reruns, deterministic
+- **Tests**: `npm test` (784 passing) — 5/5 reruns, deterministic
 - **Coverage**: `npm run test:coverage` (~82% statements, ~88% functions)
 - **Lint**: `npm run lint` (clean)
 - **Format**: `npm run format:check` (clean — `npm run format` to fix)

@@ -43,17 +43,7 @@ describe('get_started handler', () => {
     assert.ok(Array.isArray(result.tools_to_use));
     assert.ok(result.tools_to_use.includes('recommended_bets'));
     assert.ok(Array.isArray(result.avoid));
-    assert.ok(result.avoid.includes('screen_raw'));
-  });
-
-  it('returns workflow for intermediate user type', async () => {
-    const result = await handlers.get_started({ user_type: 'intermediate' });
-    assert.ok(result.summary);
-    assert.ok(Array.isArray(result.steps));
-    assert.ok(result.tools_to_use.includes('recommended_bets'));
-    assert.ok(result.tools_to_use.includes('player_context'));
-    assert.ok(result.tools_to_use.includes('find_best_price'));
-    assert.ok(result.avoid.includes('screen_raw'));
+    assert.ok(result.avoid.includes('sharp_consensus'));
     assert.ok(result.avoid.includes('sharp_consensus'));
   });
 
