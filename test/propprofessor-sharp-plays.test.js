@@ -12,6 +12,7 @@ const {
   resolveTargetBooks,
   summarizeSharpPlayRows
 } = require('../lib/propprofessor-sharp-plays');
+const { compactRow } = require('../lib/propprofessor-shared-utils');
 
 describe('UFC card/date filtering helpers', () => {
   it('parses a row start time from a start field', () => {
@@ -307,7 +308,7 @@ describe('sharp play target book helpers', () => {
       limit: 10
     });
 
-    assert.deepEqual(summary.filteredRows, filtered);
+    assert.deepEqual(summary.filteredRows.map(compactRow), filtered);
     assert.ok(filtered.length >= 1);
     assert.equal(filtered[0].pick, 'Phoenix Suns');
     assert.ok(summary.classificationSummary.verdictCounts['Bet candidate'] >= 1);
