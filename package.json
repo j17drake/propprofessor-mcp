@@ -67,7 +67,6 @@
     "pp-exe": "node scripts/prop-professor.exe.js",
     "exe": "node scripts/prop-professor.exe.js",
     "check:version": "node scripts/check-version-consistency.js",
-    "audit:sharp-research": "node scripts/audit-sharp-play-research.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
