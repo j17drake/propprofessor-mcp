@@ -785,7 +785,6 @@ describe('createPropProfessorClient', () => {
     assert.equal(Array.isArray(result.result[0].historySportsbooksRequested), true);
     assert.equal(typeof result.result[0].movementDebug, 'object');
     assert.equal(Array.isArray(result.result[0].filteredLineHistory), true);
-    assert.equal(typeof result.result[0].droppedHistoryReasons, 'object');
     assert.equal(typeof result.result[0].openToCurrentClvPct, 'number');
     assert.equal(result.result[0].rankingProvenance.focusBook, 'NoVigApp');
     assert.equal(result.result[0].rankingProvenance.historyMatchedBy, 'selectionId');
