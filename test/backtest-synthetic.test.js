@@ -72,9 +72,6 @@ describe('synthetic backtest', () => {
 
     // TIER 4 should have the most plays (most rows are not top-tier)
     // TIER 1 should have the fewest (only the best)
-    const t1Count = tierCounts['TIER 1'] || 0;
-    const t4Count = tierCounts['TIER 4'] || 0;
-
     // At minimum, the system should produce plays in multiple tiers
     const tiersWithPlays = Object.values(tierCounts).filter((c) => c > 0).length;
     assert.ok(tiersWithPlays >= 2, `Expected plays in at least 2 tiers, got ${tiersWithPlays}`);

@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 'use strict';
 
-const { createPropProfessorClient, getCookieExpiryInfo, isAuthValid, resolveAuthFile, readAuthState } = require('../lib/propprofessor-api');
+const {
+  createPropProfessorClient,
+  getCookieExpiryInfo,
+  isAuthValid,
+  resolveAuthFile,
+  readAuthState
+} = require('../lib/propprofessor-api');
 const {
   getTennisMarketFamily,
   normalizeTennisMarketQuery,
@@ -46,7 +52,13 @@ const {
   DEFAULT_WINDOWS,
   DEFAULT_SHARP_BOOKS
 } = require('../lib/propprofessor-sharp-consensus');
-const { getConfidenceTier, getConfidenceTierStable, getTierTrajectory, clearTierCache, clearScoreTimeline, buildRationale, suggestStakes } = require('../lib/propprofessor-risk-score');
+const {
+  getConfidenceTierStable,
+  clearTierCache,
+  clearScoreTimeline,
+  buildRationale,
+  suggestStakes
+} = require('../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../lib/propprofessor-player-context');
 const {
   formatRecommendedBetsMinimal,
@@ -459,7 +471,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // Cache check for tennis screen
     const canCache = !args.compact && !args.fields && !args.include;
-    const cacheKey = canCache ? buildCacheKey('tennis', { ...args, books: requestedBooks.length ? requestedBooks : ALL_SCREEN_BOOKS, market: marketResolution.single }, 'Tennis') : null;
+    const cacheKey = canCache
+      ? buildCacheKey(
+          'tennis',
+          {
+            ...args,
+            books: requestedBooks.length ? requestedBooks : ALL_SCREEN_BOOKS,
+            market: marketResolution.single
+          },
+          'Tennis'
+        )
+      : null;
     if (cacheKey) {
       const cached = responseCache.get(cacheKey);
       if (cached) {
@@ -576,8 +598,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const marketFamilyCandidates = requestedMarket
       ? evCandidates.filter((row) => {
           const rowFamily = getTennisMarketFamily(row);
-          const requestedFamilies = normalizeTennisMarketQuery(requestedMarket)
-            .map((m) => getTennisMarketFamily({ market: m }));
+          const requestedFamilies = normalizeTennisMarketQuery(requestedMarket).map((m) =>
+            getTennisMarketFamily({ market: m })
+          );
           return rowFamily !== null && requestedFamilies.includes(rowFamily);
         })
       : evCandidates;
@@ -1038,7 +1061,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             }
           }
           const deduped = Array.from(seen.values());
-          let eligible = deduped.filter((row) => targetTiers.includes(row.confidenceTier || getConfidenceTierStable(row)));
+          let eligible = deduped.filter((row) =>
+            targetTiers.includes(row.confidenceTier || getConfidenceTierStable(row))
+          );
           const recommended = eligible
             .sort((a, b) => {
               const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };

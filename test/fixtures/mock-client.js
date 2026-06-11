@@ -36,12 +36,7 @@ const DEFAULT_SCREEN_PAYLOADS = {
  * @param {Function} [options.onCall] - Callback `(method, args)` fired on every client call.
  * @returns {{ client: Object, calls: Object }} Mock client and call tracker.
  */
-function createMockClient({
-  screenPayloads = {},
-  historyByGame = {},
-  healthPayload = null,
-  onCall = null
-} = {}) {
+function createMockClient({ screenPayloads = {}, historyByGame = {}, healthPayload = null, onCall = null } = {}) {
   const payloads = { ...DEFAULT_SCREEN_PAYLOADS, ...screenPayloads };
   const history = { ...HISTORY_BY_GAME, ...historyByGame };
 
@@ -109,11 +104,13 @@ function createMockClient({
       async healthStatus() {
         track('healthStatus', null);
         calls.healthStatus += 1;
-        return healthPayload || {
-          ok: true,
-          endpoints: { screen: 'ok', sportsbook: 'ok', smart: 'ok', odds_history: 'ok' },
-          token: { exp: Math.floor(Date.now() / 1000) + 86400, expiresInSeconds: 86400 }
-        };
+        return (
+          healthPayload || {
+            ok: true,
+            endpoints: { screen: 'ok', sportsbook: 'ok', smart: 'ok', odds_history: 'ok' },
+            token: { exp: Math.floor(Date.now() / 1000) + 86400, expiresInSeconds: 86400 }
+          }
+        );
       },
 
       async getHiddenBets() {

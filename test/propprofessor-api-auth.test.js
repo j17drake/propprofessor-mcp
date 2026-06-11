@@ -152,7 +152,13 @@ describe('getCookieExpiryInfo', () => {
   it('returns browser_session_only when only session cookies exist (expires -1)', () => {
     const auth = {
       cookies: [
-        { name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1, session: true }
+        {
+          name: '__Secure-next-auth.session-token',
+          value: 'tok',
+          domain: 'app.propprofessor.com',
+          expires: -1,
+          session: true
+        }
       ]
     };
     const info = getCookieExpiryInfo(auth, Date.now);

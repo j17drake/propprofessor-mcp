@@ -11,8 +11,6 @@
  * Add/remove leagues as needed.
  */
 
-const fs = require('node:fs');
-const path = require('node:path');
 const { takeSnapshot } = require('./backtest');
 
 const SNAPSHOTS = [

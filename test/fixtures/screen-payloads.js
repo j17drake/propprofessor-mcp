@@ -167,11 +167,7 @@ const NBA_TOTAL_PAYLOAD = {
 
 // Multi-market payload (for all_slates / multi-market tests)
 const NBA_MULTI_MARKET_PAYLOAD = {
-  game_data: [
-    ...NBA_MONEYLINE_PAYLOAD.game_data,
-    ...NBA_SPREAD_PAYLOAD.game_data,
-    ...NBA_TOTAL_PAYLOAD.game_data
-  ]
+  game_data: [...NBA_MONEYLINE_PAYLOAD.game_data, ...NBA_SPREAD_PAYLOAD.game_data, ...NBA_TOTAL_PAYLOAD.game_data]
 };
 
 // MLB fixture

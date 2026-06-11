@@ -48,6 +48,8 @@ try {
   process.exit(0);
 } catch (err) {
   // Auth file missing or unreadable
-  console.log(`🔴 PropProfessor Auth: UNREADABLE\n\nCould not read auth file: ${err.message}\n\nTo fix: pp-query login`);
+  console.log(
+    `🔴 PropProfessor Auth: UNREADABLE\n\nCould not read auth file: ${err.message}\n\nTo fix: pp-query login`
+  );
   process.exit(0);
 }

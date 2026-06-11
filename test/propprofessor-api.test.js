@@ -1327,9 +1327,15 @@ describe('token refresh mutex', () => {
   it('only calls fetchAccessToken once when multiple concurrent getAccessToken calls happen', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-mutex-'));
     const authFile = path.join(dir, 'auth.json');
-    fs.writeFileSync(authFile, JSON.stringify({
-      cookies: [{ name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }]
-    }), 'utf8');
+    fs.writeFileSync(
+      authFile,
+      JSON.stringify({
+        cookies: [
+          { name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }
+        ]
+      }),
+      'utf8'
+    );
 
     let fetchCount = 0;
     const fakeGotScraping = async () => {
@@ -1372,9 +1378,15 @@ describe('token refresh mutex', () => {
   it('allows a new refresh after the previous one completes', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-mutex-2-'));
     const authFile = path.join(dir, 'auth.json');
-    fs.writeFileSync(authFile, JSON.stringify({
-      cookies: [{ name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }]
-    }), 'utf8');
+    fs.writeFileSync(
+      authFile,
+      JSON.stringify({
+        cookies: [
+          { name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }
+        ]
+      }),
+      'utf8'
+    );
 
     let fetchCount = 0;
     const fakeGotScraping = async () => {
@@ -1409,9 +1421,15 @@ describe('token refresh mutex', () => {
   it('concurrent calls after invalidation all wait for the same refresh', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-mutex-3-'));
     const authFile = path.join(dir, 'auth.json');
-    fs.writeFileSync(authFile, JSON.stringify({
-      cookies: [{ name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }]
-    }), 'utf8');
+    fs.writeFileSync(
+      authFile,
+      JSON.stringify({
+        cookies: [
+          { name: '__Secure-next-auth.session-token', value: 'tok', domain: 'app.propprofessor.com', expires: -1 }
+        ]
+      }),
+      'utf8'
+    );
 
     let fetchCount = 0;
     const fakeGotScraping = async () => {
@@ -1427,7 +1445,12 @@ describe('token refresh mutex', () => {
       const client = createPropProfessorClient({
         authFile,
         gotScrapingImpl: fakeGotScraping,
-        fetchImpl: async () => ({ ok: true, status: 200, text: async () => '{"ok":true}', json: async () => ({ ok: true }) })
+        fetchImpl: async () => ({
+          ok: true,
+          status: 200,
+          text: async () => '{"ok":true}',
+          json: async () => ({ ok: true })
+        })
       });
 
       await client.getAccessToken();

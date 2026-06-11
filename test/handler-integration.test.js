@@ -15,7 +15,7 @@
  * - Error handling works for missing params
  */
 
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
 const { createMockClient } = require('./fixtures/mock-client');
@@ -64,7 +64,10 @@ describe('handler integration: screen_ranked', () => {
     assert.equal(result.ok, true);
     const scores = result.result.map((r) => r.screenScore || 0);
     for (let i = 1; i < scores.length; i++) {
-      assert.ok(scores[i] <= scores[i - 1], `Row ${i} score (${scores[i]}) should be <= row ${i - 1} (${scores[i - 1]})`);
+      assert.ok(
+        scores[i] <= scores[i - 1],
+        `Row ${i} score (${scores[i]}) should be <= row ${i - 1} (${scores[i - 1]})`
+      );
     }
   });
 
@@ -84,10 +87,17 @@ describe('handler integration: screen_ranked', () => {
   it('compact mode returns smaller responses', async () => {
     const handlers = createHandlers();
     const full = await handlers.screen_ranked({
-      league: 'NBA', market: 'Moneyline', limit: 3, includeAll: true
+      league: 'NBA',
+      market: 'Moneyline',
+      limit: 3,
+      includeAll: true
     });
     const compact = await handlers.screen_ranked({
-      league: 'NBA', market: 'Moneyline', limit: 3, includeAll: true, compact: true
+      league: 'NBA',
+      market: 'Moneyline',
+      limit: 3,
+      includeAll: true,
+      compact: true
     });
 
     assert.equal(compact.ok, true);
@@ -109,8 +119,10 @@ describe('handler integration: screen_ranked', () => {
     assert.equal(result.ok, true);
     if (result.result.length > 0) {
       const row = result.result[0];
-      assert.ok(row.game !== undefined || row.selection !== undefined || row.odds !== undefined,
-        'Should have at least one requested field');
+      assert.ok(
+        row.game !== undefined || row.selection !== undefined || row.odds !== undefined,
+        'Should have at least one requested field'
+      );
     }
   });
 
@@ -333,8 +345,10 @@ describe('handler integration: find_best_price', () => {
 
     // All prices should be sorted best to worst
     for (let i = 1; i < result.allPrices.length; i++) {
-      assert.ok(result.allPrices[i].odds <= result.allPrices[i - 1].odds,
-        `Prices should be sorted descending: ${result.allPrices[i - 1].odds} >= ${result.allPrices[i].odds}`);
+      assert.ok(
+        result.allPrices[i].odds <= result.allPrices[i - 1].odds,
+        `Prices should be sorted descending: ${result.allPrices[i - 1].odds} >= ${result.allPrices[i].odds}`
+      );
     }
   });
 });
@@ -453,15 +467,17 @@ describe('handler integration: error handling', () => {
     const handlers = createHandlers({
       screenPayloads: {
         'NBA:Moneyline': {
-          game_data: [{
-            gameId: 'empty-game',
-            league: 'NBA',
-            market: 'Moneyline',
-            homeTeam: 'Team A',
-            awayTeam: 'Team B',
-            selections: {},
-            defaultKey: 'a'
-          }]
+          game_data: [
+            {
+              gameId: 'empty-game',
+              league: 'NBA',
+              market: 'Moneyline',
+              homeTeam: 'Team A',
+              awayTeam: 'Team B',
+              selections: {},
+              defaultKey: 'a'
+            }
+          ]
         }
       }
     });

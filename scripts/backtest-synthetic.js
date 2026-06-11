@@ -24,10 +24,18 @@ const { extractScreenRows } = require('../lib/propprofessor-screen-utils');
 // ---------------------------------------------------------------------------
 
 const TEAMS = [
-  ['Lakers', 'Celtics'], ['Warriors', 'Nuggets'], ['Bucks', 'Heat'],
-  ['76ers', 'Knicks'], ['Suns', 'Clippers'], ['Mavericks', 'Grizzlies'],
-  ['Cavaliers', 'Pacers'], ['Timberwolves', 'Kings'], ['Thunder', 'Pelicans'],
-  ['Hawks', 'Magic'], ['Raptors', 'Nets'], ['Bulls', 'Hornets']
+  ['Lakers', 'Celtics'],
+  ['Warriors', 'Nuggets'],
+  ['Bucks', 'Heat'],
+  ['76ers', 'Knicks'],
+  ['Suns', 'Clippers'],
+  ['Mavericks', 'Grizzlies'],
+  ['Cavaliers', 'Pacers'],
+  ['Timberwolves', 'Kings'],
+  ['Thunder', 'Pelicans'],
+  ['Hawks', 'Magic'],
+  ['Raptors', 'Nets'],
+  ['Bulls', 'Hornets']
 ];
 
 const BOOKS = ['NoVigApp', 'Pinnacle', 'Circa', 'BetOnline', 'BookMaker', 'Fliff', 'DraftKings'];
@@ -65,9 +73,7 @@ function generateScenario() {
 
   // Choose scenario type — determines whether there's real edge
   const scenarioRoll = Math.random();
-  const scenarioType = scenarioRoll < 0.35 ? 'sharp_move'
-    : scenarioRoll < 0.7 ? 'stable_no_edge'
-    : 'adverse';
+  const scenarioType = scenarioRoll < 0.35 ? 'sharp_move' : scenarioRoll < 0.7 ? 'stable_no_edge' : 'adverse';
 
   // Base odds from true probability
   const baseOdds = Math.round(-100 / (homeWinProb - 0.01));
@@ -99,7 +105,7 @@ function generateScenario() {
     }
 
     bookOdds = Math.max(-300, Math.min(300, bookOdds));
-    const awayOdds = Math.round(bookOdds > 0 ? -(bookOdds + 100) : (-bookOdds + 100));
+    const awayOdds = Math.round(bookOdds > 0 ? -(bookOdds + 100) : -bookOdds + 100);
     odds[book] = { odds1: bookOdds, odds2: awayOdds };
 
     // Generate odds history
@@ -150,26 +156,28 @@ function generateScenario() {
 
   // Build screen payload
   const screenPayload = {
-    game_data: [{
-      gameId,
-      league: 'NBA',
-      market: 'Moneyline',
-      updatedAt: new Date().toISOString(),
-      homeTeam: home,
-      awayTeam: away,
-      selections: {
-        ml: {
-          selection1: home,
-          participant1: home,
-          selection1Id: `Moneyline:${home.replace(/\s+/g, '_')}`,
-          selection2: away,
-          participant2: away,
-          selection2Id: `Moneyline:${away.replace(/\s+/g, '_')}`,
-          odds
-        }
-      },
-      defaultKey: 'ml'
-    }]
+    game_data: [
+      {
+        gameId,
+        league: 'NBA',
+        market: 'Moneyline',
+        updatedAt: new Date().toISOString(),
+        homeTeam: home,
+        awayTeam: away,
+        selections: {
+          ml: {
+            selection1: home,
+            participant1: home,
+            selection1Id: `Moneyline:${home.replace(/\s+/g, '_')}`,
+            selection2: away,
+            participant2: away,
+            selection2Id: `Moneyline:${away.replace(/\s+/g, '_')}`,
+            odds
+          }
+        },
+        defaultKey: 'ml'
+      }
+    ]
   };
 
   const description = `${scenarioType}_${homeWins ? home.replace(/\s+/g, '_') : away.replace(/\s+/g, '_')}_wins`;
@@ -206,7 +214,7 @@ function runBacktest({ scenarios = 200, verbose = false } = {}) {
   let errorCount = 0;
 
   for (let i = 0; i < scenarios; i++) {
-    const { screenPayload, oddsHistory, outcome, gameId, description } = generateScenario();
+    const { screenPayload, oddsHistory, outcome, gameId } = generateScenario();
 
     try {
       // Extract rows from screen payload
@@ -238,7 +246,6 @@ function runBacktest({ scenarios = 200, verbose = false } = {}) {
         const tier = row.confidenceTier || 'TIER 4';
         const kaiCall = row.kaiCall || 'PASS';
         const selection = row.selection || row.participant || '';
-        const isHome = selection.includes(rows[0]?.selection1?.split(' ').pop() || '___');
 
         // The play is a "win" if the selected team won
         const selectedTeam = selection;
@@ -287,11 +294,16 @@ function report(backtestResults) {
     const { wins, losses } = results[tier] || { wins: 0, losses: 0 };
     const total = wins + losses;
     const hitRate = total > 0 ? ((wins / total) * 100).toFixed(1) : 'N/A';
-    const status = total === 0 ? ''
-      : tier === 'TIER 1' && wins / total >= 0.6 ? ' ✅ healthy'
-      : tier === 'TIER 1' && wins / total >= 0.55 ? ' ⚠️ borderline'
-      : tier === 'TIER 1' ? ' ❌ below target'
-      : '';
+    const status =
+      total === 0
+        ? ''
+        : tier === 'TIER 1' && wins / total >= 0.6
+          ? ' ✅ healthy'
+          : tier === 'TIER 1' && wins / total >= 0.55
+            ? ' ⚠️ borderline'
+            : tier === 'TIER 1'
+              ? ' ❌ below target'
+              : '';
 
     summary[tier] = { wins, losses, total, hitRate };
     console.log(`${tier}: ${hitRate}% (${wins}W/${losses}L/${total} total)${status}`);

@@ -7,8 +7,6 @@ const os = require('os');
 const path = require('path');
 
 const {
-  REPO_AUTH_FILE,
-  DEFAULT_USER_AUTH_FILE,
   getTokenCacheFile,
   readTokenCache,
   writeTokenCache,
@@ -16,7 +14,6 @@ const {
   clearTokenCache,
   getExplicitAuthFile,
   uniqueAuthPaths,
-  getAuthFileCandidates,
   ensureAuthParentDirectory,
   installAuthFile,
   resolveAuthFile,
@@ -194,10 +191,7 @@ describe('installAuthFile', () => {
   });
 
   it('throws when source file does not exist', () => {
-    assert.throws(
-      () => installAuthFile({ sourceFile: '/nonexistent/auth.json' }),
-      /not found/
-    );
+    assert.throws(() => installAuthFile({ sourceFile: '/nonexistent/auth.json' }), /not found/);
   });
 });
 
@@ -261,10 +255,7 @@ describe('isAuthValid', () => {
   });
 
   it('returns true for valid PP cookie with value', () => {
-    assert.equal(
-      isAuthValid({ cookies: [{ domain: '.propprofessor.com', value: 'session-token' }] }),
-      true
-    );
+    assert.equal(isAuthValid({ cookies: [{ domain: '.propprofessor.com', value: 'session-token' }] }), true);
   });
 });
 
@@ -296,16 +287,23 @@ describe('getCookieExpiryInfo', () => {
   });
 
   it('returns no_session_token when session cookie is missing', () => {
-    const result = getCookieExpiryInfo({ cookies: [{ domain: '.propprofessor.com', name: 'other', value: 'x', expires: 9999999999 }] });
+    const result = getCookieExpiryInfo({
+      cookies: [{ domain: '.propprofessor.com', name: 'other', value: 'x', expires: 9999999999 }]
+    });
     assert.equal(result.status, 'no_session_token');
   });
 
   it('returns expired when session cookie is in the past', () => {
     const nowFn = () => Date.now();
     const pastExpiry = Math.floor(Date.now() / 1000) - 86400; // 1 day ago
-    const result = getCookieExpiryInfo({
-      cookies: [{ domain: '.propprofessor.com', name: '__Secure-next-auth.session-token', value: 'x', expires: pastExpiry }]
-    }, nowFn);
+    const result = getCookieExpiryInfo(
+      {
+        cookies: [
+          { domain: '.propprofessor.com', name: '__Secure-next-auth.session-token', value: 'x', expires: pastExpiry }
+        ]
+      },
+      nowFn
+    );
     assert.equal(result.status, 'expired');
     assert.ok(result.warning.includes('expired'));
   });
@@ -313,7 +311,9 @@ describe('getCookieExpiryInfo', () => {
   it('returns ok when session is far from expiry', () => {
     const futureExpiry = Math.floor(Date.now() / 1000) + 86400 * 30; // 30 days
     const result = getCookieExpiryInfo({
-      cookies: [{ domain: '.propprofessor.com', name: '__Secure-next-auth.session-token', value: 'x', expires: futureExpiry }]
+      cookies: [
+        { domain: '.propprofessor.com', name: '__Secure-next-auth.session-token', value: 'x', expires: futureExpiry }
+      ]
     });
     assert.equal(result.status, 'ok');
     assert.equal(result.warning, null);
@@ -322,7 +322,9 @@ describe('getCookieExpiryInfo', () => {
   it('returns critical when within 3 days', () => {
     const nearExpiry = Math.floor(Date.now() / 1000) + 86400 * 2; // 2 days
     const result = getCookieExpiryInfo({
-      cookies: [{ domain: '.propprofessor.com', name: '__Secure-next-auth.session-token', value: 'x', expires: nearExpiry }]
+      cookies: [
+        { domain: '.propprofessor.com', name: '__Secure-next-auth.session-token', value: 'x', expires: nearExpiry }
+      ]
     });
     assert.equal(result.status, 'critical');
   });

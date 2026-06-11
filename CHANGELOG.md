@@ -11,6 +11,7 @@ The `gradeMovementQuality` function was marking `insufficient_history` plays as 
 **Fix:** Removed `noMovementData` from RED conditions. Now only genuinely adverse signals (`movementLabel === 'adverse'`) or bad execution with thin consensus trigger RED.
 
 **Backtest results (3000 scenarios, before → after):**
+
 - TIER 4 vs TIER 2: was inverted (50.6% > 47.8%) → now correct (48.6% < 53.2%)
 - TIER 1 vs TIER 3 gap: 6.9pp → 7.2pp (improved)
 - Tier ordering: TIER 1/2 > TIER 3 > TIER 4 (clean)
@@ -18,6 +19,7 @@ The `gradeMovementQuality` function was marking `insufficient_history` plays as 
 ### Improved synthetic backtest generator
 
 Scenario generator now creates three distinct scenario types with real edge conditions:
+
 - `sharp_move` (35%): Sharp books moved, target book is stale → should be TIER 1/2
 - `stable_no_edge` (35%): All books agree, no edge → should be TIER 3/4
 - `adverse` (30%): Sharp books moving against the pick → should be TIER 4
@@ -36,11 +38,13 @@ Concurrent requests that trigger 401s now share a single token refresh instead o
 `scripts/backtest-synthetic.js` — runs the full ranking pipeline (extract → hydrate → rank → tier) against synthetic scenarios with known outcomes. Reports per-tier hit rates and validates tier differentiation.
 
 **Results (500 scenarios):**
+
 - TIER 1: 55.9% hit rate (borderline — target is >60%)
 - TIER 1 vs TIER 3 gap: +6.9pp — system differentiates quality
 - TIER 4 > TIER 2: red flag — risk flags need tuning
 
 **Files:**
+
 - `scripts/backtest-synthetic.js` — scenario generator + backtest runner + reporting
 - `test/backtest-synthetic.test.js` — 6 tests for scenario generation and backtest execution
 
@@ -55,12 +59,14 @@ Concurrent requests that trigger 401s now share a single token refresh instead o
 Offline tests for all major MCP handlers — no auth, no network, no API dependency.
 
 **New files:**
+
 - `test/fixtures/screen-payloads.js` — 3 NBA games + 1 MLB game across 5 books with deliberate odds differences (consensus, sharp movement, split market)
 - `test/fixtures/odds-history.js` — odds history with steam moves, gradual drift, and stable lines
 - `test/fixtures/mock-client.js` — shared mock client factory with call tracking and customizable payloads
 - `test/handler-integration.test.js` — 26 tests across 11 suites
 
 **Handlers tested:**
+
 - `screen_ranked` (7 tests) — ranking, limit, compact, fields, Spread, Total
 - `screen` (2 tests) — NBA, MLB league-specific
 - `sharp_plays` (3 tests) — resultMeta, Fliff lag detection, multi-league

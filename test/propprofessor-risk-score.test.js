@@ -81,9 +81,9 @@ describe('getConfidenceTierStable', () => {
   });
 
   it('allows significant tier changes (2+ levels)', () => {
-    // First call: good data → TIER 1 or 2
+    // First call: good data → TIER 1 or 2 (populates cache for hysteresis check)
     const goodItem = makeRow();
-    const goodTier = getConfidenceTierStable(goodItem);
+    getConfidenceTierStable(goodItem);
 
     // Second call: terrible data → should jump significantly
     const badItem = makeRow({
@@ -141,10 +141,7 @@ describe('buildRationale uses stable tier', () => {
     const item = makeRow();
     const rationale = buildRationale(item);
     const stableTier = getConfidenceTierStable(item);
-    assert.ok(
-      rationale.includes(stableTier),
-      `Rationale should include ${stableTier}, got: ${rationale}`
-    );
+    assert.ok(rationale.includes(stableTier), `Rationale should include ${stableTier}, got: ${rationale}`);
   });
 });
 
