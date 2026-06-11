@@ -57,6 +57,7 @@ function getCommandInventory() {
     { command: 'ncaab', description: 'NCAAB screen shorthand' },
     { command: 'ncaaf', description: 'NCAAF screen shorthand' },
     { command: 'presets', description: 'Show active league ranking presets' },
+    { command: 'exe', description: 'Display tier-ranked plays in a quick CLI view (pp-exe)' },
     { command: 'list', description: 'Show the command inventory' },
     { command: 'health', description: 'Check auth and endpoint health' },
     { command: 'doctor', description: 'Run first-time setup checks and explain next steps' },
@@ -88,6 +89,7 @@ function buildHelpText() {
     '  pp-query ufc --market Moneyline',
     '  pp-query ufc-card --book NoVigApp --market Moneyline',
     '  pp-query tennis --market Moneyline --limit 10',
+    '  pp-query exe                             # display tier-ranked plays',
     '',
     'Useful flags:',
     '  --league NBA',
@@ -532,6 +534,12 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       json: Boolean(opts.json),
       logger
     });
+    return;
+  } else if (command === 'exe') {
+    // Launch the tier-ranked plays display
+    const { execSync } = require('child_process');
+    const scriptPath = require('path').join(__dirname, 'prop-professor.exe.js');
+    execSync(`node "${scriptPath}"`, { stdio: 'inherit' });
     return;
   } else {
     throw new Error(`Unknown command: ${command}`);

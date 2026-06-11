@@ -120,6 +120,7 @@ describe('query-propprofessor CLI parsing', () => {
       'ncaab',
       'ncaaf',
       'presets',
+      'exe',
       'list',
       'health',
       'doctor',

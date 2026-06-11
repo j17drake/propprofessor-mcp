@@ -64,6 +64,8 @@
     "export-screen": "node scripts/export-ranked-screen.js",
     "smoke:live": "node scripts/smoke-live.js",
     "smoke:player-context": "node scripts/smoke-player-context.js",
+    "pp-exe": "node scripts/prop-professor.exe.js",
+    "exe": "node scripts/prop-professor.exe.js",
     "check:version": "node scripts/check-version-consistency.js",
     "audit:sharp-research": "node scripts/audit-sharp-play-research.js",
     "lint": "eslint .",
