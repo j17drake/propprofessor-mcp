@@ -1486,9 +1486,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         const result = await client.clearHiddenBets();
         return { ok: true, action, result };
       }
-      const error = new Error(
-        `Unknown action: ${action}. Must be one of: list, hide, unhide, clear.`
-      );
+      const error = new Error(`Unknown action: ${action}. Must be one of: list, hide, unhide, clear.`);
       error.code = 'INVALID_ACTION';
       error.category = 'validation';
       error.status = 400;
