@@ -135,7 +135,10 @@ if (!skipTests) {
       cwd: repoRoot,
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    const passMatch = testOutput.match(/# pass (\d+)/);
+    // node --test emits the summary in one of two formats depending on Node
+    // version: older versions used `# pass N`, newer versions use `ℹ pass N`
+    // (with the info glyph). Match either so the script works on both.
+    const passMatch = testOutput.match(/^[#\s]*[ℹ#]\s*pass\s+(\d+)/m);
     if (!passMatch) {
       warn(`Could not parse test count from npm test output`);
     } else {
@@ -161,7 +164,7 @@ if (!skipTests) {
     // npm test can fail if there are real test failures — surface them but don't
     // mask the claim check. Exit code 1 from npm test shows real failures.
     if (err.status && err.stdout) {
-      const passMatch = err.stdout.match(/# pass (\d+)/);
+      const passMatch = err.stdout.match(/^[#\s]*[ℹ#]\s*pass\s+(\d+)/m);
       if (passMatch) {
         const testCount = parseInt(passMatch[1], 10);
         fail(

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.4
+
+### Docs
+
+- **README test count corrected** — bumped from 773 to 774 to match the v1.5.3 changelog (which already noted the +1 from `test/backtest-daily-snapshot.test.js`). Updated the badge, "The numbers" table, Status section, and maintainers section. The shipped v1.5.3 README was internally inconsistent — the changelog and the codebase agreed on 774, the README didn't.
+
+### Chore
+
+- **Added `npm run check:claims`** — automates the pre-release claim-drift checks that the `propprofessor-mcp-release-format` skill documents. Verifies that the README's tool count matches the tool definitions and the OpenAPI spec, that every tool referenced in the "All N tools" section actually exists, that the test count matches `npm test` output, and that the TIER 4 ≤ TIER 2 inversion claim is directionally supported. Runs in 1.1s with `--skip-tests`, 5.2s full. This is the script that would have caught the test-count drift above on the v1.5.3 release — flagging the issue at the source instead of leaking into a shipped README.
+- **Deleted 3 stale branches** — `fix/novig-screen-research-and-filtering` (already merged), `release/v1.3.0-market-freshness-overhaul` and `release/v1.4.0-dx-and-cleanup` (long-since shipped release branches). Cleanup only, no code impact.
+
+### Stats
+
+- 774 tests passing (unchanged)
+- Open issues: 0
+- Open PRs: 0
+- Tool count: 27 (verified consistent across definitions, OpenAPI spec, and README by `check:claims`)
+
 ## 1.5.3
 
 ### Bug fix
