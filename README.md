@@ -1,6 +1,6 @@
 # PropProfessor MCP
 
-> An MCP server that shows you what the sharp money is doing. 26 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
+> An MCP server that shows you what the sharp money is doing. 23 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
@@ -9,7 +9,7 @@
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 26 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
+Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 23 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
 
 **Honest scope:** PropProfessor MCP is a **sharp-money signal feed**, not a betting oracle. The ranking pipeline reliably detects _what sharp books are doing_ (line moves, consensus, steam, independent sharp confirmation) — it does **not** reliably predict _which side will win_. The TIER 1/2/3/4 system is a quality rating on the signal strength, not a confidence claim about outcomes. Use it as a tool to inform your own handicapping, not to outsource your decisions.
 
@@ -107,7 +107,7 @@ flowchart LR
         T[Tier + risk score]
     end
 
-    subgraph OUTPUT["26 tools exposed via MCP"]
+    subgraph OUTPUT["23 tools exposed via MCP"]
         RB[recommended_bets]
         SP[sharp_plays]
         SC[sharp_consensus]
@@ -121,7 +121,7 @@ flowchart LR
     CLIENT -. "you decide what to bet" .- BOOKS
 ```
 
-The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 26 tools. The betting decision stays with the human.
+The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 23 tools. The betting decision stays with the human.
 
 ---
 
@@ -216,7 +216,7 @@ Replace the path with wherever you cloned the repo. Token compression (smaller c
 
 ---
 
-## All 26 tools (reference)
+## All 23 tools (reference)
 
 ### For quick situational checks (the 5-minute scan)
 
@@ -239,7 +239,7 @@ Everything in casual, plus:
 || `find_best_price` | Line-shop across all books for the best price |
 || `league_presets` | Sport-specific ranking weights |
 || `novig_screen` | NoVigApp-specific screen |
-|| `hide_bet` / `unhide_bet` / `clear_hidden_bets` / `get_hidden_bets` | Manage flagged-play visibility |
+|| `manage_hidden_bets` | Manage flagged-play visibility (action=list/hide/unhide/clear) |
 || `get_pick_history` | View logged picks |
 
 ### For full raw data and research (complete control over the signal)
@@ -268,7 +268,7 @@ Everything above, plus:
 |                         | **Line Shopping**                                           | `find_best_price`                                                                                      |
 |                         | **Player Context**                                          | `player_context`                                                                                       |
 |                         | **UFC**                                                     | `ufc_card`                                                                                             |
-|                         | **Bet Management**                                          | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets`                                       |
+|                         | **Bet Management**                                          | `manage_hidden_bets`                                                                                   |
 |                         | **Picks & Tracking**                                        | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts`, `clear_score_timeline` |
 |                         | **Meta**                                                    | `get_started`, `health_status`, `league_presets`                                                       |
 

@@ -252,20 +252,18 @@ describe('propprofessor MCP server stdio contract', () => {
       const toolNames = toolsResponse.result.tools.map((tool) => tool.name).sort();
       assert.deepEqual(toolNames, [
         'all_slates',
-        'clear_hidden_bets',
         'clear_score_timeline',
         'ev_candidates',
         'find_best_price',
         'get_alerts',
-        'get_hidden_bets',
         'get_pick_history',
         'get_pick_stats',
         'get_play_details',
         'get_started',
         'health_status',
-        'hide_bet',
         'league_presets',
         'log_pick',
+        'manage_hidden_bets',
         'novig_screen',
         'player_context',
         'recommended_bets',
@@ -275,8 +273,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'sharp_consensus',
         'sharp_plays',
         'staking_plan',
-        'ufc_card',
-        'unhide_bet'
+        'ufc_card'
       ]);
     } finally {
       proc.kill('SIGTERM');

@@ -1452,35 +1452,47 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     // ─── Bet Management ─────────────────────────────────────────────
-    async get_hidden_bets() {
-      const result = await client.getHiddenBets();
-      return { ok: true, result };
-    },
-    async hide_bet(args = {}) {
-      if (!args.bet || typeof args.bet !== 'object') {
-        const error = new Error('The bet parameter is required and must be an object.');
-        error.code = 'MISSING_BET';
-        error.category = 'validation';
-        error.status = 400;
-        throw error;
+    // Consolidated from get_hidden_bets + hide_bet + unhide_bet + clear_hidden_bets
+    // (4 tools → 1) in v1.6.3.
+    async manage_hidden_bets(args = {}) {
+      const { action } = args;
+      if (action === 'list') {
+        const result = await client.getHiddenBets();
+        return { ok: true, action, result };
       }
-      const result = await client.hideBet(args.bet);
-      return { ok: true, result };
-    },
-    async unhide_bet(args = {}) {
-      if (!args.id) {
-        const error = new Error('The id parameter is required.');
-        error.code = 'MISSING_ID';
-        error.category = 'validation';
-        error.status = 400;
-        throw error;
+      if (action === 'hide') {
+        if (!args.bet || typeof args.bet !== 'object') {
+          const error = new Error('The bet parameter is required and must be an object.');
+          error.code = 'MISSING_BET';
+          error.category = 'validation';
+          error.status = 400;
+          throw error;
+        }
+        const result = await client.hideBet(args.bet);
+        return { ok: true, action, result };
       }
-      const result = await client.unhideBet(args.id);
-      return { ok: true, result };
-    },
-    async clear_hidden_bets() {
-      const result = await client.clearHiddenBets();
-      return { ok: true, result };
+      if (action === 'unhide') {
+        if (!args.id) {
+          const error = new Error('The id parameter is required.');
+          error.code = 'MISSING_ID';
+          error.category = 'validation';
+          error.status = 400;
+          throw error;
+        }
+        const result = await client.unhideBet(args.id);
+        return { ok: true, action, result };
+      }
+      if (action === 'clear') {
+        const result = await client.clearHiddenBets();
+        return { ok: true, action, result };
+      }
+      const error = new Error(
+        `Unknown action: ${action}. Must be one of: list, hide, unhide, clear.`
+      );
+      error.code = 'INVALID_ACTION';
+      error.category = 'validation';
+      error.status = 400;
+      throw error;
     },
 
     async clear_score_timeline() {
