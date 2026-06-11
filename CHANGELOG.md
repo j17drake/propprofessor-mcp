@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.5.3
+
+### Bug fix
+
+- **Cron data pollution** — `scripts/backtest-daily-snapshot.js` now validates the league parameter against a supported-league list (`NBA`, `MLB`, `NHL`, `NFL`, `WNBA`, `UFC`, `TENNIS`, `SOCCER`, `NCAAB`, `NCAAF`) before writing snapshot files. Previously, any league the upstream API returned — including garbage values like `NONEXISTENT_LEAGUE_999` — was being persisted to `backtest-data/`. The script also no longer auto-runs its `main()` on `require()` (now guarded by `require.main === module`), so importing it from tests no longer kicks off the cron job.
+- **Tool count drift** — `clear_score_timeline` is now registered in the OpenAPI spec generator (`scripts/generate-openapi-spec.js`), bringing the tool count to **27** across README, code, and OpenAPI. Previously the tool was implemented in the server and pinned in the integration tests, but missing from the auto-generated API spec.
+
+### Chore
+
+- **Removed dangling `audit:sharp-research` npm script** — `package.json` referenced `scripts/audit-sharp-play-research.js` which never existed. Zero callers in the codebase, docs, or CI. The dead reference is gone.
+
+### Housekeeping
+
+- **Closed 9 stale v1.3.0 issues** (#20–#28) — all were already shipped in v1.3.0–v1.4.0. Closed retroactively with references to the shipping commits so the issues tab no longer shows a misleading "9 open enhancement issues all targeting v1.3.0."
+
+### Stats
+
+- 774 tests passing (was 773 — added `test/backtest-daily-snapshot.test.js`)
+- README tool count: 26 → 27
+- OpenAPI spec endpoints: 26 → 27
+- Zero algorithm changes. TIER 1 hit rate, risk-scoring weights, tier assignment table, and kaiCall semantics are unchanged from v1.5.2.
+- TIER 1 hit rate work (the 55.9% → 60% gap) is deferred to v1.6.0.
+
 ## 1.5.2
 
 ### New README
