@@ -11,7 +11,7 @@ const {
 } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
-const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
+const { correctTennisTimes } = require('../lib/propprofessor-tennis');
 const {
   rankTennisScreenRows,
   rankLeagueScreenRows,

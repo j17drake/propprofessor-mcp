@@ -45,7 +45,7 @@ const {
 } = require('../lib/propprofessor-mcp-stdio');
 const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
-const { correctTennisTimes } = require('../lib/propprofessor-tennis-times');
+const { correctTennisTimes } = require('../lib/propprofessor-tennis');
 const {
   analyzeMultiWindow,
   summarizeResults,
