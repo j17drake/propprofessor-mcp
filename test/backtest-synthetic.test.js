@@ -2,7 +2,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { runBacktest, generateScenario } = require('../scripts/backtest-synthetic');
+const { runBacktest, generateScenario, setRandomSeed, resetRandomSeed } = require('../scripts/backtest-synthetic');
 
 describe('synthetic backtest', () => {
   it('generateScenario returns valid scenario with required fields', () => {
@@ -33,18 +33,25 @@ describe('synthetic backtest', () => {
   });
 
   it('generateScenario creates odds history with multiple data points', () => {
-    const scenario = generateScenario();
-    const historyKeys = Object.keys(scenario.oddsHistory);
+    // Seed for deterministic results — this test asserts on a specific
+    // threshold (>= 3 books with history) that was flaky on Math.random().
+    setRandomSeed(42);
+    try {
+      const scenario = generateScenario();
+      const historyKeys = Object.keys(scenario.oddsHistory);
 
-    assert.ok(historyKeys.length >= 1, 'Has at least one game history');
+      assert.ok(historyKeys.length >= 1, 'Has at least one game history');
 
-    const gameId = scenario.gameId;
-    const gameHistory = scenario.oddsHistory[gameId];
-    assert.ok(gameHistory, 'History exists for the game');
+      const gameId = scenario.gameId;
+      const gameHistory = scenario.oddsHistory[gameId];
+      assert.ok(gameHistory, 'History exists for the game');
 
-    // At least some books should have history
-    const booksWithHistory = Object.keys(gameHistory).filter((b) => gameHistory[b].length > 0);
-    assert.ok(booksWithHistory.length >= 3, `Expected at least 3 books with history, got ${booksWithHistory.length}`);
+      // At least some books should have history
+      const booksWithHistory = Object.keys(gameHistory).filter((b) => gameHistory[b].length > 0);
+      assert.ok(booksWithHistory.length >= 3, `Expected at least 3 books with history, got ${booksWithHistory.length}`);
+    } finally {
+      resetRandomSeed();
+    }
   });
 
   it('runBacktest produces tier results for 50 scenarios', () => {

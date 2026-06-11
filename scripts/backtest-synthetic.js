@@ -40,12 +40,41 @@ const TEAMS = [
 
 const BOOKS = ['NoVigApp', 'Pinnacle', 'Circa', 'BetOnline', 'BookMaker', 'Fliff', 'DraftKings'];
 
+// Seedable PRNG for deterministic test scenarios. Default uses Math.random.
+// Tests call setRandomSeed(seed) to get reproducible scenarios; call
+// setRandomSeed(null) (or resetRandomSeed) to go back to Math.random.
+let _rng = null; // null → use Math.random; otherwise a function returning [0, 1)
+
+function setRandomSeed(seed) {
+  if (seed == null) {
+    _rng = null;
+    return;
+  }
+  // mulberry32 — small, fast, good enough for scenario generation
+  let a = seed >>> 0;
+  _rng = function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function resetRandomSeed() {
+  setRandomSeed(null);
+}
+
+function _rand() {
+  return _rng ? _rng() : Math.random();
+}
+
 function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(_rand() * (max - min + 1)) + min;
 }
 
 function randomChoice(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(_rand() * arr.length)];
 }
 
 /**
@@ -65,14 +94,14 @@ function randomChoice(arr) {
  */
 function generateScenario() {
   const [home, away] = randomChoice(TEAMS);
-  const gameId = `synth-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const gameId = `synth-${Date.now()}-${_rand().toString(36).slice(2, 8)}`;
 
   // Determine "true" outcome — home team wins with some probability
-  const homeWinProb = 0.35 + Math.random() * 0.3; // 35-65% range
-  const homeWins = Math.random() < homeWinProb;
+  const homeWinProb = 0.35 + _rand() * 0.3; // 35-65% range
+  const homeWins = _rand() < homeWinProb;
 
   // Choose scenario type — determines whether there's real edge
-  const scenarioRoll = Math.random();
+  const scenarioRoll = _rand();
   const scenarioType = scenarioRoll < 0.35 ? 'sharp_move' : scenarioRoll < 0.7 ? 'stable_no_edge' : 'adverse';
 
   // Base odds from true probability
@@ -149,7 +178,7 @@ function generateScenario() {
     }
 
     // Only include history for some books
-    if (Math.random() > 0.15) {
+    if (_rand() > 0.15) {
       history[book] = historyPoints;
     }
   }
@@ -365,4 +394,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { runBacktest, report, generateScenario };
+module.exports = { runBacktest, report, generateScenario, setRandomSeed, resetRandomSeed };
