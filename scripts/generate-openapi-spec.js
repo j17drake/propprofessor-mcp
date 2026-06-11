@@ -196,6 +196,14 @@ const RESPONSE_SCHEMAS = {
       result: { type: 'object' }
     }
   },
+  clear_score_timeline: {
+    type: 'object',
+    properties: {
+      ok: { type: 'boolean' },
+      message: { type: 'string', description: 'Confirmation message' }
+    },
+    required: ['ok', 'message']
+  },
   get_started: {
     type: 'object',
     properties: {
