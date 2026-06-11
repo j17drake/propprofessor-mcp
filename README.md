@@ -1,6 +1,6 @@
 # PropProfessor MCP
 
-> An MCP server that turns your AI agent into a sharp. 26 tools that screen 36 sportsbooks, rank plays by sharp movement + consensus edge, and tell you what to bet — with the math shown.
+> An MCP server that turns your AI agent into a sharp. 27 tools that screen 36 sportsbooks, rank plays by sharp movement + consensus edge, and tell you what to bet — with the math shown.
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
@@ -9,7 +9,7 @@
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 26 tools to screen odds, detect sharp money, line-shop, size stakes, and track your record. It needs a [PropProfessor](https://propprofessor.com) account to work.
+Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 27 tools to screen odds, detect sharp money, line-shop, size stakes, and track your record. It needs a [PropProfessor](https://propprofessor.com) account to work.
 
 ---
 
@@ -166,7 +166,7 @@ Replace the path with wherever you cloned the repo. Token compression (smaller c
 
 ---
 
-## All 26 tools (reference)
+## All 27 tools (reference)
 
 ### For casual bettors (just tell me what to bet)
 
@@ -211,17 +211,17 @@ Everything above, plus:
 
 ### Tool guide by category
 
-| Category                | Tools                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------ |
-| **Screening & Ranking** | `screen_ranked`, `screen`, `screen_raw`, `all_slates`, `get_play_details`      |
-| **Sharp Movement**      | `sharp_plays`, `sharp_consensus`                                               |
-| **Betting**             | `recommended_bets`, `staking_plan`, `ev_candidates`                            |
-| **Line Shopping**       | `find_best_price`                                                              |
-| **Player Context**      | `player_context`                                                               |
-| **UFC**                 | `ufc_card`                                                                     |
-| **Bet Management**      | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets`               |
-| **Picks & Tracking**    | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts` |
-| **Meta**                | `get_started`, `health_status`, `league_presets`                               |
+| Category                | Tools                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Screening & Ranking** | `screen_ranked`, `screen`, `screen_raw`, `all_slates`, `get_play_details`                              |
+| **Sharp Movement**      | `sharp_plays`, `sharp_consensus`                                                                       |
+| **Betting**             | `recommended_bets`, `staking_plan`, `ev_candidates`                                                    |
+| **Line Shopping**       | `find_best_price`                                                                                      |
+| **Player Context**      | `player_context`                                                                                       |
+| **UFC**                 | `ufc_card`                                                                                             |
+| **Bet Management**      | `hide_bet`, `unhide_bet`, `clear_hidden_bets`, `get_hidden_bets`                                       |
+| **Picks & Tracking**    | `log_pick`, `resolve_pick`, `get_pick_history`, `get_pick_stats`, `get_alerts`, `clear_score_timeline` |
+| **Meta**                | `get_started`, `health_status`, `league_presets`                                                       |
 
 Every tool accepts a `verbosity` param (`"minimal"` / `"standard"` / `"full"`) and a `compact: true` flag to shrink responses by ~90%. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for response-size tuning.
 
