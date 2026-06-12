@@ -2,6 +2,8 @@
 'use strict';
 
 const os = require('node:os');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   createPropProfessorClient,
@@ -38,6 +40,7 @@ const LEAGUE_ALIASES = {
 
 function getCommandInventory() {
   return [
+    { command: 'setup', description: 'Install default config to ~/.propprofessor/config.json (idempotent)' },
     { command: 'opinion', description: 'Analyze a single prop from sportsbook rows' },
     { command: 'sportsbook', description: 'Fetch sportsbook +EV rows' },
     { command: 'smart', description: 'Fetch smart money rows' },
@@ -430,6 +433,24 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
 
   if (command === 'list') {
     emitJson(logger, { command, commands: getCommandInventory() });
+    return;
+  }
+
+  if (command === 'setup') {
+    const CONFIG_DIR = path.join(os.homedir(), '.propprofessor');
+    const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+    const DEFAULT_PATH = path.join(__dirname, '..', 'config.default.json');
+
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+
+    if (fs.existsSync(CONFIG_PATH)) {
+      emitJson(logger, { command: 'setup', status: 'exists', path: CONFIG_PATH });
+      return;
+    }
+
+    const defaults = fs.readFileSync(DEFAULT_PATH, 'utf8');
+    fs.writeFileSync(CONFIG_PATH, defaults, { mode: 0o600 });
+    emitJson(logger, { command: 'setup', status: 'created', path: CONFIG_PATH });
     return;
   }
 
