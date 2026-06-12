@@ -26,14 +26,29 @@ It needs a paid [PropProfessor](https://propprofessor.com) account to work.
 - **Node.js 18+** — check: `node --version`
 - **Git** — check: `git --version`
 - **Paid PropProfessor account**
+- **Hermes Agent** (optional, for one-command install)
 
-### Clone and install
+### Option A: Hermes (recommended for Hermes users)
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
 cd propprofessor-mcp
 npm install
 npm link
+make install             # links coach skill, wires MCP server, installs default config
+pp-query login           # opens a browser, log into PropProfessor
+pp-query doctor          # confirms everything's wired up
+```
+
+### Option B: Manual install (any MCP client)
+
+```bash
+git clone https://github.com/j17drake/propprofessor-mcp.git
+cd propprofessor-mcp
+npm install
+npm link
+pp-query login       # opens a browser, log into PropProfessor
+pp-query doctor     # confirms everything's wired up
 ```
 
 That's it. Two commands available now:

@@ -16,12 +16,12 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const PP_QUERY = path.join(REPO_ROOT, 'scripts', 'query-propprofessor.js');
 
 const COMMANDS = {
-  hide:     { ppArgs: () => ['hide-bet', '--json'] },            // hidden: wire in 2.4
-  unhide:   { ppArgs: () => ['unhide-bet', '--json'] },
-  hidden:   { ppArgs: () => ['get-hidden-bets', '--json'] },
-  sync:     { ppArgs: () => ['health', '--json'] },
-  doctor:   { ppArgs: () => ['doctor'] },
-  today:    { ppArgs: () => ['sport', 'nba', '--limit', '5'] }
+  hide: { ppArgs: () => ['hide-bet', '--json'] }, // hidden: wire in 2.4
+  unhide: { ppArgs: () => ['unhide-bet', '--json'] },
+  hidden: { ppArgs: () => ['get-hidden-bets', '--json'] },
+  sync: { ppArgs: () => ['health', '--json'] },
+  doctor: { ppArgs: () => ['doctor'] },
+  today: { ppArgs: () => ['sport', 'nba', '--limit', '5'] }
 };
 
 function printHelp() {

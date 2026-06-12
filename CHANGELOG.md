@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.1.0 — Hermes Plugin Conversion (Apollo-Style Install)
+
+**This release adds the Apollo-style one-command install flow. No behavior change to the 23 MCP tools.**
+
+### Added
+
+- `make install` — one-command install: links the `propprofessor-coach` skill into hermes, registers the MCP server, installs the default config
+- `make install-cron` — registers the optional `propprofessor-alerts` sharp-money cron
+- `make uninstall` — reverses both
+- `scripts/install.py` — idempotent Python installer (stdlib only, no pip deps)
+- `scripts/install_helpers.py` + `scripts/test_install_helpers.py` — hermes path/profile resolution helpers with tests
+- `bin/pp` — thin CLI wrapper for `pp hide / unhide / hidden / sync / doctor / today`
+- `config.default.json` — ships sane defaults (league=NBA, bankroll=1000, targetBook=NoVigApp)
+- `pp-query setup` — copies the default config to `~/.propprofessor/config.json`
+- `skills/propprofessor-coach/SKILL.md` — operator-facing coach skill (auto-routes "what should I bet today" to the right tools)
+- `docs/cron-prompts/sharp-money-alert.md` — cron prompt template
+- `INSTALL.md` — 60-second quick-start
+
+### Behavior
+
+- The 23 MCP tools and 784-test suite are unchanged. Pure packaging work.
+- `hermes mcp add propprofessor` is unchanged in shape — the installer just automates the config edit that users previously did manually.
+
+### Migration
+
+- Existing users: re-running `make install` is a no-op. New install gets the skill symlink + config.
+- The 3 hermes-side `propprofessor-*` skills in `~/.hermes/skills/` are unchanged. The new coach skill ships in the repo and gets linked separately.
+
 ## 2.0.1
 
 ### Docs

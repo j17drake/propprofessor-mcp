@@ -4,7 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-784%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-787%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -71,7 +71,7 @@ The ranking pipeline is validated against synthetic scenarios where the movement
 | TIER 4 > TIER 2 inversion                | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2                         |
 | Steam move detection                     | Coordinated sharp moves across 3+ books within a 90-min window                |
 | Line lag detection                       | Target-book price divergence vs sharp consensus (avg 12-25pt gap)             |
-| Tests                                    | **784 passing**                                                               |
+| Tests                                    | **787 passing**                                                               |
 | Coverage                                 | **82% statements, 88% functions**                                             |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
@@ -157,7 +157,33 @@ The first three sections are the data tool's core. The last section is optional 
 
 ---
 
-## Install (60 seconds)
+## Install (one command)
+
+**The new flow (Hermes users):**
+
+```bash
+git clone https://github.com/j17drake/propprofessor-mcp.git
+cd propprofessor-mcp
+npm install
+npm link
+make install             # links the coach skill, wires the MCP server, installs default config
+pp-query login           # opens a browser, log into PropProfessor
+pp-query doctor          # confirms everything's wired up
+```
+
+**What `make install` does:**
+
+1. Links the `propprofessor-coach` skill into `~/.hermes/skills/`
+2. Registers the MCP server with hermes (idempotent)
+3. Installs the default config to `~/.propprofessor/config.json`
+
+**Optional:** install the sharp-money alert cron (runs hourly, delivers TIER 1 plays to your home telegram channel):
+
+```bash
+make install-cron
+```
+
+**Traditional flow (non-Hermes or manual):**
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
@@ -333,7 +359,7 @@ Run `pp-query doctor` first — it diagnoses most setup problems. If the issue p
 
 ## Status
 
-**Actively maintained.** Latest release: [v2.0.1](https://github.com/j17drake/propprofessor-mcp/releases/tag/v2.0.1) — pre-directory polish + two README drift fixes (23 tools, 784 tests, no behavior change). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green.
+**Actively maintained.** Latest release: [v2.1.0](https://github.com/j17drake/propprofessor-mcp/releases/tag/v2.1.0) — Apollo-style Hermes install flow + 3 new tests (23 tools, 787 tests, no behavior change). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green.
 
 The repo runs a nightly live-smoke workflow that hits the real PropProfessor API and validates end-to-end behavior. Failures show up as red on the Actions tab.
 
@@ -355,7 +381,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 
 ## For maintainers
 
-- **Tests**: `npm test` (784 passing) — 5/5 reruns, deterministic
+- **Tests**: `npm test` (787 passing) — 5/5 reruns, deterministic
 - **Coverage**: `npm run test:coverage` (~82% statements, ~88% functions)
 - **Lint**: `npm run lint` (clean)
 - **Format**: `npm run format:check` (clean — `npm run format` to fix)

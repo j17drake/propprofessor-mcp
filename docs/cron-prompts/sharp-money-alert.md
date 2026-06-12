@@ -13,9 +13,11 @@ mcp_propprofessor_recommended_bets(targetTiers=["TIER 1"])
 ```
 
 If the response is empty OR `result.plays` is an empty array:
+
 - Stay silent. Do not post anything. The user is drowning in empty alerts.
 
 If there are TIER 1 plays:
+
 1. Load the `propprofessor-coach` skill for the tier-format layout.
 2. For each play, call `mcp_propprofessor_player_context` to check the risk flag.
 3. Format the top 3 plays as a tier table.

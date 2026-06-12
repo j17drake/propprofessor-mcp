@@ -107,8 +107,9 @@ describe('query-propprofessor CLI parsing', () => {
   });
 
   it('exposes the documented command inventory', () => {
-    const inventory = getCommandInventory().map((entry) => entry.command);
-    assert.deepEqual(inventory, [
+    const commands = getCommandInventory().map((c) => c.command);
+    assert.deepEqual(commands, [
+      'setup',
       'opinion',
       'sportsbook',
       'smart',

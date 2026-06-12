@@ -106,10 +106,9 @@ def install_cron() -> None:
     prompt_body = match.group(1).strip()
 
     cmd = [
-        hermes_bin(), "cron", "create", "every 1h",
-        "-z", prompt_body,
+        hermes_bin(), "cron", "create", "every 1h", prompt_body,
         "--name", "propprofessor-alerts",
-        "--skills", "propprofessor-coach"
+        "--skill", "propprofessor-coach"
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
