@@ -107,7 +107,7 @@ def install_cron() -> None:
 
     cmd = [
         hermes_bin(), "cron", "create", "every 1h",
-        "--prompt", prompt_body,
+        "-z", prompt_body,
         "--name", "propprofessor-alerts",
         "--skills", "propprofessor-coach"
     ]
