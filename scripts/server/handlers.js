@@ -1346,7 +1346,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     async get_play_details(args = {}) {
       const league = String(args.league || '').trim();
-      const gameIds = Array.isArray(args.game_ids) ? args.game_ids.map(String) : [];
+      const rawGameIds = Array.isArray(args.game_ids) ? args.game_ids : [];
+      // Sanitize: trim, drop empties, dedupe. Stale/closed/malformed game IDs
+      // (e.g. non-numeric timestamps) used to crash the per-row enrichment
+      // path with "Cannot read properties of undefined (reading 'filter')".
+      // Clean them here so the downstream pipeline only sees well-formed IDs.
+      const gameIds = Array.from(new Set(rawGameIds.map((id) => String(id == null ? '' : id).trim()).filter(Boolean)));
       if (!league || !gameIds.length) {
         const error = new Error('league and game_ids are required.');
         error.code = 'MISSING_PARAMS';
@@ -1361,30 +1366,62 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const focusBook = requestedBooks[0] || preset.preferredBooks[0];
 
       // Fetch full screen data (with history hydration — this is the detailed view)
-      const payload = await client.queryScreenOddsBestComps({
-        market,
-        league,
-        games: gameIds,
-        participants: [],
-        books: requestedBooks,
-        is_live: false
-      });
-      const response = buildRankedScreenResponseShared({
-        client,
-        payloads: [payload],
-        args: { ...args, compact: false, skipHistory: false },
-        league,
-        focusBook,
-        rankRows: (hydratedRows, { debug } = {}) =>
-          rankLeagueScreenRows(hydratedRows, {
-            league,
-            market,
-            limit: gameIds.length * 4,
-            books: requestedBooks.length ? requestedBooks : undefined,
-            includeAll: true,
-            debug
-          })
-      });
+      let payload;
+      try {
+        payload = await client.queryScreenOddsBestComps({
+          market,
+          league,
+          games: gameIds,
+          participants: [],
+          books: requestedBooks,
+          is_live: false
+        });
+      } catch (err) {
+        return {
+          ok: true,
+          result: [],
+          resultMeta: {
+            queryGameIds: gameIds,
+            matchedRows: 0,
+            error: err?.message || String(err),
+            errorCode: 'SCREEN_QUERY_FAILED'
+          }
+        };
+      }
+      let response;
+      try {
+        // BUGFIX (regression pitfall #48): the previous code omitted the
+        // `await` here, so `response` was a Promise and the subsequent
+        // `response.result.filter(...)` crashed with
+        // "Cannot read properties of undefined (reading 'filter')".
+        response = await buildRankedScreenResponseShared({
+          client,
+          payloads: [payload],
+          args: { ...args, compact: false, skipHistory: false },
+          league,
+          focusBook,
+          rankRows: (hydratedRows, { debug } = {}) =>
+            rankLeagueScreenRows(hydratedRows, {
+              league,
+              market,
+              limit: gameIds.length * 4,
+              books: requestedBooks.length ? requestedBooks : undefined,
+              includeAll: true,
+              debug
+            })
+        });
+      } catch (err) {
+        return {
+          ok: true,
+          result: [],
+          resultMeta: {
+            queryGameIds: gameIds,
+            matchedRows: 0,
+            error: err?.message || String(err),
+            errorCode: 'RANK_PIPELINE_FAILED'
+          }
+        };
+      }
 
       // Add market alias info to resultMeta if any aliases were used
       if (marketResolution.aliasesUsed.length) {
@@ -1394,13 +1431,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         };
       }
 
-      // Filter to only the requested game IDs
+      // Filter to only the requested game IDs. Guard against response.result
+      // being undefined (can happen when the upstream screen query returns no
+      // matching rows for the requested gameIds).
       const gameIdSet = new Set(gameIds);
-      response.result = response.result.filter((row) => gameIdSet.has(row.gameId));
+      const safeResult = Array.isArray(response.result) ? response.result : [];
+      const filtered = safeResult.filter((row) => gameIdSet.has(row && row.gameId));
+      response.result = filtered;
       response.resultMeta = {
         ...response.resultMeta,
         queryGameIds: gameIds,
-        matchedRows: response.result.length
+        matchedRows: filtered.length
       };
       return response;
     },

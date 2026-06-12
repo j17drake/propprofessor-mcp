@@ -503,3 +503,68 @@ describe('handler integration: error handling', () => {
     assert.ok(Array.isArray(result.result));
   });
 });
+
+// ─── get_play_details sanitization (regression: pitfall #48) ───────
+//
+// The handler used to crash with "Cannot read properties of undefined
+// (reading 'filter')" when given stale/empty/malformed gameIds. The fix
+// sanitizes input (trim, drop empties, dedupe) and guards the filter
+// call so a missing `result` returns a clean envelope instead of crashing.
+
+describe('handler integration: get_play_details sanitization', () => {
+  it('throws MISSING_PARAMS when sanitized gameIds is empty', async () => {
+    const handlers = createHandlers();
+    await assert.rejects(
+      handlers.get_play_details({
+        league: 'NBA',
+        game_ids: ['', '  ', null, undefined]
+      }),
+      (err) => err.code === 'MISSING_PARAMS' && err.status === 400
+    );
+  });
+
+  it('dedupes and trims gameIds before passing to the screen client', async () => {
+    const handlers = createHandlers();
+    // Three copies with whitespace and exact duplicates should reduce to
+    // one gameId. Verified via resultMeta.queryGameIds on the response.
+    const result = await handlers.get_play_details({
+      league: 'NBA',
+      game_ids: ['nba-20260610-lal-bos', '  nba-20260610-lal-bos  ', 'nba-20260610-lal-bos']
+    });
+    assert.deepEqual(result.resultMeta.queryGameIds, ['nba-20260610-lal-bos']);
+  });
+
+  it('returns clean envelope when client throws on screen query', async () => {
+    const { client } = createMockClient();
+    client.queryScreenOddsBestComps = async () => {
+      throw new Error('backend down');
+    };
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.get_play_details({
+      league: 'NBA',
+      game_ids: ['nba-20260610-lal-bos']
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.result, []);
+    assert.equal(result.resultMeta.errorCode, 'SCREEN_QUERY_FAILED');
+    assert.equal(result.resultMeta.matchedRows, 0);
+    assert.match(result.resultMeta.error, /backend down/);
+  });
+
+  it('returns clean envelope for a non-existent gameId (no rows match)', async () => {
+    const { client } = createMockClient();
+    // Empty screen payload — simulates a stale/closed gameId that the
+    // upstream API no longer has data for. The handler must not crash.
+    client.queryScreenOddsBestComps = async () => ({ rows: [] });
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.get_play_details({
+      league: 'NBA',
+      game_ids: ['nba-does-not-exist-12345']
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.result, []);
+    // resultMeta is present and contains the sanitized gameIds.
+    assert.ok(result.resultMeta, 'resultMeta is present');
+    assert.deepEqual(result.resultMeta.queryGameIds, ['nba-does-not-exist-12345']);
+  });
+});
