@@ -59,9 +59,29 @@ describe('resolveMarketName — NBA', () => {
     assert.equal(r.wasAliased, true);
   });
 
-  it('Spread stays Spread (NBA canonical)', () => {
+  it('Spread → Point Spread (NBA canonical)', () => {
     const r = resolveMarketName('Spread', 'NBA');
-    assert.equal(r.resolved, 'Spread');
+    assert.equal(r.resolved, 'Point Spread');
+    assert.equal(r.wasAliased, true);
+  });
+
+  it('Handicap → Point Spread (NBA)', () => {
+    const r = resolveMarketName('Handicap', 'NBA');
+    assert.equal(r.resolved, 'Point Spread');
+    assert.equal(r.wasAliased, true);
+  });
+});
+
+describe('resolveMarketName — WNBA', () => {
+  it('Total → Total Points', () => {
+    const r = resolveMarketName('Total', 'WNBA');
+    assert.equal(r.resolved, 'Total Points');
+    assert.equal(r.wasAliased, true);
+  });
+
+  it('Spread → Point Spread (WNBA canonical — was "Spread" pre-2026-06-12 fix)', () => {
+    const r = resolveMarketName('Spread', 'WNBA');
+    assert.equal(r.resolved, 'Point Spread');
     assert.equal(r.wasAliased, true);
   });
 });
@@ -87,9 +107,9 @@ describe('resolveMarketName — SOCCER', () => {
     assert.equal(r.wasAliased, true);
   });
 
-  it('Spread stays Spread', () => {
+  it('Spread → Point Spread (SOCCER canonical — was "Spread" pre-2026-06-12 fix)', () => {
     const r = resolveMarketName('Spread', 'SOCCER');
-    assert.equal(r.resolved, 'Spread');
+    assert.equal(r.resolved, 'Point Spread');
     assert.equal(r.wasAliased, true);
   });
 });
@@ -158,14 +178,20 @@ describe('getAltMarketBooks', () => {
     assert.ok(books.length >= 5);
   });
 
-  it('returns books for NBA Spread', () => {
-    const books = getAltMarketBooks({ league: 'NBA', market: 'Spread' });
+  it('returns books for NBA Point Spread', () => {
+    const books = getAltMarketBooks({ league: 'NBA', market: 'Point Spread' });
+    assert.ok(Array.isArray(books));
+    assert.ok(books.length >= 5);
+  });
+
+  it('returns books for WNBA Point Spread', () => {
+    const books = getAltMarketBooks({ league: 'WNBA', market: 'Point Spread' });
     assert.ok(Array.isArray(books));
     assert.ok(books.length >= 5);
   });
 
   it('returns null for unknown league', () => {
-    const books = getAltMarketBooks({ league: 'NFL', market: 'Spread' });
+    const books = getAltMarketBooks({ league: 'NFL', market: 'Point Spread' });
     assert.equal(books, null);
   });
 

@@ -91,8 +91,64 @@ assertEqual(
 
 assertEqual(
   resolveMarketName('Spread', 'NBA'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + NBA -> "Point Spread"'
+);
+
+// Regression: basketball/football/soccer spread must be "Point Spread" (canonical
+// PropProfessor /screen market name), not "Spread". Discovered 2026-06-12: live
+// /screen endpoint serves "Point Spread" for NBA/WNBA/NCAAB/NCAAF/NFL/SOCCER;
+// the previous alias table pointed at "Spread" which made the screen return
+// empty payloads for every spread query on these leagues.
+assertEqual(
+  resolveMarketName('Spread', 'WNBA'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + WNBA -> "Point Spread"'
+);
+assertEqual(
+  resolveMarketName('Spread', 'NCAAB'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + NCAAB -> "Point Spread"'
+);
+assertEqual(
+  resolveMarketName('Spread', 'NCAAF'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + NCAAF -> "Point Spread"'
+);
+assertEqual(
+  resolveMarketName('Spread', 'NFL'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + NFL -> "Point Spread"'
+);
+assertEqual(
+  resolveMarketName('Spread', 'SOCCER'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + SOCCER -> "Point Spread"'
+);
+
+// Tennis keeps "Spread" because normalizeTennisMarketQuery() expands it to
+// ['Game Handicap', 'Set Handicap', 'Point Spread'] before the /screen query.
+assertEqual(
+  resolveMarketName('Spread', 'TENNIS'),
   { resolved: 'Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
-  '"Spread" + NBA -> "Spread" (passthrough)'
+  '"Spread" + TENNIS -> "Spread" (tennis expansion handles it)'
+);
+
+// Handicap alias follows the same per-league mapping.
+assertEqual(
+  resolveMarketName('Handicap', 'NBA'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Handicap', aliasKey: 'handicap' },
+  '"Handicap" + NBA -> "Point Spread"'
+);
+assertEqual(
+  resolveMarketName('Handicap', 'WNBA'),
+  { resolved: 'Point Spread', wasAliased: true, original: 'Handicap', aliasKey: 'handicap' },
+  '"Handicap" + WNBA -> "Point Spread"'
+);
+assertEqual(
+  resolveMarketName('Handicap', 'NHL'),
+  { resolved: 'Puck Line', wasAliased: true, original: 'Handicap', aliasKey: 'handicap' },
+  '"Handicap" + NHL -> "Puck Line"'
 );
 
 // Case insensitivity and whitespace handling
