@@ -11,6 +11,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -57,17 +58,26 @@ def install_skill() -> None:
     target.symlink_to(SKILL_SOURCE)
     print(f"  ✓ linked {SKILL_SOURCE} → {target}")
 
-
 def install_mcp() -> None:
     if not MCP_SERVER_PATH.exists():
         raise SystemExit(f"MCP server not found: {MCP_SERVER_PATH}")
+
+    # Install default config first.
+    import subprocess
+    setup_result = subprocess.run(
+        ["node", str(REPO_ROOT / "scripts" / "query-propprofessor.js"), "setup"],
+        capture_output=True, text=True
+    )
+    if setup_result.returncode == 0:
+        print(f"  ✓ config: {setup_result.stdout.strip()}")
+    else:
+        print(f"  ⚠ config setup failed: {setup_result.stderr}", file=sys.stderr)
 
     hermes_home = resolve_hermes_home()
     auth_file = AUTH_FILE_DEFAULT
     auth_file.parent.mkdir(parents=True, exist_ok=True)
     if not auth_file.exists():
         print(f"  ⚠ auth file not found at {auth_file}. Run 'pp-query login' after install.")
-
     # `hermes mcp add` is idempotent — re-running updates in place.
     run_hermes([
         "mcp", "add", MCP_NAME,
@@ -82,20 +92,30 @@ def install_mcp() -> None:
 def install_cron() -> None:
     """Register a no-agent sharp-money alert cron (optional)."""
     from install_helpers import hermes_bin
-    import subprocess
-    prompt = (
-        "Run `pp sync` hourly and alert via telegram if any TIER 1 play appears. "
-        "Use `mcp_propprofessor_recommended_bets` to check, format with the coach skill, "
-        "and deliver to the user's home telegram channel. Skip silently if no plays."
-    )
-    cmd = [hermes_bin(), "cron", "create", "every 1h", "--prompt", prompt, "--name", "propprofessor-alerts", "--no-agent"]
-    # Use --no-agent via the no_agent flag — but that's only on the cronjob tool, not the CLI.
-    # For the CLI: skip --no-agent here; the agent loop will handle delivery.
+    import re
+
+    prompt_path = REPO_ROOT / "docs" / "cron-prompts" / "sharp-money-alert.md"
+    if not prompt_path.exists():
+        raise SystemExit(f"Cron prompt template not found: {prompt_path}")
+
+    # Extract the prompt body (between ## Prompt and ## Schedule headers).
+    text = prompt_path.read_text()
+    match = re.search(r"## Prompt\n(.+?)\n## Schedule", text, re.DOTALL)
+    if not match:
+        raise SystemExit("Could not extract prompt body from template")
+    prompt_body = match.group(1).strip()
+
+    cmd = [
+        hermes_bin(), "cron", "create", "every 1h",
+        "--prompt", prompt_body,
+        "--name", "propprofessor-alerts",
+        "--skills", "propprofessor-coach"
+    ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"  ⚠ cron registration failed: {result.stderr}", file=sys.stderr)
     else:
-        print("  ✓ registered sharp-money alert cron")
+        print("  ✓ registered sharp-money alert cron (every 1h)")
 
 
 def uninstall() -> None:

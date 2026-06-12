@@ -78,3 +78,36 @@ def test_install_mcp_calls_hermes(fake_hermes_home, capsys):
     captured = capsys.readouterr()
     # The fake hermes stub echoes its args; verify it was called with mcp add propprofessor.
     assert "fake hermes mcp add propprofessor" in (result.stdout + result.stderr + captured.out)
+
+
+def test_install_mcp_creates_config(fake_hermes_home, monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))  # redirect ~/.propprofessor
+    subprocess.run([sys.executable, str(INSTALL), "mcp"], check=True,
+                   env={**os.environ, "HERMES_HOME": str(fake_hermes_home)})
+    assert (tmp_path / ".propprofessor" / "config.json").exists()
+
+
+def test_uninstall_removes_skill_link(fake_hermes_home):
+    subprocess.run([sys.executable, str(INSTALL), "skill"], check=True,
+                   env={**os.environ, "HERMES_HOME": str(fake_hermes_home)})
+    target = fake_hermes_home / "skills" / "propprofessor-coach"
+    assert target.is_symlink()
+    subprocess.run([sys.executable, str(INSTALL), "uninstall"], check=True,
+                   env={**os.environ, "HERMES_HOME": str(fake_hermes_home)})
+    assert not target.exists()
+
+
+def test_uninstall_is_idempotent(fake_hermes_home):
+    """Running uninstall twice doesn't error."""
+    result = subprocess.run(
+        [sys.executable, str(INSTALL), "uninstall"],
+        capture_output=True, text=True,
+        env={**os.environ, "HERMES_HOME": str(fake_hermes_home)}
+    )
+    assert result.returncode == 0, result.stderr
+    result2 = subprocess.run(
+        [sys.executable, str(INSTALL), "uninstall"],
+        capture_output=True, text=True,
+        env={**os.environ, "HERMES_HOME": str(fake_hermes_home)}
+    )
+    assert result2.returncode == 0
