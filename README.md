@@ -333,7 +333,7 @@ Run `pp-query doctor` first — it diagnoses most setup problems. If the issue p
 
 ## Status
 
-**Actively maintained.** Latest release: [v2.0.0](https://github.com/j17drake/propprofessor-mcp/releases/tag/v2.0.0) — lib refactor, no behavior change (23 tools, 784 tests, same TIER 1 hit rate as v1.7.0). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green.
+**Actively maintained.** Latest release: [v2.0.1](https://github.com/j17drake/propprofessor-mcp/releases/tag/v2.0.1) — pre-directory polish + two README drift fixes (23 tools, 784 tests, no behavior change). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green.
 
 The repo runs a nightly live-smoke workflow that hits the real PropProfessor API and validates end-to-end behavior. Failures show up as red on the Actions tab.
 

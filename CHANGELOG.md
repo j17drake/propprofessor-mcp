@@ -63,6 +63,30 @@ Tool surface consolidation. Two of the findings from the June 11 audit, folded i
 - TIER 1 hit rate: 51.5% on 575 plays (unchanged from v1.6.2)
 - TIER 4 ≤ TIER 2 inversion: still holds
 
+## 1.6.4 — Bug fixes (addendum)
+
+**Addendum note:** This release section captures a set of bug fixes, feature changes, and test updates that shipped in the codebase between v1.6.3 and v1.7.0 but were never migrated out of the `Unreleased` bucket in the changelog. The code changes themselves (commits `dbc7636` through `c117450`) are present in every release tag from v1.6.3 onward. This section exists so the versioned history matches the shipped code.
+
+### Bug fix
+
+- **`sharp_plays` now requires real sharp book confirmation for `Bet candidate` rows** — fixed the NoVigApp "consensus gap" where `consensusBookCount` was always 0 (NoVigApp is a P2P exchange, not a bookmaker, so its no-vig lines never matched any other book exactly). Each sharp book's screen is now cross-referenced individually to find independent supportive movement on the same game+selection. New row fields: `sharpBookMovementConfirmed`, `sharpBookMovementSource`, `sharpBookClv` — populated when a sharp book independently confirms the play. `movementIsSharpSourced` now accepts `sharpBookMovementConfirmed` as an alternative to traditional independent sharp movement. Misleading pass reasons (`no_usable_line_history`, `movement_source_is_target_book`, etc.) are suppressed when sharp book confirmation exists.
+- **Removed unsound fallback paths in `classifySharpPlay`** — `consensusEdgeOnlyOk`, `consensusOnlyOk`, and `clvOnlyOk` were previously accepted as `Bet candidate` paths based on consensus edge or CLV alone without actual sharp movement confirmation. All `Bet candidates` now require either traditional `movementIsSharpSourced` (independent sharp book movement) or `sharpBookMovementConfirmed` (sharp book cross-reference). Also removed the `consensusValidated` path and the now-unused variables (`hasConsensusEdge`, `clvValue`, `movementLabelOk`, `movementUnverifiable`). Simplified pass reason logic — no longer conditional on fallback flags.
+
+### Feature
+
+- **Nitter RSS as primary tweet source in `player_context`** — `player_context` now tries Nitter RSS first (fast, no auth, local instance via `NITTER_BASE` env var, default `http://localhost:8080`). Fallback chain: Nitter RSS → X GraphQL (nitter-session-api) → Google News RSS → ESPN search. New source labels: `nitter-rss`, `nitter-combined`, `news-fallback` (previously only `x-direct`, `combined`, `empty`). New helper: `searchNitterRSS()` in `lib/propprofessor-news-sources.js` with RSS parsing that handles both Google News and Nitter RSS formats (`<dc:creator>` for author).
+- **`skipHistory: boolean` param on screen tools** — added to `screen_ranked`, `recommended_bets`, `all_slates`, `staking_plan`, and `sharp_consensus`. When `true`, skips odds history hydration entirely — useful when you only need current odds/edges and don't need movement data. Propagated through all handler call chains: `recommended_bets` → `screen_ranked`, `staking_plan` → `recommended_bets`, `all_slates` → `runLeagueScreen`/`runTennisScreen`, `sharp_consensus` → `screen_ranked`. `sharp_plays` already supported it via `...args` spread in `runSharpPlays` service. Companion to `compact`: `compact` only affects output formatting, not data hydration — use `skipHistory` to skip hydration.
+
+### Docs
+
+- **Compact mode description fix** — clarified the `compact` param description across all tools: "Does NOT affect history hydration — movement data is always fetched." Previously the wording implied `compact` skipped history. Aligns the tool description with actual behavior (post-fix: `compact` is purely a payload-shaping flag, hydration always runs).
+
+### Stats
+
+- 784 tests passing (was 784 in v1.6.3; test count for this addendum window unchanged because the affected modules' tests were updated in-place rather than added/removed)
+- 23 tools (unchanged)
+- Tool count: 23 (unchanged)
+
 ## 1.6.2
 
 ### Bug fix
@@ -574,48 +598,6 @@ Makes it transparent when Spread/Total have fewer plays due to upstream data qua
 ### Lint cleanup
 
 - Fixed 22 pre-existing lint errors across lib and test files (unused imports, duplicate keys, redundant Boolean casts).
-
-## Unreleased
-
-### Sharp book cross-reference for `sharp_plays`
-
-- `sharp_plays` now cross-references each sharp book's screen individually to find independent supportive movement on the same game+selection. This satisfies the "movement from a non-target sharp book" requirement for books like NoVigApp whose vig-removed lines always show as self-sourced.
-- New row fields: `sharpBookMovementConfirmed`, `sharpBookMovementSource`, `sharpBookClv` — populated when a sharp book independently confirms the play.
-- `movementIsSharpSourced` now accepts `sharpBookMovementConfirmed` as an alternative to traditional independent sharp movement.
-- Misleading pass reasons (`no_usable_line_history`, `movement_source_is_target_book`, etc.) are suppressed when sharp book confirmation exists.
-
-### Removed fallback paths
-
-- Removed `consensusEdgeOnlyOk`, `consensusOnlyOk`, and `clvOnlyOk` as `Bet candidate` paths. These previously accepted rows based on consensus edge or CLV alone without actual sharp movement confirmation.
-- All `Bet candidates` now require either traditional `movementIsSharpSourced` (independent sharp book movement) or `sharpBookMovementConfirmed` (sharp book cross-reference).
-- Removed `consensusValidated` path (consensus edge without movement confirmation).
-- Removed unused variables: `hasConsensusEdge`, `clvValue`, `movementLabelOk`, `movementUnverifiable`.
-- Simplified pass reason logic — no longer conditional on fallback flags.
-
-### Test updates
-
-- Updated all test expectations to reflect stricter Bet candidate criteria.
-- 489/489 tests passing.
-
-### Nitter RSS as primary tweet source in `player_context`
-
-- `player_context` now tries Nitter RSS first (fast, no auth, local instance via `NITTER_BASE` env var, default `http://localhost:8080`).
-- Fallback chain: Nitter RSS → X GraphQL (nitter-session-api) → Google News RSS → ESPN search.
-- New source labels: `nitter-rss`, `nitter-combined`, `news-fallback` (previously only `x-direct`, `combined`, `empty`).
-- New file: `searchNitterRSS()` in `lib/propprofessor-news-sources.js` with RSS parsing that handles both Google News and Nitter RSS formats (`<dc:creator>` for author).
-- Tests: updated `test/propprofessor-news-sources.test.js` and `test/propprofessor-player-context.test.js` with Nitter RSS fixtures and source label assertions.
-
-### `skipHistory` param on screen tools
-
-- New `skipHistory: boolean` param on `screen_ranked`, `recommended_bets`, `all_slates`, `staking_plan`, and `sharp_consensus` tools.
-- When `true`, skips odds history hydration entirely — useful when you only need current odds/edges and don't need movement data.
-- Propagated through all handler call chains: `recommended_bets` → `screen_ranked`, `staking_plan` → `recommended_bets`, `all_slates` → `runLeagueScreen`/`runTennisScreen`, `sharp_consensus` → `screen_ranked`.
-- `sharp_plays` already supported it via `...args` spread in `runSharpPlays` service.
-- `compact` description clarified: it only affects output formatting, not data hydration. Use `skipHistory` to skip hydration.
-
-### Compact mode description fix
-
-- Clarified `compact` param description across all tools: "Does NOT affect history hydration — movement data is always fetched." Previously implied compact skipped history.
 
 ## 1.0.7
 
