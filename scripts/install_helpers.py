@@ -47,7 +47,16 @@ def hermes_bin() -> str:
     """Locate the hermes binary. The venv at ~/.hermes/hermes-agent/venv/bin/hermes
     is the real binary; ~/.local/bin/hermes is a thin wrapper that's not always on
     PATH for cron / sub-spawned shells. Prefer the venv path.
+
+    Respects HERMES_HOME env var for testing.
     """
+    # Check HERMES_HOME first (for testing)
+    hermes_home = os.environ.get("HERMES_HOME")
+    if hermes_home:
+        venv_hermes = Path(hermes_home) / "hermes-agent" / "venv" / "bin" / "hermes"
+        if venv_hermes.exists() and os.access(venv_hermes, os.X_OK):
+            return str(venv_hermes)
+
     candidates = [
         Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "hermes",
         Path("/opt/homebrew/bin/hermes"),
@@ -62,9 +71,12 @@ def run_hermes(args: list[str], check: bool = True) -> int:
     import subprocess
     cmd = [hermes_bin(), *args]
     result = subprocess.run(cmd, capture_output=True, text=True)
-    if check and result.returncode != 0:
+    # Print hermes output so it's visible in test output
+    if result.stdout:
         print(result.stdout, file=sys.stdout)
+    if result.stderr:
         print(result.stderr, file=sys.stderr)
+    if check and result.returncode != 0:
         raise SystemExit(f"hermes {' '.join(args)} failed (exit {result.returncode})")
     return result.returncode
 
