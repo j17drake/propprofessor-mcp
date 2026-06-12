@@ -30,6 +30,7 @@
     "lib/",
     "scripts/",
     "skills/",
+    "config.default.json",
     "README.md",
     "SETUP.md",
     "AUTH.md",
