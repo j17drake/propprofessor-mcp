@@ -3,7 +3,12 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { hydrateScreenRowsWithHistory } = require('../lib/propprofessor-screen-history');
+const {
+  hydrateScreenRowsWithHistory,
+  extractLineFromPick,
+  generateLineVariants,
+  rebuildPickWithLine
+} = require('../lib/propprofessor-screen-history');
 
 function makeClient(queryFn) {
   return { queryOddsHistory: queryFn || (async () => []) };
@@ -257,5 +262,161 @@ describe('hydrateScreenRowsWithHistory', () => {
     assert.equal(result.gameId, 'game-prop');
     assert.equal(result.selectionId, 'sel-prop');
     assert.equal(result.lineHistoryAvailable, true);
+  });
+});
+
+describe('extractLineFromPick', () => {
+  it('parses total-style picks (Over/Under + number)', () => {
+    assert.deepEqual(extractLineFromPick('Over 9.5'), {
+      side: 'over',
+      line: 9.5,
+      format: 'total'
+    });
+    assert.deepEqual(extractLineFromPick('Under 8'), {
+      side: 'under',
+      line: 8,
+      format: 'total'
+    });
+  });
+
+  it('parses spread-style picks (team + signed number)', () => {
+    assert.deepEqual(extractLineFromPick('Lakers -3.5'), {
+      side: 'Lakers',
+      line: -3.5,
+      format: 'spread'
+    });
+    assert.deepEqual(extractLineFromPick('Athletics +1.5'), {
+      side: 'Athletics',
+      line: 1.5,
+      format: 'spread'
+    });
+  });
+
+  it('returns null for moneyline picks with large signed numbers', () => {
+    assert.equal(extractLineFromPick('Lakers +200'), null);
+    assert.equal(extractLineFromPick('Celtics -150'), null);
+  });
+
+  it('returns null for empty / null / non-string input', () => {
+    assert.equal(extractLineFromPick(null), null);
+    assert.equal(extractLineFromPick(''), null);
+    assert.equal(extractLineFromPick(undefined), null);
+    assert.equal(extractLineFromPick(42), null);
+  });
+});
+
+describe('generateLineVariants', () => {
+  it('returns ±0.5 for a finite line value', () => {
+    assert.deepEqual(generateLineVariants(9.5), [9, 10]);
+    assert.deepEqual(generateLineVariants(-3.5), [-4, -3]);
+  });
+
+  it('returns empty array for non-finite values', () => {
+    assert.deepEqual(generateLineVariants(NaN), []);
+    assert.deepEqual(generateLineVariants(Infinity), []);
+    assert.deepEqual(generateLineVariants(undefined), []);
+  });
+});
+
+describe('rebuildPickWithLine', () => {
+  it('rebuilds totals with the new line value', () => {
+    const parsed = extractLineFromPick('Over 9.5');
+    assert.equal(rebuildPickWithLine(parsed, 9), 'Over 9');
+    assert.equal(rebuildPickWithLine(parsed, 10), 'Over 10');
+  });
+
+  it('rebuilds spreads with the new signed line value', () => {
+    const parsed = extractLineFromPick('Lakers -3.5');
+    assert.equal(rebuildPickWithLine(parsed, -3), 'Lakers -3');
+    assert.equal(rebuildPickWithLine(parsed, -4), 'Lakers -4');
+    assert.equal(rebuildPickWithLine(parsed, 3.5), 'Lakers +3.5');
+  });
+
+  it('returns null for unsupported parsed shapes', () => {
+    assert.equal(rebuildPickWithLine(null, 9), null);
+    assert.equal(rebuildPickWithLine({ side: 'x', line: 1, format: 'other' }, 9), null);
+  });
+});
+
+describe('hydrateScreenRowsWithHistory — line-key fallback', () => {
+  it('uses adjacent-line history when exact line has no history', async () => {
+    // Orioles/Padres over/under rows: target "Over 9.5" has no history,
+    // but the adjacent "Over 9" row has full history. The wrapper should
+    // bridge through the variant row and return its history.
+    const callLog = [];
+    const client = makeClient(async (params) => {
+      callLog.push(params);
+      // First call: exact target with selectionId 'sel-95' returns empty.
+      // Second call: variant target with selectionId 'sel-90' returns history.
+      if (params.selectionId === 'sel-90') {
+        return [
+          { odds: -101, start_ts: 1 },
+          { odds: -110, start_ts: 2 },
+          { odds: -120, start_ts: 3 }
+        ];
+      }
+      return [];
+    });
+
+    // The screen rows include both the target "Over 9.5" and the adjacent
+    // "Over 9" row. The matcher finds both by pick, and the variant
+    // re-resolution uses the "Over 9" row's selectionId.
+    const sourceRows = [
+      makeRow({ gameId: 'g1', selectionId: 'sel-95', pick: 'Over 9.5', book: 'Pinnacle' }),
+      makeRow({ gameId: 'g1', selectionId: 'sel-90', pick: 'Over 9', book: 'BetOnline' })
+    ];
+    const [result] = await hydrateScreenRowsWithHistory(sourceRows, { client });
+    // The first row ("Over 9.5") should have inherited the variant history.
+    assert.equal(result.pick, 'Over 9.5');
+    assert.equal(result.lineHistoryAvailable, true);
+    assert.equal(result.lineHistorySource, 'odds_history');
+    assert.equal(result.lineVariantUsed, 'Over 9');
+    assert.equal(result.historyMatchedBy, 'line_variant');
+    assert.equal(result.lineHistory.length, 3);
+    // Sanity: both the exact and variant calls were attempted.
+    assert.ok(callLog.length >= 2);
+  });
+
+  it('skips variant fallback when exact line already has history', async () => {
+    let callCount = 0;
+    const client = makeClient(async () => {
+      callCount += 1;
+      return [
+        { odds: -110, start_ts: 1 },
+        { odds: -120, start_ts: 2 }
+      ];
+    });
+    const row = makeRow({ gameId: 'g1', selectionId: 'sel-1', pick: 'Over 9.5', book: 'Pinnacle' });
+    const [result] = await hydrateScreenRowsWithHistory([row], { client });
+    assert.equal(result.lineHistoryAvailable, true);
+    assert.equal(result.lineVariantUsed, undefined);
+    assert.equal(callCount, 1, 'no variant attempt when exact line resolves');
+  });
+
+  it('skips variant fallback for moneyline picks (no line value)', async () => {
+    let callCount = 0;
+    const client = makeClient(async () => {
+      callCount += 1;
+      return []; // No history for the moneyline pick.
+    });
+    const row = makeRow({ gameId: 'g1', selectionId: 'sel-1', pick: 'Lakers', book: 'Pinnacle' });
+    const [result] = await hydrateScreenRowsWithHistory([row], { client });
+    assert.equal(result.lineHistoryAvailable, false);
+    assert.equal(callCount, 1, 'no variant attempt for moneyline pick');
+  });
+
+  it('returns no history when both exact and variant lines are missing', async () => {
+    let callCount = 0;
+    const client = makeClient(async () => {
+      callCount += 1;
+      return []; // No history available for any line.
+    });
+    const sourceRows = [
+      makeRow({ gameId: 'g1', selectionId: 'sel-95', pick: 'Over 9.5', book: 'Pinnacle' }),
+      makeRow({ gameId: 'g1', selectionId: 'sel-90', pick: 'Over 9', book: 'BetOnline' })
+    ];
+    const [result] = await hydrateScreenRowsWithHistory(sourceRows, { client });
+    assert.equal(result.lineHistoryAvailable, false);
+    assert.ok(callCount >= 2, 'tried both exact and variant lines');
   });
 });
