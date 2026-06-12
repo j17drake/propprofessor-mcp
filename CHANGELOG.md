@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.1
+
+### Docs
+
+Pre-directory polish. The README's polish checklist from v1.6.1 (repo description, Mermaid diagram, FAQ, docs map, install path verification) was already comprehensive. v2.0.1 ships two targeted fixes for drift:
+
+- **FAQ "TIER 1 hit rate"** — updated from the v1.5.5-era 580-play sample to the current 575-play backtest count. Honest framing: hit rate sits around chance (~50%) on a ~575-play synthetic backtest. Numbers drift slightly with the random seed; the round claim is stable.
+- **Status section "Latest release"** — was a generic pointer to the releases page. Now names v2.0.0 specifically with a one-line description of what it was, so directory visitors landing on the README see the most recent release at a glance.
+
+Install path verification: `node scripts/propprofessor-mcp-server.js` boots clean, NDJSON framing works end-to-end, `initialize` + `tools/list` returns all 23 tools, `npm link --dry-run` confirms the `pp-mcp` / `pp-query` binaries would install. No code changes; no behavior change.
+
 ## 2.0.0
 
 ### Refactor

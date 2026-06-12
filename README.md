@@ -309,7 +309,7 @@ Full methodology in [docs/BACKTESTING.md](docs/BACKTESTING.md).
 ## FAQ
 
 **Does this tell me what to bet?**
-No. PropProfessor MCP surfaces _what sharp books are doing_ — line moves, consensus, steam, line lag. It does not predict outcomes. The TIER 1 hit rate is ~50% on a 580-play synthetic sample. Use the system to inform your handicapping, not to outsource your decisions.
+No. PropProfessor MCP surfaces _what sharp books are doing_ — line moves, consensus, steam, line lag. It does not predict outcomes. The TIER 1 hit rate sits around chance (~50%) on a ~575-play synthetic backtest. Use the system to inform your handicapping, not to outsource your decisions.
 
 **Do I need a PropProfessor account?**
 Yes. Live data requires a paid PropProfessor subscription — the tool queries their API for odds + line history. Without an account, `pp-query login` will redirect you to sign up at [propprofessor.com](https://propprofessor.com).
@@ -333,7 +333,7 @@ Run `pp-query doctor` first — it diagnoses most setup problems. If the issue p
 
 ## Status
 
-**Actively maintained.** Last release: see [releases](https://github.com/j17drake/propprofessor-mcp/releases). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green, 784 tests passing.
+**Actively maintained.** Latest release: [v2.0.0](https://github.com/j17drake/propprofessor-mcp/releases/tag/v2.0.0) — lib refactor, no behavior change (23 tools, 784 tests, same TIER 1 hit rate as v1.7.0). Live runtime status: check the [CI badge](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml) — green means main is green.
 
 The repo runs a nightly live-smoke workflow that hits the real PropProfessor API and validates end-to-end behavior. Failures show up as red on the Actions tab.
 
