@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.0
+
+### Refactor
+
+Lib organization, part 2 of 2. The 23 `createMcpHandlers()` tool implementations (~1,730 lines) are extracted from `scripts/propprofessor-mcp-server.js` into `scripts/server/handlers.js`. The JSON-RPC frame (`createMcpServer`) and the stdio serve loop stay in the entry point; `handlers.js` is a leaf that the entry re-exports from for backward compatibility with existing imports. Algorithm, tier system, and tool surface unchanged. No user-facing behavior changes.
+
+### Bug fix
+
+A v1.7.0 leftover from the planned-but-incomplete v2.0.0 refactor: the previous server file dropped its `module.exports` block, which would have broken every external importer (CLI scripts, tests, downstream tools). The v2.0.0 entry point restores the exports block and prunes 9 dead imports/consts the partial refactor had carried into `handlers.js` (`createJsonRpcSuccess`, `createJsonRpcError`, `encodeMessage`, `createStdioMessageReader`, `buildToolDefinitions`, `clearTierCache`, `SERVER_NAME`, `SERVER_VERSION`, `PROTOCOL_VERSION` — all server-level, none of which belong in a leaf module). `mapWithConcurrency` (a top-level helper) is also re-exported from the new leaf so existing test imports still resolve.
+
+### Stats
+
+- 784 tests passing (unchanged from 1.7.0)
+- 23 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged)
+- TIER 4 ≤ TIER 2 inversion: still holds (49.7% ≤ 49.9%)
+- Server entry: 1,861 → 158 lines
+- New leaf: `scripts/server/handlers.js` (1,730 lines)
+- Lib files: 31 (unchanged)
+
 ## 1.7.0
 
 ### Refactor
