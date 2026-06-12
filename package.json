@@ -28,6 +28,7 @@
   "files": [
     "lib/",
     "scripts/",
+    "skills/",
     "README.md",
     "SETUP.md",
     "AUTH.md",
