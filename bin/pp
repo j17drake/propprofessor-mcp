@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * pp — ergonomic CLI dispatcher for PropProfessor.
+ *
+ * Thin shellout to pp-query for common operations. Designed to be on $PATH
+ * after `npm link` so cron jobs, shell scripts, and the user can call it
+ * without thinking about pp-query's argument grammar.
+ */
+
+const path = require('node:path');
+const { spawn } = require('node:child_process');
+
+const REPO_ROOT = path.resolve(__dirname, '..');
+const PP_QUERY = path.join(REPO_ROOT, 'scripts', 'query-propprofessor.js');
+
+const COMMANDS = {
+  hide:     { ppArgs: () => ['hide-bet', '--json'] },            // hidden: wire in 2.4
+  unhide:   { ppArgs: () => ['unhide-bet', '--json'] },
+  hidden:   { ppArgs: () => ['get-hidden-bets', '--json'] },
+  sync:     { ppArgs: () => ['health', '--json'] },
+  doctor:   { ppArgs: () => ['doctor'] },
+  today:    { ppArgs: () => ['sport', 'nba', '--limit', '5'] }
+};
+
+function printHelp() {
+  console.log(`pp — PropProfessor quick commands
+
+Usage: pp <command> [args]
+
+Commands:
+  hide <bet-id>     Hide a bet from the fantasy table
+  unhide <id>       Restore visibility to a hidden bet
+  hidden            List currently hidden bets
+  sync              Run a health check + data refresh
+  doctor            Run first-time setup checks
+  today             Show today's top NBA plays (default league)
+
+All other commands are passed through to pp-query:
+  pp <anything-else>  →  pp-query <anything-else>
+
+Run 'pp-query list' for the full pp-query command inventory.
+`);
+}
+
+function main() {
+  const [, , sub, ...rest] = process.argv;
+
+  if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
+    printHelp();
+    return;
+  }
+
+  let args;
+  if (COMMANDS[sub]) {
+    args = [...COMMANDS[sub].ppArgs(...rest), ...rest];
+  } else {
+    // Pass-through to pp-query.
+    args = [sub, ...rest];
+  }
+
+  const child = spawn(process.execPath, [PP_QUERY, ...args], {
+    stdio: 'inherit',
+    env: process.env
+  });
+
+  child.on('exit', (code) => process.exit(code ?? 1));
+  child.on('error', (err) => {
+    console.error(`pp: failed to spawn pp-query: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+main();
