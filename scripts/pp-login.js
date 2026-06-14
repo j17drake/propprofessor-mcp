@@ -68,8 +68,20 @@ async function loginAndSaveAuth(options = {}) {
     const authDir = path.dirname(authFile);
     fs.mkdirSync(authDir, { recursive: true });
 
-    // Write auth file
-    fs.writeFileSync(authFile, JSON.stringify(storageState, null, 2), 'utf8');
+    // Write auth file. 0o600 — owner read/write only. The auth file holds
+    // the full cookie jar (June 8 SEC-003): any other local user on the box
+    // being able to read these cookies means full account impersonation
+    // against PropProfessor. mkdirSync above may have created the parent dir
+    // with the default 0o755, which is fine — the file itself is the
+    // sensitive artifact and must be locked down.
+    fs.writeFileSync(authFile, JSON.stringify(storageState, null, 2), { mode: 0o600, encoding: 'utf8' });
+    // Explicit chmod to cover the case where the file pre-exists from a
+    // prior install with looser permissions. Idempotent.
+    try {
+      fs.chmodSync(authFile, 0o600);
+    } catch {
+      // Best effort — chmod failures on read-only volumes are non-fatal
+    }
 
     logger.log('');
     logger.log(`Auth saved to ${authFile}`);

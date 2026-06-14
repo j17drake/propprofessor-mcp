@@ -110,6 +110,79 @@ describe('fetchViaXurl', () => {
     assert.equal(result.source, 'xurl-failed');
     assert.ok(result.error.includes('non-JSON'));
   });
+
+  // SEC-001 (June 8 audit): the player name is passed as a positional arg to
+  // the xurl CLI via cp.execFile. Even though execFile doesn't shell-exec,
+  // the input is still user-controlled and could trigger flag-style parsing
+  // or break the CLI in subtle ways. The sanitizer rejects anything outside
+  // the allowlist before the subprocess is invoked.
+  it('rejects player names with shell-meta or flag-like characters', async () => {
+    const { fetchViaXurl } = require('../lib/propprofessor-player-context');
+    const malicious = 'Lakers; rm -rf /';
+    const result = await fetchViaXurl({ player: malicious, sport: 'NBA' });
+    assert.equal(result.source, 'xurl-failed');
+    assert.ok(result.error.includes('rejected by sanitizer'));
+  });
+
+  it('rejects player names starting with -- (xurl flag-injection guard)', async () => {
+    const { fetchViaXurl } = require('../lib/propprofessor-player-context');
+    const result = await fetchViaXurl({ player: '--help', sport: 'NBA' });
+    assert.equal(result.source, 'xurl-failed');
+    assert.ok(result.error.includes('rejected by sanitizer'));
+  });
+
+  it('rejects empty / non-string player names', async () => {
+    const { fetchViaXurl } = require('../lib/propprofessor-player-context');
+    assert.equal((await fetchViaXurl({ player: '' })).source, 'xurl-failed');
+    assert.equal((await fetchViaXurl({ player: null })).source, 'xurl-failed');
+    assert.equal((await fetchViaXurl({ player: undefined })).source, 'xurl-failed');
+    assert.equal((await fetchViaXurl({ player: 12345 })).source, 'xurl-failed');
+  });
+});
+
+describe('sanitizePlayerName', () => {
+  it('accepts typical player names with spaces, hyphens, apostrophes, dots', () => {
+    const { sanitizePlayerName } = require('../lib/propprofessor-player-context');
+    assert.equal(sanitizePlayerName('LeBron James'), 'LeBron James');
+    assert.equal(sanitizePlayerName("D'Angelo Russell"), "D'Angelo Russell");
+    assert.equal(sanitizePlayerName('J.T. Realmuto'), 'J.T. Realmuto');
+    assert.equal(sanitizePlayerName('Karl-Anthony Towns'), 'Karl-Anthony Towns');
+  });
+
+  it('rejects shell-meta, flag-like, and Unicode noise', () => {
+    const { sanitizePlayerName } = require('../lib/propprofessor-player-context');
+    assert.equal(sanitizePlayerName('a; b'), '');
+    assert.equal(sanitizePlayerName('$(whoami)'), '');
+    assert.equal(sanitizePlayerName('--help'), '');
+    assert.equal(sanitizePlayerName('-flag'), ''); // any leading hyphen rejected
+    assert.equal(sanitizePlayerName('Lakers 🏀'), '');
+    assert.equal(sanitizePlayerName('name\u200Bwith\u200Bzwsp'), ''); // zero-width space
+  });
+
+  it('accepts internal hyphens (Karl-Anthony Towns style)', () => {
+    const { sanitizePlayerName } = require('../lib/propprofessor-player-context');
+    assert.equal(sanitizePlayerName('Karl-Anthony Towns'), 'Karl-Anthony Towns');
+    assert.equal(sanitizePlayerName('Jean-Luc Picard'), 'Jean-Luc Picard');
+  });
+
+  it('rejects inputs over 100 chars', () => {
+    const { sanitizePlayerName } = require('../lib/propprofessor-player-context');
+    assert.equal(sanitizePlayerName('A'.repeat(101)), '');
+    assert.equal(sanitizePlayerName('A'.repeat(100)), 'A'.repeat(100));
+  });
+
+  it('trims surrounding whitespace', () => {
+    const { sanitizePlayerName } = require('../lib/propprofessor-player-context');
+    assert.equal(sanitizePlayerName('  Alcaraz  '), 'Alcaraz');
+  });
+
+  it('returns empty string for non-string input', () => {
+    const { sanitizePlayerName } = require('../lib/propprofessor-player-context');
+    assert.equal(sanitizePlayerName(null), '');
+    assert.equal(sanitizePlayerName(undefined), '');
+    assert.equal(sanitizePlayerName(42), '');
+    assert.equal(sanitizePlayerName({}), '');
+  });
 });
 
 describe('extractXurlTweets', () => {

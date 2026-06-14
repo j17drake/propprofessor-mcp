@@ -11,6 +11,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -62,29 +63,55 @@ def install_mcp() -> None:
     if not MCP_SERVER_PATH.exists():
         raise SystemExit(f"MCP server not found: {MCP_SERVER_PATH}")
 
-    # Install default config first.
-    import subprocess
+    # Install default config first. The `pp-query setup` command is idempotent
+    # — it only writes the default config if `~/.propprofessor/config.json`
+    # doesn't exist. We parse the JSON output so the user sees "created" vs
+    # "exists" rather than a raw JSON blob.
+    import json
     setup_result = subprocess.run(
         ["node", str(REPO_ROOT / "scripts" / "query-propprofessor.js"), "setup"],
         capture_output=True, text=True
     )
     if setup_result.returncode == 0:
-        print(f"  ✓ config: {setup_result.stdout.strip()}")
+        try:
+            payload = json.loads(setup_result.stdout.strip())
+            status = payload.get("status", "unknown")
+            config_path = payload.get("path", "")
+            if status == "created":
+                print(f"  ✓ config: created at {config_path}")
+            elif status == "exists":
+                print(f"  ✓ config: kept existing at {config_path}")
+            else:
+                print(f"  ✓ config: {status} at {config_path}")
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # Fall back to raw output if the JSON shape changes in a future
+            # release — install should still complete even if we can't pretty-print.
+            print(f"  ✓ config: {setup_result.stdout.strip()}")
     else:
         print(f"  ⚠ config setup failed: {setup_result.stderr}", file=sys.stderr)
 
     hermes_home = resolve_hermes_home()
-    auth_file = AUTH_FILE_DEFAULT
+    # Honor AUTH_FILE env var if set — the doctor/install-auth commands respect
+    # it, and the install shouldn't silently override a user's existing path.
+    # Falls back to the standard ~/.propprofessor/auth.json default.
+    auth_file = Path(os.environ.get("AUTH_FILE", "").strip()).expanduser() \
+        if os.environ.get("AUTH_FILE", "").strip() \
+        else AUTH_FILE_DEFAULT
     auth_file.parent.mkdir(parents=True, exist_ok=True)
     if not auth_file.exists():
         print(f"  ⚠ auth file not found at {auth_file}. Run 'pp-query login' after install.")
-    # `hermes mcp add` is idempotent — re-running updates in place.
+    # `hermes mcp add` is idempotent — re-running updates in place. Only pass
+    # AUTH_FILE if it's not already inherited from the environment (the user's
+    # shell may have set it; we just want to make sure the registered config
+    # points at the same file either way).
+    hermes_env_args = ["--env", "PROPPROFESSOR_MCP_NDJSON=true"]
+    if not os.environ.get("AUTH_FILE"):
+        hermes_env_args = ["--env", f"AUTH_FILE={auth_file}"] + hermes_env_args
     run_hermes([
         "mcp", "add", MCP_NAME,
         "--command", "node",
         "--args", str(MCP_SERVER_PATH),
-        "--env", f"AUTH_FILE={auth_file}",
-        "--env", "PROPPROFESSOR_MCP_NDJSON=true"
+        *hermes_env_args
     ])
     print(f"  ✓ registered MCP server '{MCP_NAME}' with hermes")
 

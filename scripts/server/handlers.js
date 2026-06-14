@@ -690,7 +690,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
 
   // ===== CONSOLIDATED HANDLER MAP =====
-  // 31 old tools → 20 new tools:
+  // 32 old tools → 21 new tools:
   //   ev_candidates          ← query_positive_ev_candidates + query_validated_positive_ev_candidates
   //   screen_raw             ← query_screen_odds + query_screen_odds_best_comps
   //   screen_ranked          ← query_screen_odds_ranked
@@ -707,10 +707,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   //   player_context         ← query_player_context
   //   league_presets         ← league_presets (unchanged)
   //   health_status          ← health_status (unchanged)
-  //   get_hidden_bets        ← get_hidden_bets (unchanged)
-  //   hide_bet               ← hide_bet (unchanged)
-  //   unhide_bet             ← unhide_bet (unchanged)
-  //   clear_hidden_bets      ← clear_hidden_bets (unchanged)
+  //   manage_hidden_bets     ← get_hidden_bets + hide_bet + unhide_bet + clear_hidden_bets (unchanged)
+  //   fantasy_optimizer      ← query_fantasy_picks (new)
   //   find_best_price        ← find_best_price (unchanged)
   const handlers = {
     // ─── Screening & Ranking ────────────────────────────────────────
@@ -1530,6 +1528,47 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       error.category = 'validation';
       error.status = 400;
       throw error;
+    },
+
+    // ─── Fantasy Optimizer ──────────────────────────────────────────────
+    async fantasy_optimizer(args = {}) {
+      const filters = {
+        isLive: args.isLive,
+        showBreakOnly: args.showBreakOnly,
+        showTimeoutOnly: args.showTimeoutOnly,
+        showPeriodEndOnly: args.showPeriodEndOnly,
+        timeAvailable: args.timeAvailable,
+        userState: args.userState,
+        hideNCAAPlayerProps: args.hideNCAAPlayerProps,
+        fantasyApps: Array.isArray(args.fantasyApps) ? args.fantasyApps : ['PrizePicks'],
+        sportsbooks: Array.isArray(args.sportsbooks)
+          ? args.sportsbooks
+          : ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle'],
+        leagues: Array.isArray(args.leagues) ? args.leagues : ['NBA', 'MLB', 'NHL', 'WNBA'],
+        league: args.league,
+        market: args.market,
+        minOdds: args.minOdds,
+        maxOdds: args.maxOdds,
+        minValue: args.minValue,
+        maxValue: args.maxValue,
+        minLegEV: args.minLegEV,
+        maxLegEV: args.maxLegEV,
+        minSlipEV: args.minSlipEV,
+        maxSlipEV: args.maxSlipEV,
+        hiddenBets: Array.isArray(args.hiddenBets) ? args.hiddenBets : [],
+        liveStatus: Array.isArray(args.liveStatus) ? args.liveStatus : [],
+        periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : ['Full Game'],
+        minHoursAway: args.minHoursAway,
+        maxHoursAway: args.maxHoursAway,
+        minLiquidity: args.minLiquidity,
+        maxLiquidity: args.maxLiquidity
+      };
+      const result = await client.queryFantasyPicks(filters);
+      return {
+        ok: true,
+        count: Array.isArray(result) ? result.length : 0,
+        result: Array.isArray(result) ? result : []
+      };
     },
 
     async clear_score_timeline() {

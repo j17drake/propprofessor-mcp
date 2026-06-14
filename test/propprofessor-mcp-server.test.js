@@ -60,7 +60,7 @@ function createRankedScreenClientStub({
     client: {
       queryFantasyPicks: async (filters) => {
         calls.queryFantasyPicks.push(filters);
-        return { rows: [{ id: 'fantasy-row-1', sportsbook: filters?.sportsbook || 'DraftKings6' }] };
+        return [{ id: 'fantasy-row-1', sportsbook: filters?.sportsbook || 'DraftKings6' }];
       },
       querySportsbook: async (filters) => {
         calls.querySportsbook.push(filters);
@@ -254,6 +254,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'all_slates',
         'clear_score_timeline',
         'ev_candidates',
+        'fantasy_optimizer',
         'find_best_price',
         'get_alerts',
         'get_pick_history',
@@ -553,7 +554,42 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.ok(Object.prototype.hasOwnProperty.call(result.result[0], 'rankingProvenance'));
   });
 
+  it('fantasy_optimizer returns fantasy picks with filters', async () => {
+    const { client, calls } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.fantasy_optimizer({
+      fantasyApps: ['PrizePicks', 'Underdog'],
+      leagues: ['NBA', 'MLB'],
+      market: 'Fantasy Points',
+      isLive: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.count, 1);
+    assert.equal(result.result[0].id, 'fantasy-row-1');
+    assert.equal(calls.queryFantasyPicks.length, 1);
+    assert.deepEqual(calls.queryFantasyPicks[0].fantasyApps, ['PrizePicks', 'Underdog']);
+    assert.deepEqual(calls.queryFantasyPicks[0].leagues, ['NBA', 'MLB']);
+    assert.equal(calls.queryFantasyPicks[0].market, 'Fantasy Points');
+  });
+
+  it('fantasy_optimizer handles empty results gracefully', async () => {
+    const handlers = createMcpHandlers({
+      client: {
+        queryFantasyPicks: async () => []
+      }
+    });
+
+    const result = await handlers.fantasy_optimizer({ leagues: ['NBA'] });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.count, 0);
+    assert.deepEqual(result.result, []);
+  });
+
   // NOTE: screen_raw (bestComps) test removed — tool deprecated in v1.6.3.
+  // NOTE: fantasy_optimizer test added — handler implemented for Fantasy Optimizer subscription.
 
   it('league presets expose sharpMainMarkets and sharpProps labels', async () => {
     const handlers = createMcpHandlers({

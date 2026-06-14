@@ -2,9 +2,12 @@
 
 ## Supported Versions
 
-| Version | Supported |
-| ------- | --------- |
-| 1.0.x   | Yes       |
+| Version | Supported                     |
+| ------- | ----------------------------- |
+| 2.1.x   | Yes — current release         |
+| 2.0.x   | Yes — receives security fixes |
+| 1.7.x   | Security fixes only           |
+| < 1.7   | No — please upgrade           |
 
 ## Reporting a Vulnerability
 

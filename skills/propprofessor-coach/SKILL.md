@@ -35,9 +35,11 @@ This skill auto-loads when a user's question contains any of:
 | "player prop for [player] [market] [line]" | `mcp_propprofessor_player_context` first (injury/news check) | then `mcp_propprofessor_opinion` | NEVER bet without context check |
 | "log this bet" | `mcp_propprofessor_log_pick` | confirm with pick ID | Returns UUID for later resolve |
 | "my record" / "how am I doing" | `mcp_propprofessor_get_pick_stats` | format win rate + P&L | Optional: `days` filter |
-| "hide this bet from fantasy" | `mcp_propprofessor_hide_bet` | confirm hidden | Use betId from prior response |
-| "show hidden bets" | `mcp_propprofessor_get_hidden_bets` | list | |
-| "is [book] sharp on this?" | `mcp_propprofessor_screen` filtered to that book | cross-reference with sharp books list | Sharp books: Pinnacle, BetOnline, Circa, BookMaker, 4cx, OnyxOdds, Kalshi, Polymarket, NoVigApp |
+
+- "hide this bet from fantasy" | `mcp_propprofessor_hide_bet` | confirm hidden | Use betId from prior response |
+  || "show hidden bets" | `mcp_propprofessor_get_hidden_bets` | list | |
+  || "fantasy optimizer" / "dfs picks" / "fantasy plays" | `mcp_propprofessor_fantasy_optimizer` | filter by league/app/market, return ranked rows | Requires Fantasy Optimizer subscription |
+  || "is [book] sharp on this?" | `mcp_propprofessor_screen` filtered to that book | cross-reference with sharp books list | Sharp books: Pinnacle, BetOnline, Circa, BookMaker, 4cx, OnyxOdds, Kalshi, Polymarket, NoVigApp |
 
 ## Tier format (MANDATORY for any bet recommendation)
 

@@ -88,6 +88,19 @@ describe('writeTokenCache', () => {
     writeTokenCache({ token: 'tok', exp: 1 }, authFile);
     assert.ok(fs.existsSync(getTokenCacheFile(authFile)));
   });
+
+  // SEC-003 (June 8 audit): token cache must be owner read/write only.
+  // Skipped on Windows where chmod semantics differ — the test is asserting
+  // POSIX 0o600, which is the documented contract for macOS/Linux.
+  it('writes token cache with 0o600 permissions', { skip: process.platform === 'win32' }, () => {
+    const authFile = path.join(tmpDir, 'auth.json');
+    writeTokenCache({ token: 'tok_perm', exp: 9999999999, perm: {} }, authFile);
+    const cacheFile = getTokenCacheFile(authFile);
+    const stat = fs.statSync(cacheFile);
+    // 0o600 = owner rw, group/other none. Mask out the file-type bits
+    // (upper bits) so we compare just the 9 permission bits.
+    assert.equal(stat.mode & 0o777, 0o600, 'token-cache.json should be owner-only');
+  });
 });
 
 describe('clearTokenCache', () => {
@@ -192,6 +205,19 @@ describe('installAuthFile', () => {
 
   it('throws when source file does not exist', () => {
     assert.throws(() => installAuthFile({ sourceFile: '/nonexistent/auth.json' }), /not found/);
+  });
+
+  // SEC-003 (June 8 audit): installed auth.json must be 0o600 even if the
+  // source was more permissive (e.g. a user's prior export at 0o644).
+  it('writes destination with 0o600 permissions', { skip: process.platform === 'win32' }, () => {
+    const source = path.join(tmpDir, 'source-loose.json');
+    const dest = path.join(tmpDir, 'dest.json');
+    // Source intentionally written with loose permissions to prove the
+    // install path tightens the destination regardless of source mode.
+    fs.writeFileSync(source, JSON.stringify({ cookies: [] }), { mode: 0o644 });
+    installAuthFile({ sourceFile: source, destinationFile: dest });
+    const stat = fs.statSync(dest);
+    assert.equal(stat.mode & 0o777, 0o600, 'installed auth.json should be owner-only');
   });
 });
 

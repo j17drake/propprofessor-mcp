@@ -87,6 +87,47 @@ def test_install_mcp_creates_config(fake_hermes_home, monkeypatch, tmp_path):
     assert (tmp_path / ".propprofessor" / "config.json").exists()
 
 
+def test_install_mcp_passes_auth_file_env(fake_hermes_home, monkeypatch, tmp_path):
+    """When AUTH_FILE is set in the env, install.py must pass it through to hermes
+    rather than overriding with the default path. Regression test for the v2.1.1
+    install.py update — previously AUTH_FILE was always hardcoded to the default,
+    silently overriding users with custom auth paths (e.g. multi-project setups)."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Use a custom AUTH_FILE path the user might set for a multi-project setup.
+    custom_auth = tmp_path / "shared-secrets" / "my-propprofessor-auth.json"
+    custom_auth.parent.mkdir(parents=True)
+
+    # Replace the fake hermes stub with one that records its env to a log file.
+    # The venv-path hermes stub (from fake_hermes_home fixture) gets used by
+    # install_helpers.hermes_bin() — that's the one we need to instrument.
+    venv_hermes = fake_hermes_home / "hermes-agent" / "venv" / "bin" / "hermes"
+    venv_hermes.parent.mkdir(parents=True, exist_ok=True)
+    log_file = tmp_path / "hermes-env.log"
+    venv_hermes.write_text(
+        f"#!/bin/sh\nenv > {log_file}\nexit 0\n"
+    )
+    venv_hermes.chmod(0o755)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALL), "mcp"],
+        capture_output=True, text=True,
+        env={
+            **os.environ,
+            "HERMES_HOME": str(fake_hermes_home),
+            "AUTH_FILE": str(custom_auth),
+        }
+    )
+    assert result.returncode == 0, result.stderr
+    # The fake hermes writes its env to log_file on every invocation. Verify
+    # the env that hermes actually saw contained the custom AUTH_FILE.
+    assert log_file.exists(), "fake hermes did not run"
+    hermes_env = log_file.read_text()
+    assert f"AUTH_FILE={custom_auth}" in hermes_env, (
+        f"install.py did not pass through AUTH_FILE env var to hermes. "
+        f"Expected AUTH_FILE={custom_auth} in env, got:\n{hermes_env}"
+    )
+
+
 def test_uninstall_removes_skill_link(fake_hermes_home):
     subprocess.run([sys.executable, str(INSTALL), "skill"], check=True,
                    env={**os.environ, "HERMES_HOME": str(fake_hermes_home)})

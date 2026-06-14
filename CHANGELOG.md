@@ -1,10 +1,35 @@
 # Changelog
 
-## Unreleased
+## 2.1.1
+
+**Fantasy Optimizer tool, spread-alias regression fix, and auth-file permission tightening.** Closes 3 high-priority items from the June 14 deep audit.
+
+### Added
+
+- **Fantasy Optimizer tool** — new `fantasy_optimizer` MCP tool for DFS-style fantasy picks (PrizePicks, Underdog, etc.). Requires a paid PropProfessor subscription with Fantasy Optimizer access. Query by league, fantasy app, market, min/max odds/value, and more. 24 total tools now exposed (was 23 in v2.1.0).
+- **Player-name sanitizer for `player_context` xurl escalation** — `sanitizePlayerName()` in `lib/propprofessor-player-context.js` now allowlist-validates player names (Unicode letters/numbers + space + `.'-`) before passing them to the xurl CLI via `cp.execFile`. Rejects empty input, flag-like strings (`--help`), shell metacharacters, emoji, and inputs over 100 chars. Surfaced as a clean `source: "xurl-failed"` response rather than a malformed CLI invocation. June 8 SEC-001 partial fix.
 
 ### Fixed
 
-- **Spread alias wrong for basketball/football/soccer** (`lib/propprofessor-shared-utils.js` + `lib/propprofessor-sharp-books.js`). `MARKET_ALIASES.spread` and `.handicap` resolved to `"Spread"` for NBA/WNBA/NCAAB/NCAAF/NFL/SOCCER, but the live PropProfessor `/screen` endpoint serves those leagues as `"Point Spread"`. Every spread query on those leagues returned an empty payload. Discovered 2026-06-12 when a WNBA `novig_screen` with `markets=["Spread"]` returned 0 candidates but `find_best_price(market="Point Spread")` returned 19 books. Tennis was unaffected because `normalizeTennisMarketQuery()` expands `"Spread"` to `["Game Handicap", "Set Handicap", "Point Spread"]` before the screen call. `ALT_MARKET_BOOKS` keys renamed to match the new canonical name; 4 new regression tests added; README test count bumped 787 → 788.
+- **Auth file permissions tightened (SEC-003)** — `pp-query login`, `installAuthFile`, and the token cache now write `0o600` (owner read/write only) and `chmod` to enforce on existing files. The auth.json and token-cache.json files previously inherited the system default `0644`, which let any other local user on the box read the bearer token / cookie jar — full account impersonation against PropProfessor. 2 new regression tests cover the new mode bits. Closes the June 8 high-severity finding.
+- **Spread alias wrong for basketball/football/soccer** (`lib/propprofessor-shared-utils.js` + `lib/propprofessor-sharp-books.js`). `MARKET_ALIASES.spread` and `.handicap` resolved to `"Spread"` for NBA/WNBA/NCAAB/NCAAF/NFL/SOCCER, but the live PropProfessor `/screen` endpoint serves those leagues as `"Point Spread"`. Every spread query on those leagues returned an empty payload. Discovered 2026-06-12 when a WNBA `novig_screen` with `markets=["Spread"]` returned 0 candidates but `find_best_price(market="Point Spread")` returned 19 books. Tennis was unaffected because `normalizeTennisMarketQuery()` expands `"Spread"` to `["Game Handicap", "Set Handicap", "Point Spread"]` before the screen call. `ALT_MARKET_BOOKS` keys renamed to match the new canonical name; 4 new regression tests added.
+- **SECURITY.md support matrix** — was reporting v1.0.x as the only supported release (project is at v2.1.x). Now lists 2.0.x / 2.1.x as supported, 1.7.x as security-fixes-only, and pre-1.7 as unsupported. First thing a vuln researcher reads — previously implied the project was abandoned since v1.0.x.
+
+### Changed
+
+- **install.py** now (a) parses the JSON output of `pp-query setup` to print a human-readable "created at <path>" / "kept existing at <path>" line instead of a raw JSON blob, and (b) honors the `AUTH_FILE` env var when present instead of always overriding with the default path. 1 new regression test verifies the env passthrough.
+- **README** "Status" + "What's new" sections updated to reflect v2.1.1 (previously the v2.1.1 WIP was claiming v2.1.0 included Fantasy Optimizer, which it did not — v2.1.0 shipped without it).
+
+### Stats
+
+- 818 tests passing (was 784 in v2.1.0; +34 net: 19 fantasy-optimizer, 8 sanitizer, 4 spread-alias, 2 SEC-003, 1 install.py env passthrough)
+- 24 tools (was 23, +1 fantasy_optimizer)
+- Python tests: 12 (was 11, +1 env passthrough)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged — algorithm untouched)
+- TIER 4 ≤ TIER 2 inversion: still holds (49.7% ≤ 49.9%)
+- Lib files: 31 (unchanged)
+- Server entry: 158 lines (unchanged from v2.0.0)
+- Handlers: 1,804 → 1,847 lines (+43 for fantasy_optimizer)
 
 ## 2.1.0
 
