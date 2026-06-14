@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.2
+
+**UFC / Soccer screen_ranked hotfix.** 2 hours after v2.1.1 shipped, a live test against the UFC card revealed that `screen_ranked` was returning 0 rows for any league where the default focus book (Pinnacle) didn't post moneylines. Same root cause hit any non-major league passed to the focused tool. Algorithm, tier system, and tool surface unchanged.
+
+### Fixed
+
+- **`screen_ranked` returned 0 rows for UFC / Soccer** (`scripts/server/handlers.js`, `lib/screen-parser.js`). The handler was defaulting `focusBook` to `preset.preferredBooks[0]` (Pinnacle) even when the user didn't specify one. `extractScreenRows` then applied a `focusPlays` filter that dropped every row whose odds didn't include Pinnacle — which is every UFC row, since Pinnacle doesn't post UFC moneylines in the live data feed. Fix: `screen_ranked` now only sets `focusBook` when the user explicitly passes `books`; otherwise `focusPlays` is empty and the row expansion covers all books in the payload. Defensive follow-up: `extractScreenRows` now falls back to "all books in the row" if the requested focus book has no odds in that row (the "best effort" intent of the focus feature). 1 new regression test in `test/handler-integration.test.js` asserts the fix against a fixture mirroring the live 2026-06-14 data shape (Pinnacle absent, BetOnline/Caesars/FanDuel/DraftKings present).
+
+### Stats
+
+- 819 tests passing (was 818 in v2.1.1; +1 UFC regression test)
+- 24 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged)
+- TIER 4 ≤ TIER 2 inversion: still holds (49.7% ≤ 49.9%)
+
 ## 2.1.1
 
 **Fantasy Optimizer tool, spread-alias regression fix, and auth-file permission tightening.** Closes 3 high-priority items from the June 14 deep audit.

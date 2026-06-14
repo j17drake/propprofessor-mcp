@@ -151,6 +151,99 @@ describe('handler integration: screen_ranked', () => {
     assert.equal(result.ok, true);
     assert.ok(Array.isArray(result.result));
   });
+
+  // Regression: 2026-06-14 live test found that screen_ranked({league:'UFC'})
+  // returned 0 rows. The handler was defaulting focusBook to the preset's first
+  // preferred book (Pinnacle for most leagues), and the focusPlays filter in
+  // extractScreenRows then dropped every row whose odds didn't include
+  // Pinnacle — which is every UFC row, since Pinnacle doesn't post UFC
+  // moneylines. Fix: only set focusBook when the user explicitly passed books;
+  // leave focusPlays empty (= expand to all books) otherwise. Also: a
+  // defensive fallback in extractScreenRows for the case where the requested
+  // focus book has no odds in a given row.
+  it('returns ranked rows for UFC when no focus book is specified (regression)', async () => {
+    // Build a UFC payload where Pinnacle has no odds but BetOnline, Caesars,
+    // FanDuel, and DraftKings all do. This mirrors the live 2026-06-14 data
+    // shape that triggered the original bug.
+    const ufcPayload = {
+      game_data: [
+        {
+          id: 'UFC:PREMATCH:Aswell:Bolanos:1782000000:Aswell',
+          gameId: 'UFC:PREMATCH:Aswell:Bolanos:1782000000',
+          start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          league: 'UFC',
+          homeTeam: 'Aswell',
+          awayTeam: 'Bolanos',
+          isLive: false,
+          market: 'Moneyline',
+          defaultKey: 'null',
+          selections: {
+            null: {
+              selection1: 'Aswell',
+              selection2: 'Bolanos',
+              selection1Id: 'Moneyline:Aswell',
+              selection2Id: 'Moneyline:Bolanos',
+              odds: {
+                BetOnline: { book: 'BetOnline', odds1: -450, odds2: 350 },
+                Caesars: { book: 'Caesars', odds1: -400, odds2: 310 },
+                FanDuel: { book: 'FanDuel', odds1: -400, odds2: 290 },
+                DraftKings: { book: 'DraftKings', odds1: -380, odds2: 300 }
+                // NOTE: no Pinnacle — Pinnacle doesn't post UFC moneylines.
+              }
+            }
+          }
+        },
+        {
+          id: 'UFC:PREMATCH:Chandler:Ruffy:1781484000:Chandler',
+          gameId: 'UFC:PREMATCH:Chandler:Ruffy:1781484000',
+          start: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+          league: 'UFC',
+          homeTeam: 'Chandler',
+          awayTeam: 'Ruffy',
+          isLive: false,
+          market: 'Moneyline',
+          defaultKey: 'null',
+          selections: {
+            null: {
+              selection1: 'Chandler',
+              selection2: 'Ruffy',
+              selection1Id: 'Moneyline:Chandler',
+              selection2Id: 'Moneyline:Ruffy',
+              odds: {
+                BetOnline: { book: 'BetOnline', odds1: 415, odds2: -535 },
+                FanDuel: { book: 'FanDuel', odds1: 400, odds2: -550 }
+              }
+            }
+          }
+        }
+      ],
+      games: [],
+      participants: []
+    };
+    const { client } = createMockClient({ screenPayloads: { 'UFC:Moneyline': ufcPayload } });
+    const handlers = createMcpHandlers({ client });
+    const result = await handlers.screen_ranked({
+      league: 'UFC',
+      market: 'Moneyline',
+      includeAll: true
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(Array.isArray(result.result));
+    // The bug: returned 0 rows because the focus-book filter (Pinnacle)
+    // eliminated every row. After the fix: should have all expanded rows
+    // (2 events × 4 books × 2 sides = 8 for Aswell, plus 2 × 2 × 2 = 4 for
+    // Chandler, so at least 8 rows post-ranking; we don't assert exact
+    // count because the ranker may filter more, but > 0 is the bug check).
+    assert.ok(result.result.length > 0, `Expected UFC rows post-fix, got 0. Pre-fix this was the bug.`);
+    // None of the rows should have book='Pinnacle' (since Pinnacle has no
+    // odds in our fixture) — the defensive fallback should have used the
+    // books that DO have odds.
+    const books = new Set(result.result.map((r) => r.book).filter(Boolean));
+    for (const book of books) {
+      assert.notEqual(book, 'Pinnacle', 'Should not surface Pinnacle rows when Pinnacle has no odds');
+    }
+  });
 });
 
 // ─── screen (league-specific) ──────────────────────────────────────

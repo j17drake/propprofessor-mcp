@@ -772,8 +772,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const league = args.league || 'NBA';
       const marketResolution = resolveMarkets(args, league);
       const market = marketResolution.single;
-      const preset = getLeagueRankingPreset(league, market);
-      const focusBook = requestedBooks[0] || preset.preferredBooks[0];
+      // focusBook: only set if the user explicitly asked for one. Defaulting to
+      // preset.preferredBooks[0] (Pinnacle for most leagues) breaks UFC/Soccer
+      // because Pinnacle doesn't post those moneylines — the focusPlays filter
+      // in extractScreenRows would then drop every row.
+      // Fix shipped 2026-06-14: the screen_ranked handler used to default the
+      // focus book to the preset's preferred book, which worked for NBA/NFL/MLB
+      // but eliminated every UFC row. Now we only set focusBook when the user
+      // explicitly passed books, leaving focusPlays empty (= expand to all
+      // books in the payload) otherwise.
+      const focusBook = requestedBooks.length ? requestedBooks[0] : '';
       const payload = await client.queryScreenOddsBestComps({
         market,
         league,
