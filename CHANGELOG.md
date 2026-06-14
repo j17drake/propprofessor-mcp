@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.4
+
+**Hotfix on top of v2.1.3: degraded-line warning was silently filtering out Puck Line / Run Line / Total markets.** v2.1.3 added the backfill + warning for line-based markets, but the warning check used `r.line1 == null` as a defense-in-depth moneyline check. For Puck Line rows, the ranker doesn't surface `line1` on the output (because `normalizeRow` only lifts `selections.null.*` — for default keys like "-1" or "-3.5" the line lives at `selections[defaultKey].line1` and never makes it to the top level). The check evaluated `undefined == null === true` and excluded every Puck Line row from the warning. Test data included `line1` so unit tests passed; the live MCP call never got the warning. Fixed in this release.
+
+### Fixed
+
+- **v2.1.3 degraded-data warning now actually fires for line-based markets** (`lib/propprofessor-mcp-ranked-screen.js`). The warning check no longer inspects `r.line1` or `r.line` directly. It relies on `r.lineFieldMissingCount > 0` as the primary signal (the backfill code already guards on `fallbackLine !== null`, which is naturally null for moneylines, so the count is naturally 0 there) plus a defense-in-depth `market === "moneyline"` exclusion. Regression test added in `test/propprofessor-mcp-ranked-screen.test.js` that mirrors the live data shape (no `line1` on the row, large `lineFieldMissingCount`).
+
+### Stats
+
+- 826 tests passing (was 825 in v2.1.3; +1 line1-undefined regression test)
+- 24 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged)
+
 ## 2.1.3
 
 **Line-history backfill + degraded-data warning for line-based markets.** The upstream PropProfessor `/odds_history` endpoint does not return a `line` field per entry — only `odds`, `start_ts`, `end_ts`, and `liquidity`. Verified 2026-06-14: 0/874 entries had a `line` field across NHL/MLB/UFC. For line-based markets (Puck Line, Run Line, Point Spread, Total Goals/Runs/Rounds, etc.) the MCP can show the current line but cannot track line movement from history. v2.1.1 + v2.1.2 shipped the spread-alias fix but the underlying line-history data is missing upstream. This release adds a defensive local fallback and surfaces the degraded state honestly.

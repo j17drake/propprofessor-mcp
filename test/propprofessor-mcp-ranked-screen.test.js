@@ -264,13 +264,21 @@ describe('buildRankedScreenResponse', () => {
 
 describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
   it('emits a warning when non-moneyline rows had line values backfilled from upstream', () => {
-    // 2 Puck Line rows where the lineHistory entries had `line: null` and
-    // were backfilled from matchedRow.line1. 3 entries backfilled on row 1,
-    // 2 entries on row 2. Total: 5 backfilled entries, 2 backfilled rows.
+    // Real shape after the ranker: rows do NOT have `line1` or `line` set
+    // directly. The ranker spreads `...item.row` but `normalizeRow` only
+    // lifts `selections.null` — for Puck Line rows (defaultKey "-1" or
+    // "-3.5" etc.) the line value lives at `selections[defaultKey].line1`
+    // and never gets lifted. The ranker sets `line` from extractScreenRows
+    // (which does `row.line1 ?? null`) but in practice for the live NHL
+    // Puck Line data the line is on `r.line` (set to the per-row current
+    // line), not `r.line1`. The warning check must therefore rely on
+    // `lineFieldMissingCount > 0` as the primary signal, with the market
+    // name as defense-in-depth.
     const ranked = [
       {
         market: 'Puck Line',
-        line1: -1,
+        // No line1 / line2 / selection1 / selection2 — these don't survive
+        // the ranker for Puck Line rows in the live data shape.
         lineHistory: [
           { line: -1, odds: 155, time: 1 },
           { line: -1, odds: 150, time: 2 },
@@ -281,7 +289,6 @@ describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
       },
       {
         market: 'Puck Line',
-        line1: 1.5,
         lineHistory: [
           { line: 1.5, odds: -180, time: 1 },
           { line: 1.5, odds: -185, time: 2 }
@@ -298,17 +305,15 @@ describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
     assert.match(lineWarning, /Line-movement detection is degraded/);
   });
 
-  it('does not warn for moneyline rows (line: null is legitimate)', () => {
+  it('does not warn for moneyline rows (count is naturally 0 since backfill guards on fallbackLine)', () => {
     const ranked = [
       {
         market: 'Moneyline',
-        line1: null,
-        line: null,
         lineHistory: [
           { line: null, odds: -113, time: 1 },
           { line: null, odds: -114, time: 2 }
         ],
-        lineFieldMissingCount: 2,
+        lineFieldMissingCount: 0,
         consensusBookCount: 0
       }
     ];
@@ -321,7 +326,6 @@ describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
     const ranked = [
       {
         market: 'Puck Line',
-        line1: -1,
         lineHistory: [
           { line: -1, odds: 155, time: 1 },
           { line: -1.5, odds: 165, time: 2 }
@@ -333,5 +337,32 @@ describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
     const warnings = buildDegradedDataWarnings(ranked, ranked, {});
     const lineWarning = warnings.find((w) => w.includes('Line values missing from upstream'));
     assert.equal(lineWarning, undefined, 'should not warn when no fields were backfilled');
+  });
+
+  it('does not warn even when line1 is undefined but the row is Puck Line with backfill count > 0', () => {
+    // Regression: 2026-06-14 live test caught that the v2.1.3 warning check
+    // was filtering out Puck Line rows because `r.line1 == null` evaluated
+    // true (line1 is never set for non-"null" default keys). The fix
+    // removes the line1/line checks and relies on lineFieldMissingCount +
+    // market name. This test confirms the warning fires for the real
+    // ranked-row shape (no line1, no line).
+    const ranked = [
+      {
+        market: 'Puck Line',
+        // line1 deliberately not set — this is the actual shape from the ranker
+        lineHistory: [
+          { line: -3.5, odds: 800, time: 1 },
+          { line: -3.5, odds: -809, time: 2 }
+        ],
+        lineFieldMissingCount: 906,
+        consensusBookCount: 6
+      }
+    ];
+    const warnings = buildDegradedDataWarnings(ranked, ranked, {});
+    const lineWarning = warnings.find((w) => w.includes('Line values missing from upstream'));
+    assert.ok(
+      lineWarning,
+      'Puck Line rows with backfill count > 0 should trigger the warning even when line1 is missing from the row'
+    );
   });
 });
