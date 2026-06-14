@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   buildRankedScreenResponse,
+  buildDegradedDataWarnings,
   getIncludeAll,
   getLimit,
   getLookbackHours,
@@ -258,5 +259,79 @@ describe('buildRankedScreenResponse', () => {
 
     assert.equal(result.result[0].rowCount, 1);
     assert.equal(result.result[0].recentWindowHours, 1);
+  });
+});
+
+describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
+  it('emits a warning when non-moneyline rows had line values backfilled from upstream', () => {
+    // 2 Puck Line rows where the lineHistory entries had `line: null` and
+    // were backfilled from matchedRow.line1. 3 entries backfilled on row 1,
+    // 2 entries on row 2. Total: 5 backfilled entries, 2 backfilled rows.
+    const ranked = [
+      {
+        market: 'Puck Line',
+        line1: -1,
+        lineHistory: [
+          { line: -1, odds: 155, time: 1 },
+          { line: -1, odds: 150, time: 2 },
+          { line: -1, odds: 158, time: 3 }
+        ],
+        lineFieldMissingCount: 3,
+        consensusBookCount: 0
+      },
+      {
+        market: 'Puck Line',
+        line1: 1.5,
+        lineHistory: [
+          { line: 1.5, odds: -180, time: 1 },
+          { line: 1.5, odds: -185, time: 2 }
+        ],
+        lineFieldMissingCount: 2,
+        consensusBookCount: 0
+      }
+    ];
+    const warnings = buildDegradedDataWarnings(ranked, ranked, {});
+    const lineWarning = warnings.find((w) => w.includes('Line values missing from upstream'));
+    assert.ok(lineWarning, 'expected a line-field backfill warning to be present');
+    assert.match(lineWarning, /2\/2 non-moneyline rows/);
+    assert.match(lineWarning, /5 entries backfilled/);
+    assert.match(lineWarning, /Line-movement detection is degraded/);
+  });
+
+  it('does not warn for moneyline rows (line: null is legitimate)', () => {
+    const ranked = [
+      {
+        market: 'Moneyline',
+        line1: null,
+        line: null,
+        lineHistory: [
+          { line: null, odds: -113, time: 1 },
+          { line: null, odds: -114, time: 2 }
+        ],
+        lineFieldMissingCount: 2,
+        consensusBookCount: 0
+      }
+    ];
+    const warnings = buildDegradedDataWarnings(ranked, ranked, {});
+    const lineWarning = warnings.find((w) => w.includes('Line values missing from upstream'));
+    assert.equal(lineWarning, undefined, 'should not warn for moneyline rows');
+  });
+
+  it('does not warn when lineFieldMissingCount is 0 (upstream provided line values)', () => {
+    const ranked = [
+      {
+        market: 'Puck Line',
+        line1: -1,
+        lineHistory: [
+          { line: -1, odds: 155, time: 1 },
+          { line: -1.5, odds: 165, time: 2 }
+        ],
+        lineFieldMissingCount: 0,
+        consensusBookCount: 0
+      }
+    ];
+    const warnings = buildDegradedDataWarnings(ranked, ranked, {});
+    const lineWarning = warnings.find((w) => w.includes('Line values missing from upstream'));
+    assert.equal(lineWarning, undefined, 'should not warn when no fields were backfilled');
   });
 });

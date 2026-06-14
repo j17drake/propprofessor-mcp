@@ -166,6 +166,127 @@ describe('propprofessor history matching', () => {
     assert.equal(calls[0].startTimestamp, Math.floor(fixedNowMs / 1000) - 6 * 60 * 60);
   });
 
+  // Regression: 2026-06-14 live test found that the upstream /odds_history
+  // endpoint never returns a `line` field in any entry (only `odds`, `start_ts`,
+  // `end_ts`, `liquidity`). For line-based markets (Puck Line, Run Line, Point
+  // Spread, Total Goals, etc.) this means line-movement detection is degraded:
+  // every entry shows line: null, so the ranker can't see actual line movement.
+  // The fix: when the upstream response is missing `line`, backfill the
+  // matchedRow's current line (from the screen response's line1/line2) and
+  // surface a `lineFieldMissingCount` so the warning builder can flag the
+  // degraded state honestly.
+  it('backfills missing line values from the matched row and reports the count', async () => {
+    const result = await resolveHistoryForEntity({
+      client: {},
+      target: {
+        book: 'Circa',
+        pick: 'Carolina Hurricanes -1',
+        game: 'Carolina Hurricanes vs Vegas Golden Knights',
+        odds: '155',
+        line1: -1
+      },
+      rows: [
+        {
+          book: 'Circa',
+          pick: 'Carolina Hurricanes -1',
+          game: 'Carolina Hurricanes vs Vegas Golden Knights',
+          odds: '155',
+          line1: -1,
+          line2: 1,
+          gameId: 'NHL:PREMATCH:Carolina_Hurricanes:Vegas_Golden_Knights:1781481600:Carolina Hurricanes',
+          selectionId: 'Puck_Line:Carolina_Hurricanes_-1'
+        }
+      ],
+      // Upstream response: 3 entries, NONE with a `line` field. This is the
+      // exact shape observed in the live 2026-06-14 probe (874/874 entries
+      // across NHL/MLB/UFC had no line field at all).
+      queryHistoryFn: async () => [
+        { odds: 155, start_ts: 1781397799293, end_ts: 1781404059458, liquidity: 0 },
+        { odds: 150, start_ts: 1781404060668, end_ts: 1781404100000, liquidity: 0 },
+        { odds: 158, start_ts: 1781404200000, end_ts: 1781404300000, liquidity: 0 }
+      ]
+    });
+
+    assert.equal(result.lineHistoryAvailable, true);
+    assert.equal(result.lineHistory.length, 3);
+    // Every entry should now have a `line` value (backfilled from the row's line1).
+    for (const entry of result.lineHistory) {
+      assert.equal(entry.line, -1, `Expected line=-1 backfilled, got ${entry.line}`);
+    }
+    // The backfill count should match the number of missing entries.
+    assert.equal(result.lineFieldMissingCount, 3);
+  });
+
+  it('does not backfill when the upstream already provides a line value', async () => {
+    const result = await resolveHistoryForEntity({
+      client: {},
+      target: {
+        book: 'Pinnacle',
+        pick: 'Carolina Hurricanes -1',
+        game: 'Carolina Hurricanes vs Vegas Golden Knights',
+        odds: '155',
+        line1: -1
+      },
+      rows: [
+        {
+          book: 'Pinnacle',
+          pick: 'Carolina Hurricanes -1',
+          game: 'Carolina Hurricanes vs Vegas Golden Knights',
+          odds: '155',
+          line1: -1,
+          gameId: 'NHL:PREMATCH:Carolina_Hurricanes:Vegas_Golden_Knights:1781481600:Carolina Hurricanes',
+          selectionId: 'Puck_Line:Carolina_Hurricanes_-1'
+        }
+      ],
+      // Upstream response with line values present (hypothetical clean state).
+      queryHistoryFn: async () => [
+        { line: -1, odds: 155, start_ts: 1, end_ts: 2, liquidity: 0 },
+        { line: -1.5, odds: 165, start_ts: 3, end_ts: 4, liquidity: 0 }
+      ]
+    });
+
+    assert.equal(result.lineHistoryAvailable, true);
+    assert.equal(result.lineFieldMissingCount, 0);
+    // Verify actual line values were preserved (not overwritten by backfill).
+    assert.equal(result.lineHistory[0].line, -1);
+    assert.equal(result.lineHistory[1].line, -1.5);
+  });
+
+  it('does not backfill on moneyline rows (line1 is null)', async () => {
+    const result = await resolveHistoryForEntity({
+      client: {},
+      target: {
+        book: 'Pinnacle',
+        pick: 'Carolina Hurricanes',
+        game: 'Carolina Hurricanes vs Vegas Golden Knights',
+        odds: '-113',
+        line1: null
+      },
+      rows: [
+        {
+          book: 'Pinnacle',
+          pick: 'Carolina Hurricanes',
+          game: 'Carolina Hurricanes vs Vegas Golden Knights',
+          odds: '-113',
+          line1: null,
+          gameId: 'NHL:PREMATCH:Carolina_Hurricanes:Vegas_Golden_Knights:1781481600:Carolina Hurricanes',
+          selectionId: 'Moneyline:Carolina_Hurricanes'
+        }
+      ],
+      queryHistoryFn: async () => [
+        { odds: -113, start_ts: 1, end_ts: 2, liquidity: 100 },
+        { odds: -114, start_ts: 3, end_ts: 4, liquidity: 200 }
+      ]
+    });
+
+    assert.equal(result.lineHistoryAvailable, true);
+    // Moneylines legitimately have line: null. We don't backfill.
+    assert.equal(result.lineFieldMissingCount, 0);
+    for (const entry of result.lineHistory) {
+      assert.equal(entry.line, null);
+    }
+  });
+
   it('falls back to the default lookback window for invalid values', () => {
     const fixedNowMs = Date.UTC(2026, 3, 26, 12, 0, 0);
     assert.equal(

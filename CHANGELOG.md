@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.3
+
+**Line-history backfill + degraded-data warning for line-based markets.** The upstream PropProfessor `/odds_history` endpoint does not return a `line` field per entry — only `odds`, `start_ts`, `end_ts`, and `liquidity`. Verified 2026-06-14: 0/874 entries had a `line` field across NHL/MLB/UFC. For line-based markets (Puck Line, Run Line, Point Spread, Total Goals/Runs/Rounds, etc.) the MCP can show the current line but cannot track line movement from history. v2.1.1 + v2.1.2 shipped the spread-alias fix but the underlying line-history data is missing upstream. This release adds a defensive local fallback and surfaces the degraded state honestly.
+
+### Changed
+
+- **Line values are now backfilled into history entries from the row's current line** (`lib/propprofessor-history.js`, `lib/propprofessor-screen-history.js`). When the upstream response is missing the `line` field, the MCP writes the matched row's current line (`matchedRow.line1` / `line2` / `line`) into each entry. This makes the entries self-consistent and unblocks downstream consumers that read `entry.line` unconditionally. Moneylines (legitimate `line: null`) are not backfilled.
+- **New degraded-data warning** in `resultMeta.warnings` (`lib/propprofessor-mcp-ranked-screen.js`): when non-moneyline rows had line values backfilled, the response now reads `"Line values missing from upstream history for N/M non-moneyline rows (K entries backfilled from current line). Line-movement detection is degraded for this slate."` Users see the degraded state instead of a silent `line: null` everywhere.
+
+### Stats
+
+- 825 tests passing (was 819 in v2.1.2; +6 line-history backfill tests)
+- 24 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged)
+
+### Honesty note
+
+The v2.1.1 / v2.1.2 release notes claimed a "spread-alias regression fix" that resolved `MARKET_ALIASES.spread` / `.handicap` to per-league canonical names. The alias resolution is correct. The line-movement tracking it was implicitly claiming to enable is not — the upstream data doesn't carry per-entry line values. This release closes the loop: the alias works, the line-history entries are now self-consistent, and the degraded state is visible to users. Tracked upstream separately.
+
 ## 2.1.2
 
 **UFC / Soccer screen_ranked hotfix.** 2 hours after v2.1.1 shipped, a live test against the UFC card revealed that `screen_ranked` was returning 0 rows for any league where the default focus book (Pinnacle) didn't post moneylines. Same root cause hit any non-major league passed to the focused tool. Algorithm, tier system, and tool surface unchanged.
