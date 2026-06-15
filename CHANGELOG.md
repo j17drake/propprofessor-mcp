@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.1.5
+
+**Vercel 429 self-heal — the MCP refreshes its own access token via Chrome DevTools Protocol when the server-to-server path gets 429'd.** Previously, when Vercel's TLS-fingerprint challenge gated `app.propprofessor.com/api/access-token`, the MCP would return errors to tool calls until the user manually ran `pp-token-watchdog.js`. Now `fetchAccessToken()` in `lib/propprofessor-auth.js` automatically falls back to a browser-context fetch from a logged-in Chrome tab on 429 / 401 / network errors. No cron, no external schedule — the MCP heals itself on the next request that needs a fresh token. The standalone `pp-token-watchdog.js` is preserved as a manual escape hatch for diagnostics and bulk token priming.
+
+### Added
+
+- **`fetchAccessTokenViaCDP()` in `lib/propprofessor-auth.js`** — Chrome DevTools Protocol token fetch. Connects to Chrome on `127.0.0.1:9222`, finds or creates a tab on `app.propprofessor.com`, runs `Runtime.evaluate` to `fetch()` the access-token endpoint with `credentials: 'include'`, and returns the parsed body. Reuses an existing PP tab if one is open; creates one if not. All timeouts explicit; failures bubble up cleanly.
+- **Automatic fallback in `fetchAccessToken()`** — when the `got-scraping` path throws or returns 429 / 401, the MCP calls `fetchAccessTokenViaCDP()` automatically. The common path is unchanged (fast `got-scraping`); the 429 path costs ~1-2s of CDP overhead and then works for the next 8 minutes. Both paths failing yields a combined error with `err.code === 'TOKEN_REFRESH_FAILED_BOTH_PATHS'`.
+- **`PP_NO_CDP_FALLBACK=1` env var** — disables the CDP fallback for headless / CI environments where Chrome isn't available. Default: fallback enabled.
+- **17 new regression tests** in `test/propprofessor-cdp-fallback.test.js` covering the happy path, error branches, fallback gating, and the combined-error code.
+
+### Changed
+
+- `lib/propprofessor-api.js` re-exports `fetchAccessTokenViaCDP` alongside `fetchAccessToken` for backward compatibility.
+- `scripts/pp-token-watchdog.js` header rewritten to mark it as a manual escape hatch (no longer needed for production). Lint-cleaned.
+
+### Operator impact
+
+- **No more "refresh token" hand-holding.** When Vercel 429s the access-token endpoint, the next tool call will silently take the CDP path. Users on machines with Chrome open and a PropProfessor tab open won't notice anything.
+- **Failure mode shrinks.** The MCP only breaks if BOTH Vercel is gating AND Chrome isn't running with a logged-in PP tab open. In practice that means "I'm not at my Mac."
+- **Watchdog cron is no longer required.** If you previously had a `slash-5 18-23 * * *` cron driving `pp-token-watchdog.js`, you can remove it. The watchdog script itself stays in the repo for manual diagnostics.
+
+### Stats
+
+- 843 tests passing (was 826 in v2.1.4; +17 CDP fallback tests)
+- 24 tools (unchanged)
+- TIER 1 hit rate: 51.5% on 575 plays (unchanged)
+
 ## 2.1.4
 
 **Hotfix on top of v2.1.3: degraded-line warning was silently filtering out Puck Line / Run Line / Total markets.** v2.1.3 added the backfill + warning for line-based markets, but the warning check used `r.line1 == null` as a defense-in-depth moneyline check. For Puck Line rows, the ranker doesn't surface `line1` on the output (because `normalizeRow` only lifts `selections.null.*` — for default keys like "-1" or "-3.5" the line lives at `selections[defaultKey].line1` and never makes it to the top level). The check evaluated `undefined == null === true` and excluded every Puck Line row from the warning. Test data included `line1` so unit tests passed; the live MCP call never got the warning. Fixed in this release.
