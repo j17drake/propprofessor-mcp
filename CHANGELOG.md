@@ -16,23 +16,23 @@
 
 ### Live impact
 
-| Field | Before | After |
-|-------|--------|-------|
-| `consensusBookCount` | 0 | 5–19 |
-| `consensusStrength` | `"none"` | `"strong"` |
-| `consensusEdge` | `null` | 0.4–5.2pp |
-| `executionQuality` | `"unknown"` | `"best"` / `"playable"` / `"bad"` |
-| `marketBookCount` | 0 | 4–19 |
-| `supportBookCount` | 0 | 4–19 |
-| `bestAvailableOdds` | `null` | real value (e.g. 117 for a +116 side) |
-| `screenScore` | 0 | 2.4–11.8 |
-| `gatePassed` | `false` (`"score 0.00 below 2.05 gate"`) | `true` (`"score X.XX passed 2.05 gate"`) |
-| `riskScore` | 10 | 4–8 |
-| `kaiCall` | `"PASS"` | `"CONSIDER"` / `"BET"` (when signals warrant) |
-| `confidenceTier` | `"TIER 4"` | `"TIER 1"`–`"TIER 3"` |
-| `tierTrajectory` | all-zero placeholder | real trend / volatility / data points |
-| `scoreBreakdown` | all-zero | real consensus / movement / sport / freshness |
-| `"No consensus data"` warning | always present | gone (only "No line history" + freshness remain when applicable) |
+| Field                         | Before                                   | After                                                            |
+| ----------------------------- | ---------------------------------------- | ---------------------------------------------------------------- |
+| `consensusBookCount`          | 0                                        | 5–19                                                             |
+| `consensusStrength`           | `"none"`                                 | `"strong"`                                                       |
+| `consensusEdge`               | `null`                                   | 0.4–5.2pp                                                        |
+| `executionQuality`            | `"unknown"`                              | `"best"` / `"playable"` / `"bad"`                                |
+| `marketBookCount`             | 0                                        | 4–19                                                             |
+| `supportBookCount`            | 0                                        | 4–19                                                             |
+| `bestAvailableOdds`           | `null`                                   | real value (e.g. 117 for a +116 side)                            |
+| `screenScore`                 | 0                                        | 2.4–11.8                                                         |
+| `gatePassed`                  | `false` (`"score 0.00 below 2.05 gate"`) | `true` (`"score X.XX passed 2.05 gate"`)                         |
+| `riskScore`                   | 10                                       | 4–8                                                              |
+| `kaiCall`                     | `"PASS"`                                 | `"CONSIDER"` / `"BET"` (when signals warrant)                    |
+| `confidenceTier`              | `"TIER 4"`                               | `"TIER 1"`–`"TIER 3"`                                            |
+| `tierTrajectory`              | all-zero placeholder                     | real trend / volatility / data points                            |
+| `scoreBreakdown`              | all-zero                                 | real consensus / movement / sport / freshness                    |
+| `"No consensus data"` warning | always present                           | gone (only "No line history" + freshness remain when applicable) |
 
 ### What I'm NOT touching (separate concerns)
 
