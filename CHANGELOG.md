@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.1.6
+
+**Consensus-preservation fix in `extractScreenRows` — every main-line screen row was silently cascading to `consensusBookCount: 0 / TIER 4 / PASS` because the full per-book odds map was being clobbered on the expanded row.** Symptom: live screen / `get_play_details` / `recommended_bets` / `sharp_plays` calls all returned `consensusBookCount: 0`, `consensusEdge: null`, `executionQuality: "unknown"`, `marketBookCount: 0`, `supportBookCount: 0`, `screenScore: 0`, `gatePassed: false` with `gateReason: "score 0.00 below 2.05 gate"`, and consequently `riskScore: 10`, `kaiCall: "PASS"`, `confidenceTier: "TIER 4"`. The same symptom pattern as the 2026-06-15 upstream consensus outage — but the upstream `/odds_history_new` and `/screen` are healthy, so the bug was local.
+
+### Root cause
+
+`extractScreenRows` (`lib/screen-parser.js`) expands a normalized upstream row (`selections: { null: { ...lifted fields, odds: {full map} } }`, `defaultKey: null`) into per-book rows by spreading the row and then setting `odds: bookOdds.odds1` (a number). The explicit `odds` override clobbered the lifted full map. Combined with `normalizeRow` setting `selections: undefined` (because no other selection keys exist), the expanded row had no way for the ranker to find the full map. The ranker (`expandScreenRow` in `lib/screen-ranker.js`) gates on `row?.selections && (row?.book || row?.sportsbook)`; with `selections: undefined` the main path was skipped, the early-return on missing `preferredOdds` fired, and the row passed through with every consensus-derived field at zero.
+
+### Fix
+
+- `lib/screen-parser.js` `extractScreenRows` (`isNormalizedNonProp` branch) — preserve the full lifted odds map on the expanded row as `allBookOdds` before overriding `odds` with the per-book number.
+- `lib/screen-ranker.js` `expandScreenRow` — when `row.selections` is undefined but `row.allBookOdds` is present, reconstruct the `selections: { null: { ...lifted fields, odds: row.allBookOdds } }` shape the existing main path already understands.
+- 3 new regression tests in `test/propprofessor-analysis.test.js` (live-shape fixture mirroring the actual `/screen` payload, v2.1.2 fallback preservation, per-book `odds` contract preserved).
+
+### Live impact
+
+| Field | Before | After |
+|-------|--------|-------|
+| `consensusBookCount` | 0 | 5–19 |
+| `consensusStrength` | `"none"` | `"strong"` |
+| `consensusEdge` | `null` | 0.4–5.2pp |
+| `executionQuality` | `"unknown"` | `"best"` / `"playable"` / `"bad"` |
+| `marketBookCount` | 0 | 4–19 |
+| `supportBookCount` | 0 | 4–19 |
+| `bestAvailableOdds` | `null` | real value (e.g. 117 for a +116 side) |
+| `screenScore` | 0 | 2.4–11.8 |
+| `gatePassed` | `false` (`"score 0.00 below 2.05 gate"`) | `true` (`"score X.XX passed 2.05 gate"`) |
+| `riskScore` | 10 | 4–8 |
+| `kaiCall` | `"PASS"` | `"CONSIDER"` / `"BET"` (when signals warrant) |
+| `confidenceTier` | `"TIER 4"` | `"TIER 1"`–`"TIER 3"` |
+| `tierTrajectory` | all-zero placeholder | real trend / volatility / data points |
+| `scoreBreakdown` | all-zero | real consensus / movement / sport / freshness |
+| `"No consensus data"` warning | always present | gone (only "No line history" + freshness remain when applicable) |
+
+### What I'm NOT touching (separate concerns)
+
+- `< 2` gate in `resolveHistoryForEntity` — correct (you need 2+ points for movement). With consensus now flowing, rows with sparse history rank on consensus + freshness + sport score instead of being silently killed.
+- `freshnessFallbackUsed: true` for the screen call itself — separate upstream timestamp issue.
+- The prop-market `consensusBookCount: 0` tests in `test/propprofessor-analysis.test.js` — intentional, the prop code path uses a real `selections: { a: {...}, b: {...} }` map (non-null defaultKey), so the ranker already has what it needs and these rows are unchanged.
+
+### Stats
+
+- 846 tests passing (was 843 in v2.1.5; +3 live-shape regression tests)
+- 24 tools (unchanged)
+- TIER 1/2 hit rate: pending re-validation against fresh data (was 51.5% on 575 plays in v2.1.5; should improve because more rows are now rankable instead of all defaulting to TIER 4)
+
 ## 2.1.5
 
 **Vercel 429 self-heal — the MCP refreshes its own access token via Chrome DevTools Protocol when the server-to-server path gets 429'd.** Previously, when Vercel's TLS-fingerprint challenge gated `app.propprofessor.com/api/access-token`, the MCP would return errors to tool calls until the user manually ran `pp-token-watchdog.js`. Now `fetchAccessToken()` in `lib/propprofessor-auth.js` automatically falls back to a browser-context fetch from a logged-in Chrome tab on 429 / 401 / network errors. No cron, no external schedule — the MCP heals itself on the next request that needs a fresh token. The standalone `pp-token-watchdog.js` is preserved as a manual escape hatch for diagnostics and bulk token priming.

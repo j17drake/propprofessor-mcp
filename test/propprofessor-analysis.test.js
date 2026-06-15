@@ -1307,3 +1307,172 @@ describe('tennis screen ranking helpers', () => {
     assert.equal(row.executionQuality, 'best');
   });
 });
+
+describe('extractScreenRows consensus preservation (v2.1.6 live-shape regression)', () => {
+  // v2.1.6 regression: the upstream /screen response for non-prop markets
+  // arrives as `selections: { null: { ...lifted fields, odds: { full book map } } }`
+  // with `defaultKey: null`. `normalizeRow` lifts `selections.null.*` to the
+  // top level and clears `selections`, leaving the full odds map at the top
+  // level as `row.odds`. `extractScreenRows` was overriding `odds` with the
+  // per-book number and dropping the full map on the floor — the ranker then
+  // couldn't compute consensus and every row cascaded to consensusBookCount=0 /
+  // TIER 4 / PASS. The fix preserves the full map as `allBookOdds` and the
+  // ranker reconstructs `selections.null` from the lifted fields.
+
+  it('preserves the full odds map on expanded rows so the ranker finds real consensus', () => {
+    const payload = {
+      game_data: [
+        {
+          league: 'MLB',
+          market: 'Moneyline',
+          gameId: 'MLB:PREMATCH:Athletics:Pittsburgh_Pirates:1781574000',
+          homeTeam: 'Athletics',
+          awayTeam: 'Pittsburgh Pirates',
+          isLive: false,
+          defaultKey: null,
+          selections: {
+            null: {
+              selection1: 'Athletics',
+              participant1: 'Athletics',
+              selectionType1: 'home',
+              selection1Id: 'Moneyline:Athletics',
+              line1: null,
+              selection2: 'Pittsburgh Pirates',
+              participant2: 'Pittsburgh Pirates',
+              selectionType2: 'away',
+              selection2Id: 'Moneyline:Pittsburgh_Pirates',
+              line2: null,
+              odds: {
+                Pinnacle: { odds1: -122, odds2: 110 },
+                BetOnline: { odds1: -125, odds2: 113 },
+                Circa: { odds1: -122, odds2: 110 },
+                DraftKings: { odds1: -131, odds2: 108 }
+              }
+            }
+          }
+        }
+      ]
+    };
+
+    const expanded = extractScreenRows(payload, [{ book: 'Pinnacle' }]);
+    assert.equal(expanded.length, 2);
+
+    // The per-book number is preserved (caller contract unchanged)
+    assert.equal(typeof expanded[0].odds, 'number');
+    assert.equal(expanded[0].odds, -122);
+    assert.equal(expanded[0].currentOdds, -122);
+
+    // The full odds map is now preserved as `allBookOdds` (the fix)
+    assert.ok(expanded[0].allBookOdds, 'allBookOdds should be set');
+    assert.deepEqual(
+      Object.keys(expanded[0].allBookOdds).sort(),
+      ['BetOnline', 'Circa', 'DraftKings', 'Pinnacle']
+    );
+
+    // And the ranker now finds real consensus from the preserved map
+    const ranked = rankScreenRows(expanded, {
+      limit: 5,
+      preferredBooks: ['Pinnacle', 'BetOnline', 'Circa', 'DraftKings'],
+      includeAll: true
+    });
+    assert.equal(ranked.length, 2);
+    assert.ok(ranked.every((r) => r.consensusBookCount === 3), '3 comp books for each side');
+    assert.ok(ranked.every((r) => r.hasConsensus), 'hasConsensus should be true');
+    assert.ok(ranked.every((r) => r.executionQuality !== 'unknown'), 'executionQuality should be classified');
+    assert.ok(ranked.every((r) => Number.isFinite(r.consensusEdge)), 'consensusEdge should be a number');
+    assert.ok(ranked.every((r) => r.consensusStrength === 'strong'), '3 comp books is a strong consensus');
+  });
+
+  it('falls back to all books when the focus book is missing (v2.1.2 behavior preserved)', () => {
+    // v2.1.2 fix: if the focus book has no odds in a row, fall back to all
+    // books in the row. The v2.1.6 fix must not regress this — when the
+    // per-book row is produced, allBookOdds should still carry the full map.
+    const payload = {
+      game_data: [
+        {
+          league: 'UFC',
+          market: 'Moneyline',
+          gameId: 'UFC:PREMATCH:Atmane:Muller:1',
+          homeTeam: 'Atmane',
+          awayTeam: 'Muller',
+          isLive: false,
+          defaultKey: null,
+          selections: {
+            null: {
+              selection1: 'Atmane',
+              participant1: 'Atmane',
+              selection1Id: 'Moneyline:Atmane',
+              line1: null,
+              selection2: 'Muller',
+              participant2: 'Muller',
+              selection2Id: 'Moneyline:Muller',
+              line2: null,
+              odds: {
+                NoVigApp: { odds1: 116, odds2: -136 },
+                BetOnline: { odds1: 120, odds2: -140 },
+                Caesars: { odds1: 118, odds2: -138 }
+                // Pinnacle intentionally missing — UFC moneylines aren't posted
+              }
+            }
+          }
+        }
+      ]
+    };
+
+    // Ask for Pinnacle focus; the v2.1.2 fallback should surface all 3 books
+    const expanded = extractScreenRows(payload, [{ book: 'Pinnacle' }]);
+    assert.ok(expanded.length >= 2, 'should produce at least the 2 sides');
+
+    // And the per-row allBookOdds should carry the full map (so the ranker
+    // can compute consensus regardless of which books posted odds)
+    for (const row of expanded) {
+      assert.ok(row.allBookOdds, 'allBookOdds set on each expanded row');
+      assert.ok(Object.keys(row.allBookOdds).length >= 3);
+    }
+  });
+
+  it('does not regress the per-book odds contract (odds stays a number, not the map)', () => {
+    // Caller contract: `row.odds` is the per-book American odds (a number).
+    // The v2.1.6 fix adds `allBookOdds` but must not change the type or
+    // value of `odds`/`currentOdds` — many consumers (formatters, the
+    // stake plan, downstream tools) read `row.odds` directly.
+    const payload = {
+      game_data: [
+        {
+          league: 'NBA',
+          market: 'Moneyline',
+          gameId: 'NBA:PREMATCH:LAL:BOS:1',
+          homeTeam: 'Lakers',
+          awayTeam: 'Celtics',
+          defaultKey: null,
+          selections: {
+            null: {
+              selection1: 'Lakers',
+              participant1: 'Lakers',
+              selection1Id: 'Moneyline:Lakers',
+              line1: null,
+              selection2: 'Celtics',
+              participant2: 'Celtics',
+              selection2Id: 'Moneyline:Celtics',
+              line2: null,
+              odds: {
+                Pinnacle: { odds1: -110, odds2: -110 },
+                DraftKings: { odds1: -108, odds2: -112 }
+              }
+            }
+          }
+        }
+      ]
+    };
+
+    const expanded = extractScreenRows(payload, [{ book: 'Pinnacle' }]);
+    assert.equal(expanded.length, 2);
+    for (const row of expanded) {
+      assert.equal(typeof row.odds, 'number', 'odds stays a number');
+      assert.equal(typeof row.currentOdds, 'number', 'currentOdds stays a number');
+      assert.equal(row.odds, row.currentOdds, 'odds and currentOdds match');
+      assert.ok(row.allBookOdds, 'allBookOdds is set');
+      assert.equal(typeof row.allBookOdds, 'object', 'allBookOdds is the full map');
+    }
+  });
+});
