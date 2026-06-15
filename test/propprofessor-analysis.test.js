@@ -1364,10 +1364,7 @@ describe('extractScreenRows consensus preservation (v2.1.6 live-shape regression
 
     // The full odds map is now preserved as `allBookOdds` (the fix)
     assert.ok(expanded[0].allBookOdds, 'allBookOdds should be set');
-    assert.deepEqual(
-      Object.keys(expanded[0].allBookOdds).sort(),
-      ['BetOnline', 'Circa', 'DraftKings', 'Pinnacle']
-    );
+    assert.deepEqual(Object.keys(expanded[0].allBookOdds).sort(), ['BetOnline', 'Circa', 'DraftKings', 'Pinnacle']);
 
     // And the ranker now finds real consensus from the preserved map
     const ranked = rankScreenRows(expanded, {
@@ -1376,11 +1373,26 @@ describe('extractScreenRows consensus preservation (v2.1.6 live-shape regression
       includeAll: true
     });
     assert.equal(ranked.length, 2);
-    assert.ok(ranked.every((r) => r.consensusBookCount === 3), '3 comp books for each side');
-    assert.ok(ranked.every((r) => r.hasConsensus), 'hasConsensus should be true');
-    assert.ok(ranked.every((r) => r.executionQuality !== 'unknown'), 'executionQuality should be classified');
-    assert.ok(ranked.every((r) => Number.isFinite(r.consensusEdge)), 'consensusEdge should be a number');
-    assert.ok(ranked.every((r) => r.consensusStrength === 'strong'), '3 comp books is a strong consensus');
+    assert.ok(
+      ranked.every((r) => r.consensusBookCount === 3),
+      '3 comp books for each side'
+    );
+    assert.ok(
+      ranked.every((r) => r.hasConsensus),
+      'hasConsensus should be true'
+    );
+    assert.ok(
+      ranked.every((r) => r.executionQuality !== 'unknown'),
+      'executionQuality should be classified'
+    );
+    assert.ok(
+      ranked.every((r) => Number.isFinite(r.consensusEdge)),
+      'consensusEdge should be a number'
+    );
+    assert.ok(
+      ranked.every((r) => r.consensusStrength === 'strong'),
+      '3 comp books is a strong consensus'
+    );
   });
 
   it('falls back to all books when the focus book is missing (v2.1.2 behavior preserved)', () => {
