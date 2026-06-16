@@ -1379,6 +1379,13 @@ describe('validated candidate concurrency helpers', () => {
 
   it('validated candidates reuse identical odds-history lookups within a run', async () => {
     let historyCalls = 0;
+    // Use a unique gameId/selectionId that no other test in this file uses,
+    // so the cross-call LRU cache (process-shared since v2.1.9) doesn't
+    // serve a previous test's result. The dedup contract this test
+    // exercises (multiple rows with the same gameId+selectionId collapse
+    // to a single network call) is what we still want to verify.
+    const uniqueGameId = `game-dedup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const uniqueSelectionId = `Moneyline:dedup-${Math.random().toString(36).slice(2)}`;
     const handlers = createMcpHandlers({
       client: {
         querySportsbook: async () => [
@@ -1389,8 +1396,8 @@ describe('validated candidate concurrency helpers', () => {
             book: 'Fliff',
             participant: 'A',
             selection: 'A',
-            gameId: 'game-1',
-            selectionId: 'Moneyline:A',
+            gameId: uniqueGameId,
+            selectionId: uniqueSelectionId,
             odds: -110
           },
           {
@@ -1400,8 +1407,8 @@ describe('validated candidate concurrency helpers', () => {
             book: 'Fliff',
             participant: 'A',
             selection: 'A',
-            gameId: 'game-1',
-            selectionId: 'Moneyline:A',
+            gameId: uniqueGameId,
+            selectionId: uniqueSelectionId,
             odds: -110
           }
         ],

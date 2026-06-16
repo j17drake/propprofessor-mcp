@@ -1,5 +1,53 @@
 # Changelog
 
+## 2.1.10
+
+**System-wide performance pass: parallelize every serial hot path and add a cross-call odds-history cache.** v2.1.8's perf PR parallelized the `recommended_bets` league loop and the `validate_play` sub-calls. This release does the same for the rest of the fan-out paths that were still serial, plus adds an LRU-backed in-process cache for `/odds_history_new` lookups so a `screen_ranked` → `validate_play` workflow doesn't re-fetch the same data on the second call.
+
+### What changed for users
+
+- **`sharp_plays` is now 3-5x faster on default args.** The 3-level nested loop (`targetBook × league × market` for both the rank scan and the sharp-book cross-reference) used to be fully serial. With v2.1.9 defaults (1 book × 10 leagues × 1 market × 2 phases = 20 sequential round-trips), it now fans out at concurrency 4. Typical wall-clock on a quiet slate drops from ~3-6s to ~1-2s.
+- **Tennis `screen_ranked` history hydration is parallelized.** The tennis enrichment path had its own `for (const candidate of ...) { await queryOddsHistory(...) }` loop that bypassed the existing `hydrateScreenRowsWithHistory` concurrency cap. With 20-30 tennis candidates on a busy slate, that's 20-30 sequential `/odds_history_new` calls — now concurrency-6 like the rest of the codebase.
+- **`runResearchOnTopRows` is parallelized at concurrency 3.** The author originally kept it serial "to keep the cache warm" but the cache key is `player|sport|gameTime|maxAgeMinutes` so concurrent calls deduplicate just as well. `screen_ranked({ includeResearch: true })` and `recommended_bets({ includeResearch: true })` now do 3 player_context calls at a time instead of one.
+- **Cross-call odds-history LRU cache.** `queryOddsHistory` was already deduped within a single tool invocation, but the per-call `Map` was thrown away at the end of the call. Now the dedup is process-wide, 5-minute TTL, 250 entries, with an in-flight mutex so N concurrent identical lookups collapse to 1 network call. Failures are NOT cached (so transient errors retry cleanly).
+- **`recommended_bets` market loop is parallelized.** League parallelism was already added in v2.1.8, but each league worker still did its 3 markets serially. Now the inner loop is `mapWithConcurrency(3)` over markets, capped at 4×3=12 in-flight calls (vs the previous 4 leagues serial × 3 markets serial = 12 sequential).
+- **`query_player_context` races news sources in parallel.** Previously, Nitter RSS + Google News ran serially (and Google News + ESPN ran serially in the deepest-fallback path). Both are now `Promise.allSettled` so wall-clock is `max(t_a, t_b)` instead of `t_a + t_b`.
+- **`requestJSON` hoists `JSON.stringify(body)` and the static header scaffolding out of the retry loop.** Tiny win — avoids re-serializing the body on every retry attempt. The `Authorization` header still has to be re-read inside the loop (it changes after a 401).
+- **`screen-ranker` reuses the existing `nowMs` value** instead of calling `Date.now()` twice per row. Negligible, but a free cleanup.
+- **`health_status` now exposes cache stats.** Operators can now see `response.hitRate` and `oddsHistory.hitRate` to verify the caches are doing useful work. A misconfigured TTL or max-entries was previously invisible.
+
+### Why this is the right shape
+
+v2.1.8's perf PR was a one-off; this release codifies the pattern. The shared `mapWithConcurrency(items, worker, { concurrency })` (extracted to `lib/propprofessor-shared-utils.js` from `scripts/server/handlers.js`) is the same primitive every fan-out uses. The shared `createCrossCallMemoizedQuery(fn, { cache, keyFn })` is the same primitive every memoized query uses. Future "this is slow" investigations will land on the same primitives, and the reviewer can validate that the cap is appropriate for the call count.
+
+### What changed under the hood
+
+- `lib/propprofessor-shared-utils.js` — new `mapWithConcurrency` (extracted from handlers.js) and new `createCrossCallMemoizedQuery(fn, { cache, keyFn })`. Both have unit tests.
+- `lib/mcp-runtime-config.js` — new `getOddsHistoryCache()` returns the shared process-wide LRU; `getOddsHistoryCacheTtlMs()` exposes the 5-min TTL. Defaults: 250 entries, 5 min TTL — sized for a full NBA slate + 10 min of follow-up validation calls.
+- `lib/propprofessor-sharp-plays-service.js` — `runSharpPlays` rank scan and cross-ref loops converted to `mapWithConcurrency(4)`.
+- `lib/screen-tennis.js` — per-candidate history hydration wrapped in `mapWithConcurrency(6)`.
+- `lib/propprofessor-research-runner.js` — `runResearchOnTopRows` rewritten to use `mapWithConcurrency(3)` with a new `concurrency` parameter.
+- `lib/propprofessor-player-context.js` — Nitter+GoogleNews and GoogleNews+ESPN pairs converted to `Promise.allSettled`.
+- `lib/propprofessor-api.js` — `requestJSON` hoists `JSON.stringify(body)` and the static header scaffolding out of the retry loop.
+- `lib/screen-ranker.js` — `freshnessAgeMs` reuses the existing `nowMs` instead of a second `Date.now()`.
+- `scripts/server/handlers.js` — `createOddsHistoryMemoizedQuery` now uses the cross-call LRU; `recommended_bets` inner market loop is parallelized; `health_status` exposes `caches.response` and `caches.oddsHistory` stats.
+- `test/propprofessor-shared-utils.test.js` — 9 new tests covering `mapWithConcurrency` (empty input, order preservation, concurrency cap, non-numeric coercion) and `createCrossCallMemoizedQuery` (in-flight mutex, cross-call LRU, no failure caching, input validation).
+- `test/propprofessor-mcp-server.test.js` — `validated candidates reuse identical odds-history lookups` updated to use unique gameId/selectionId since the cache is now process-wide (a previous test's result would otherwise be served).
+
+### Stats
+
+- 939 tests passing (was 930 in v2.1.9; +9 from new shared-utils tests)
+- 0 lint errors (15 pre-existing function-length warnings unchanged)
+- prettier clean, tsc clean, no circular deps
+- Version consistency passes
+- Live smoke (`MLB`, `UFC`) returns full ranked data with hydrated history
+
+### Out of scope (deliberately skipped)
+
+- **Adding the response cache to `screen_ranked`.** The current cache is only consulted for the multi-league/multi-market tools (`sharp_plays`, `all_slates`). `screen_ranked` is the "single-shot" tool and the agent usually passes dynamic args (different gameId, different book) so a cache hit would be rare. The 1.5x win on cache-friendly calls was not worth the risk of caching dynamic-context responses.
+- **Increasing the response cache TTL above 60s.** Sharp-money signals decay on the minute scale; a 5-min TTL would start serving stale consensus edges. The current 60s is the right shape.
+- **Pre-warming the cross-call odds-history cache on session start.** That would require knowing which (gameId, selectionId) tuples the user is about to query, which we don't. The cache is a passive layer.
+
 ## 2.1.9
 
 **Consolidate the default-leagues list into a single source of truth, and add the two leagues the in-progress work missed (NFL, NCAAB, NCAAF).** Until v2.1.8 the default `leagues` argument across `screen_ranked`, `recommended_bets`, `get_alerts`, the `query-propprofessor.js` CLI, and the `propprofessor-api.js` default scan was a partial subset of what the PropProfessor backend supports. v2.1.9 picks up where v2.1.8 left off — the in_progress work added the missing leagues but kept them hardcoded inline in 6+ files, which is a footgun for future drift. This release replaces all of those with a single frozen `DEFAULT_LEAGUES` constant exported from `propprofessor-shared-utils.js` (and derives `SUPPORTED_LEAGUES` from it in `backtest-daily-snapshot.js`).

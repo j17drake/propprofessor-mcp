@@ -25,7 +25,13 @@ const {
   extractScreenRows,
   enrichTennisEvCandidates
 } = require('../../lib/propprofessor-screen-utils');
-const { resolveMarketName, DEFAULT_LEAGUES } = require('../../lib/propprofessor-shared-utils');
+const {
+  resolveMarketName,
+  DEFAULT_LEAGUES,
+  mapWithConcurrency,
+  createCrossCallMemoizedQuery
+} = require('../../lib/propprofessor-shared-utils');
+const { getOddsHistoryCache, getOddsHistoryCacheTtlMs } = require('../../lib/mcp-runtime-config');
 const { buildUfcShortlist } = require('../../lib/propprofessor-sharp-plays');
 const { findBestPrice } = require('../../lib/propprofessor-best-price');
 const {
@@ -78,8 +84,6 @@ const {
   resolvePick,
   writeCheckpoint
 } = require('../../lib/propprofessor-picks');
-
-const VALIDATED_EV_CONCURRENCY = 6;
 
 // Strip undefined values so they don't override API client defaults via spread
 function defined(obj) {
@@ -140,26 +144,6 @@ function resolveMarkets(args, league, defaultMarket = 'Moneyline') {
   return result;
 }
 
-async function mapWithConcurrency(items, worker, { concurrency = VALIDATED_EV_CONCURRENCY } = {}) {
-  const list = Array.isArray(items) ? items : [];
-  if (!list.length) return [];
-
-  const limit = Math.max(1, Math.floor(Number(concurrency) || 1));
-  const results = new Array(list.length);
-  let nextIndex = 0;
-
-  async function runWorker() {
-    while (nextIndex < list.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await worker(list[currentIndex], currentIndex);
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, () => runWorker()));
-  return results;
-}
-
 // league preset inspector
 function buildLeaguePresetSummary() {
   const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'UFC', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
@@ -207,30 +191,35 @@ function buildPositiveEvTarget(play = {}) {
 }
 
 function createOddsHistoryMemoizedQuery(client) {
-  const cache = new Map();
-  return async function queryHistoryMemoized(params = {}) {
-    const sportsbooks = Array.isArray(params.sportsbooks)
-      ? params.sportsbooks.map((value) => String(value || '').trim()).filter(Boolean)
-      : [];
-    const cacheKey = JSON.stringify({
-      gameId: params.gameId ?? null,
-      selectionId: params.selectionId ?? null,
-      sportsbooks,
-      startTimestamp: params.startTimestamp ?? null
-    });
-    if (!cache.has(cacheKey)) {
-      cache.set(
-        cacheKey,
-        Promise.resolve().then(() =>
-          client.queryOddsHistory({
-            ...params,
-            sportsbooks
-          })
-        )
-      );
+  // Cross-call LRU cache (shared process-wide, 5-min TTL). The previous
+  // implementation used a per-call Map, which only deduped within a single
+  // ev_candidates invocation. The shared cache absorbs "screen_ranked then
+  // validate_play" / "validate_play then find_best_price" workflows that
+  // re-fetch the same (gameId, selectionId, sportsbooks, startTimestamp).
+  // Backed by createCrossCallMemoizedQuery which also provides an in-flight
+  // mutex — N concurrent calls for the same key collapse to 1 network call.
+  const cache = getOddsHistoryCache();
+  const memoized = createCrossCallMemoizedQuery(
+    (params) => {
+      const sportsbooks = Array.isArray(params.sportsbooks)
+        ? params.sportsbooks.map((value) => String(value || '').trim()).filter(Boolean)
+        : [];
+      return client.queryOddsHistory({ ...params, sportsbooks });
+    },
+    {
+      cache,
+      keyFn: (params) =>
+        JSON.stringify({
+          gameId: params.gameId ?? null,
+          selectionId: params.selectionId ?? null,
+          sportsbooks: Array.isArray(params.sportsbooks)
+            ? params.sportsbooks.map((value) => String(value || '').trim()).filter(Boolean)
+            : [],
+          startTimestamp: params.startTimestamp ?? null
+        })
     }
-    return cache.get(cacheKey);
-  };
+  );
+  return memoized;
 }
 
 async function validatePositiveEvCandidates({ client, candidates = [], args = {} } = {}) {
@@ -1085,24 +1074,36 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         leagues,
         async (league) => {
           try {
-            let allRows = [];
-            for (const market of resolvedMarketsByLeague[league] || markets) {
-              const screenResult = await handlers.screen_ranked({
-                league,
-                market,
-                books: args.books,
-                limit: limit * 2,
-                is_live: Boolean(args.is_live),
-                includeAll: false,
-                debug: false,
-                compact: Boolean(args.compact),
-                fields: Array.isArray(args.fields) ? args.fields : undefined,
-                include: Array.isArray(args.include) ? args.include : undefined,
-                skipHistory: args.skipHistory === true
-              });
-              const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
-              allRows = allRows.concat(rows.map((r) => ({ ...r, _market: market })));
-            }
+            // Markets are independent per-league; fan them out under a small
+            // concurrency cap. Combined with the outer league concurrency of
+            // 4, peak in-flight calls sit around 4×3=12 (vs the previous
+            // 4-leagues × 3-markets serial = 12 sequential per call) — but
+            // the per-call wall-clock time drops to roughly max(per-call)
+            // instead of sum(per-call). For 10 leagues × 3 markets that
+            // cuts per-league work 3x.
+            const leagueMarkets = resolvedMarketsByLeague[league] || markets;
+            const marketResults = await mapWithConcurrency(
+              leagueMarkets,
+              async (market) => {
+                const screenResult = await handlers.screen_ranked({
+                  league,
+                  market,
+                  books: args.books,
+                  limit: limit * 2,
+                  is_live: Boolean(args.is_live),
+                  includeAll: false,
+                  debug: false,
+                  compact: Boolean(args.compact),
+                  fields: Array.isArray(args.fields) ? args.fields : undefined,
+                  include: Array.isArray(args.include) ? args.include : undefined,
+                  skipHistory: args.skipHistory === true
+                });
+                const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
+                return rows.map((r) => ({ ...r, _market: market }));
+              },
+              { concurrency: 3 }
+            );
+            const allRows = marketResults.flat();
             // Deduplicate by gameId+selection (keep higher screenScore)
             const seen = new Map();
             for (const row of allRows) {
@@ -1794,6 +1795,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
 
       const result = await client.healthStatus();
+      // Surface cache hit/miss/eviction stats so operators can verify the
+      // 60s response cache and the cross-call odds-history LRU are doing
+      // useful work. Without this, a misconfigured cache (TTL too short,
+      // max-entries too small) would silently underperform.
+      const responseCacheStats = responseCache.stats();
+      const totalLooks = responseCacheStats.hits + responseCacheStats.misses;
+      const responseCacheHitRate = totalLooks > 0 ? responseCacheStats.hits / totalLooks : 0;
+      const oddsHistoryCacheStats = getOddsHistoryCache().stats();
+      const oddsTotalLooks = oddsHistoryCacheStats.hits + oddsHistoryCacheStats.misses;
+      const oddsHistoryHitRate = oddsTotalLooks > 0 ? oddsHistoryCacheStats.hits / oddsTotalLooks : 0;
       return {
         ok: true,
         auth: authSection,
@@ -1802,6 +1813,26 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ok: result.ok,
           message: result.ok ? 'Backend is reachable' : 'Backend returned an error',
           ...result
+        },
+        caches: {
+          response: {
+            size: responseCacheStats.size,
+            max: responseCacheStats.max,
+            hits: responseCacheStats.hits,
+            misses: responseCacheStats.misses,
+            evictions: responseCacheStats.evictions,
+            hitRate: Number(responseCacheHitRate.toFixed(4)),
+            ttlMs: responseCacheTtlMs
+          },
+          oddsHistory: {
+            size: oddsHistoryCacheStats.size,
+            max: oddsHistoryCacheStats.max,
+            hits: oddsHistoryCacheStats.hits,
+            misses: oddsHistoryCacheStats.misses,
+            evictions: oddsHistoryCacheStats.evictions,
+            hitRate: Number(oddsHistoryHitRate.toFixed(4)),
+            ttlMs: getOddsHistoryCacheTtlMs()
+          }
         }
       };
     },

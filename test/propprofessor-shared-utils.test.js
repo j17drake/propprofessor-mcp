@@ -77,3 +77,127 @@ describe('DEFAULT_LEAGUES', () => {
     assert.ok(!DEFAULT_LEAGUES.includes(''), 'must not contain empty string');
   });
 });
+
+describe('createCrossCallMemoizedQuery', () => {
+  const { createCrossCallMemoizedQuery } = require('../lib/propprofessor-shared-utils');
+  const { LruCache } = require('../lib/propprofessor-lru-cache');
+
+  it('deduplicates concurrent calls for the same key (in-flight mutex)', async () => {
+    let calls = 0;
+    let resolveFn;
+    const fn = () =>
+      new Promise((resolve) => {
+        calls += 1;
+        resolveFn = () => resolve({ value: calls });
+      });
+    const cache = new LruCache(10);
+    const memoized = createCrossCallMemoizedQuery(fn, { cache, keyFn: (p) => p.id });
+    const p1 = memoized({ id: 'x' });
+    const p2 = memoized({ id: 'x' });
+    const p3 = memoized({ id: 'x' });
+    resolveFn();
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+    assert.equal(calls, 1, 'fn should fire exactly once for concurrent calls');
+    assert.deepEqual([r1, r2, r3], [{ value: 1 }, { value: 1 }, { value: 1 }]);
+  });
+
+  it('serves cached results on subsequent calls (cross-call LRU)', async () => {
+    let calls = 0;
+    const fn = async (p) => {
+      calls += 1;
+      return { value: p.id, calls };
+    };
+    const cache = new LruCache(10);
+    const memoized = createCrossCallMemoizedQuery(fn, { cache, keyFn: (p) => p.id });
+    const r1 = await memoized({ id: 'a' });
+    const r2 = await memoized({ id: 'a' });
+    const r3 = await memoized({ id: 'b' });
+    assert.deepEqual(r1, { value: 'a', calls: 1 });
+    assert.deepEqual(r2, { value: 'a', calls: 1 }, 'second call should hit cache');
+    assert.deepEqual(r3, { value: 'b', calls: 2 });
+    assert.equal(calls, 2);
+  });
+
+  it('does not cache failures (so the next call retries)', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('upstream timeout');
+      return { ok: true };
+    };
+    const cache = new LruCache(10);
+    const memoized = createCrossCallMemoizedQuery(fn, { cache, keyFn: () => 'k' });
+    await assert.rejects(() => memoized({}), /upstream timeout/);
+    const r2 = await memoized({});
+    assert.deepEqual(r2, { ok: true });
+    assert.equal(calls, 2, 'second call must retry the network request, not serve cached failure');
+  });
+
+  it('throws when fn is not a function', () => {
+    const cache = new LruCache(10);
+    assert.throws(() => createCrossCallMemoizedQuery(null, { cache }), /fn must be a function/);
+  });
+
+  it('throws when cache is not an LRU-like object', () => {
+    assert.throws(
+      () => createCrossCallMemoizedQuery(async () => null, { cache: null }),
+      /cache must be an LRU-like object/
+    );
+  });
+});
+
+describe('mapWithConcurrency', () => {
+  const { mapWithConcurrency } = require('../lib/propprofessor-shared-utils');
+
+  it('returns an empty array for empty input', async () => {
+    const out = await mapWithConcurrency([], async () => 1);
+    assert.deepEqual(out, []);
+  });
+
+  it('preserves input order even with concurrency > 1', async () => {
+    const out = await mapWithConcurrency(
+      [1, 2, 3, 4, 5],
+      async (value) => {
+        // Variable delay so order can't be relied on from wall-clock timing.
+        await new Promise((resolve) => setTimeout(resolve, 6 - value));
+        return value * 10;
+      },
+      { concurrency: 3 }
+    );
+    assert.deepEqual(out, [10, 20, 30, 40, 50]);
+  });
+
+  it('caps in-flight workers at the requested concurrency', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    await mapWithConcurrency(
+      Array.from({ length: 12 }, (_, i) => i),
+      async (value) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return value;
+      },
+      { concurrency: 4 }
+    );
+    assert.equal(maxInFlight, 4, 'in-flight count should never exceed the cap');
+    assert.ok(maxInFlight <= 4);
+  });
+
+  it('coerces non-numeric concurrency to 1', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    await mapWithConcurrency(
+      [1, 2, 3],
+      async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+      },
+      { concurrency: 'bogus' }
+    );
+    assert.equal(maxInFlight, 1, 'non-numeric concurrency should fall back to 1');
+  });
+});
