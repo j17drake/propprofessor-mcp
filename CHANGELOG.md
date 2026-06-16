@@ -1,5 +1,54 @@
 # Changelog
 
+## 2.1.7
+
+**Two related ranker bugs that mis-reported consensus / execution data on single-book queries — both surfaced during a live Fliff Tennis query on 2026-06-15.** The first was a missing sharp-book augmentation in `screen_ranked` (consensus fields were 0 on every row when the user requested a non-sharp book). The second was the ranker reporting a non-preferred book's odds as if they were the preferred book's, producing misleading "Fliff -117" output when Fliff never posted a line.
+
+### Root cause
+
+**Bug 1: `screen_ranked` missing sharp-book augmentation.** The `runLeagueScreen` helper (used by `sharp_plays` via `queryLeagueScreen`) augmented the backend query with the league's sharp-book set so consensus data populated. The standalone `screen_ranked` handler had its own copy of the same logic but never got the augmentation — it called `client.queryScreenOddsBestComps({ books: requestedBooks })` directly. When a user requested a single non-sharp book (e.g. `books: ['Fliff']`), the backend returned just that one book and `consensusBookCount: 0` on every row.
+
+**Bug 2: ranker falls through to non-preferred book.** `expandScreenRow` in `lib/screen-ranker.js` derives `preferredOdds` via `oddsMap?.[resolvedBook] || oddsMap?.[preferredBook] || oddsMap?.[rowBook] || oddsMap?.NoVigApp`. When the user requested a book (e.g. Fliff) that wasn't in the row's `oddsMap`, the ranker fell through to `oddsMap?.[rowBook]` (the source book, e.g. Pinnacle) and reported Pinnacle's line as if it were Fliff's. The user saw a confident-looking "-117" with no indication it was a different book.
+
+### Fix
+
+- `scripts/server/handlers.js` `screen_ranked` (~line 793) — augment the backend query with `getSharpBookComparisonSet({ league, market })` the same way `runLeagueScreen` does. Three pre-existing test assertions updated to expect the augmented book list (`['NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']` for NBA Moneyline, equivalent for other leagues).
+- `scripts/server/handlers.js` `screen_ranked` + `runLeagueScreen` (sharp_plays path) — pass `requirePreferredBook: requestedBooks.length > 0` to `rankLeagueScreenRows`. The ranker drops any row where the user-requested book doesn't have a price in the row's `oddsMap`, rather than reporting a non-preferred book's odds as the preferred book's.
+- `lib/screen-ranker.js` `expandScreenRow` — new `requirePreferredBook` option. When true and the preferred book isn't in `oddsMap`, the function returns `[]` (drops the row). When false (default), the legacy fallback behavior is preserved for callers that explicitly want "any book with consensus."
+- `lib/screen-ranker.js` `rankScreenRows` + `rankLeagueScreenRows` — new `requirePreferredBook` option threaded through.
+- `lib/screen-tennis.js` `rankTennisScreenRows` — same `requirePreferredBook` option threaded through.
+- `test/screen-ranker.test.js` (new file, 6 tests) — first direct unit tests for the ranker. Covers the happy path, the `requirePreferredBook` drop, the legacy fallback, and the v2.1.6 `allBookOdds` reconstruction. The ranker was the most complex file in the project (916 LOC) without a direct test before this release; this is the test debt LOW-1 / LOW-2 from the prior audit, partially retired.
+- `test/propprofessor-api.test.js` (3 assertions updated) and `test/propprofessor-mcp-server.test.js` (1 assertion + 1 mock update) — updated to reflect the augmented book list and the new "first sharp book" mock convention.
+
+### Live impact (Fliff Tennis example)
+
+| Field                                         | Before v2.1.7               | After v2.1.7                                  |
+| --------------------------------------------- | --------------------------- | --------------------------------------------- |
+| `consensusBookCount` on Fliff Tennis          | 0 on every row              | 1–5 (Pinnacle, Polymarket, Kalshi, BetOnline) |
+| `consensusEdge`                               | `null`                      | -1.80 to +0.5pp (real)                        |
+| `screenScore`                                 | 0.00 (all rows failed gate) | 5.13–8.66 (rankable)                          |
+| Surfaces "Fliff -117" when Fliff never posted | YES (wrong book)            | NO (rows dropped)                             |
+| Tier 1–3 plays when Fliff has no line         | Surfaced as if real         | Dropped (requirePreferredBook gate)           |
+
+### Why this matters
+
+The v2.1.6 release fixed the consensus-preservation bug (the data was being clobbered). v2.1.7 fixes the remaining two data-quality issues that were masking the v2.1.6 fix in practice. After v2.1.7:
+
+- A user asking `screen_ranked(league='Tennis', books=['Fliff'])` sees rows where Fliff actually has a price, with real consensus from the league's sharp books.
+- A user asking for a match where Fliff doesn't post gets 0 rows for that match — not a fake row with another book's odds mislabeled as Fliff's.
+- A user asking `sharp_plays(book='Fliff', ...)` only sees plays where Fliff is actually priced.
+
+### Stats
+
+- 872 tests passing (was 866 in v2.1.6; +6 screen-ranker direct unit tests)
+- 24 tools (unchanged)
+- TIER 4 ≤ TIER 2 inversion: held (49.7% ≤ 49.9%)
+
+### Deferred (carryover from v2.1.6)
+
+- `import/no-cycle` ESLint rule — `eslint-plugin-import` does not yet support ESLint 10 (tracked at import-js/eslint-plugin-import#3227).
+- MEDIUM-1 from prior audit (two LRU cache classes coexist) — defer to v3.0. No user-facing impact.
+
 ## 2.1.6
 
 **Consensus-preservation fix in `extractScreenRows` — every main-line screen row was silently cascading to `consensusBookCount: 0 / TIER 4 / PASS` because the full per-book odds map was being clobbered on the expanded row.** Symptom: live screen / `get_play_details` / `recommended_bets` / `sharp_plays` calls all returned `consensusBookCount: 0`, `consensusEdge: null`, `executionQuality: "unknown"`, `marketBookCount: 0`, `supportBookCount: 0`, `screenScore: 0`, `gatePassed: false` with `gateReason: "score 0.00 below 2.05 gate"`, and consequently `riskScore: 10`, `kaiCall: "PASS"`, `confidenceTier: "TIER 4"`. The same symptom pattern as the 2026-06-15 upstream consensus outage — but the upstream `/odds_history_new` and `/screen` are healthy, so the bug was local.

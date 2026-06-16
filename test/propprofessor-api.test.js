@@ -765,7 +765,17 @@ describe('createPropProfessorClient', () => {
     assert.equal(result.freshness.rowCount, 2);
     assert.equal(result.freshness.newestAgeMs !== null, true);
     assert.equal(result.resultMeta.lookbackHoursUsed, 6);
-    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['NoVigApp']);
+    // Audit 2026-06-15: screen_ranked augments historySportsbooks with the
+    // NBA Moneyline sharp-book set so the hydration step can fetch line
+    // history from the consensus reference books.
+    assert.deepEqual(result.resultMeta.historySportsbooksRequested, [
+      'NoVigApp',
+      'Circa',
+      'Pinnacle',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings'
+    ]);
     assert.equal(result.resultMeta.debugEnabled, true);
     assert.equal(result.resultMeta.freshnessFallbackUsed, false);
     assert.deepEqual(result.resultMeta.timestampSources, { updatedAt: 2 });
@@ -790,9 +800,20 @@ describe('createPropProfessorClient', () => {
     assert.equal(result.result[0].rankingProvenance.historyMatchedBy, 'selectionId');
     assert.equal(result.result[0].rankingProvenance.lineHistorySource, 'odds_history');
     assert.equal(result.result[0].rankingProvenance.normalizedSelectionId, 'Moneyline:Boston_Celtics');
-    assert.deepEqual(screenCalls[0].books, ['NoVigApp']);
+    // Audit 2026-06-15: screen_ranked now augments the backend query with the
+    // league's sharp-book set so consensus data populates. Previously the
+    // backend was called with only the user-requested book, which left
+    // consensusBookCount=0 on every row for non-sharp books (e.g. Fliff).
+    assert.deepEqual(screenCalls[0].books, ['NoVigApp', 'Circa', 'Pinnacle', 'BookMaker', 'BetOnline', 'DraftKings']);
     assert.equal(historyCalls.length >= 1, true);
-    assert.deepEqual(historyCalls[0].sportsbooks, ['NoVigApp']);
+    assert.deepEqual(historyCalls[0].sportsbooks, [
+      'NoVigApp',
+      'Circa',
+      'Pinnacle',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings'
+    ]);
   });
 
   it('screen_ranked canonicalizes ReBet aliases for screen filtering and history hydration', async () => {
@@ -855,12 +876,41 @@ describe('createPropProfessorClient', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(screenCalls[0].books, ['Rebet']);
-    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['Rebet']);
+    // Audit 2026-06-15: ReBet is canonicalized to NoVigApp for book-matching
+    // purposes (see assert below: result.result[0].book === 'Rebet'), but the
+    // raw books list still includes the user-requested 'Rebet' string. The
+    // screen_ranked handler augments with the MLB Moneyline sharp-book set
+    // so consensus data populates.
+    assert.deepEqual(screenCalls[0].books, [
+      'Rebet',
+      'Pinnacle',
+      'Circa',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings',
+      'BetMGM'
+    ]);
+    assert.deepEqual(result.resultMeta.historySportsbooksRequested, [
+      'Rebet',
+      'Pinnacle',
+      'Circa',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings',
+      'BetMGM'
+    ]);
     assert.equal(result.result.length >= 1, true);
     assert.equal(result.result[0].book, 'Rebet');
     assert.equal(historyCalls.length >= 1, true);
-    assert.deepEqual(historyCalls[0].sportsbooks, ['Rebet']);
+    assert.deepEqual(historyCalls[0].sportsbooks, [
+      'Rebet',
+      'Pinnacle',
+      'Circa',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings',
+      'BetMGM'
+    ]);
   });
 
   it('screen_ranked omits verbose movement debug when disabled', async () => {

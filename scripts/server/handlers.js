@@ -440,7 +440,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           books: requestedBooks.length ? requestedBooks : undefined,
           includeAll: getIncludeAll(args),
           maxAgeMs: getMaxAgeMs(args),
-          debug
+          debug,
+          // Audit 2026-06-15: same gate as screen_ranked — drop rows where
+          // the user-requested book has no price. Without this, sharp_plays
+          // could surface "Fliff -117" when Fliff never posted a line.
+          requirePreferredBook: requestedBooks.length > 0
         })
     });
 
@@ -532,7 +536,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             preferredBook,
             includeAll: getIncludeAll(args),
             maxAgeMs: getMaxAgeMs(args),
-            debug
+            debug,
+            // Audit 2026-06-15: see the screen_ranked comment. Same
+            // requirePreferredBook gate prevents surfacing non-Fliff rows
+            // as "Fliff -117" when Fliff never posted a line.
+            requirePreferredBook: requestedBooks.length > 0
           })
       });
       if (screenResult?.result) {
@@ -782,18 +790,28 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // explicitly passed books, leaving focusPlays empty (= expand to all
       // books in the payload) otherwise.
       const focusBook = requestedBooks.length ? requestedBooks[0] : '';
+      // Auto-augment the backend query with the league's sharp-book set so
+      // consensus data populates. The user-requested book (e.g. Fliff) typically
+      // is NOT a sharp book, so without augmentation the backend returns just
+      // that one book and consensusBookCount=0 on every row. The ranker needs
+      // at least 2-3 comp books in allBookOdds to compute consensusEdge.
+      // Audit 2026-06-15: this augmentation was present in runLeagueScreen
+      // (used by sharp_plays) but missing from screen_ranked. Symptom: every
+      // screen_ranked call on a single non-sharp book returned consBk=0.
+      const sharpBookSet = getSharpBookComparisonSet({ league, market });
+      const augmentedBooks = uniqueBooks([...requestedBooks, ...sharpBookSet]);
       const payload = await client.queryScreenOddsBestComps({
         market,
         league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
-        books: requestedBooks,
+        books: augmentedBooks,
         is_live: Boolean(args.is_live)
       });
       const response = await buildRankedScreenResponseShared({
         client,
         payloads: [payload],
-        args,
+        args: { ...args, historySportsbooks: augmentedBooks },
         league,
         focusBook,
         rankRows: (hydratedRows, { debug } = {}) =>
@@ -804,7 +822,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             books: requestedBooks.length ? requestedBooks : undefined,
             includeAll: getIncludeAll(args),
             maxAgeMs: getMaxAgeMs(args),
-            debug
+            debug,
+            // Audit 2026-06-15: when the user passes an explicit books list,
+            // the ranker must drop rows where the preferred book has no
+            // price — otherwise a row whose allBookOdds only contains
+            // Pinnacle/Polymarket/Kalshi gets reported as "Fliff -117"
+            // when Fliff never posted a line.
+            requirePreferredBook: requestedBooks.length > 0
           })
       });
       // Add market alias info to resultMeta if any aliases were used

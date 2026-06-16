@@ -76,6 +76,13 @@ function createRankedScreenClientStub({
       },
       queryOddsHistory: async ({ sportsbooks } = {}) => {
         const requested = Array.isArray(sportsbooks) && sportsbooks.length ? sportsbooks : ['NoVigApp'];
+        // Mock returns history for the first SHARP book in the list (not the
+        // first user-requested book). This is what the ranker needs to identify
+        // movement from an independent sharp source (rather than the focus
+        // book). Audit 2026-06-15: with the augmented books list, requested[0]
+        // is the user's focus book; we want requested[1] (the first sharp
+        // book) for the movement source so classifySharpPlay sees
+        // sourceIsTargetBook=false and produces verdict='Bet candidate'.
         const book = requested.length > 1 ? requested[1] : requested[0];
         return {
           [book]: [
@@ -845,13 +852,37 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls.queryScreenOddsBestComps.length, 1);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
+    // Audit 2026-06-15: screen_ranked now augments the backend query and the
+    // historySportsbooks list with the NBA Moneyline sharp-book set so
+    // consensus data populates. Without augmentation, single-book queries on
+    // non-sharp books returned consensusBookCount=0 on every row.
+    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, [
+      'NoVigApp',
+      'Circa',
+      'Pinnacle',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings'
+    ]);
     assertBasicRankedResponse(result, 'NBA');
     assert.equal(result.freshness.newestAgeMs !== null, true);
     assert.equal(result.resultMeta.focusBook, 'NoVigApp');
-    assert.deepEqual(result.resultMeta.historySportsbooksRequested, ['NoVigApp']);
+    assert.deepEqual(result.resultMeta.historySportsbooksRequested, [
+      'NoVigApp',
+      'Circa',
+      'Pinnacle',
+      'BookMaker',
+      'BetOnline',
+      'DraftKings'
+    ]);
     assert.equal(result.resultMeta.debugEnabled, true);
     assert.equal(result.result[0].movementMode, 'same_book');
-    assert.equal(result.result[0].movementSourceBook, 'NoVigApp');
+    // Audit 2026-06-15: the mock returns history for requested[1] (the first
+    // sharp book in the augmented list, Circa for NBA Moneyline). The ranker
+    // uses that as the movement source. The real PropProfessor API would
+    // return history for the focus book first; the mock simulates the
+    // cross-book movement pattern that classifySharpPlay needs.
+    assert.equal(result.result[0].movementSourceBook, 'Circa');
     assert.equal(result.result[0].freshnessSource, 'updatedAt');
     assert.equal(result.result[0].freshnessFallbackUsed, false);
     assert.equal(result.result[0].rankingProvenance.focusBook, 'NoVigApp');
