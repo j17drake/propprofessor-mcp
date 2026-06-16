@@ -4,7 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-872%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-876%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -71,7 +71,7 @@ The ranking pipeline is validated against synthetic scenarios where the movement
 || TIER 4 > TIER 2 inversion | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2 |
 || Steam move detection | Coordinated sharp moves across 3+ books within a 90-min window |
 || Line lag detection | Target-book price divergence vs sharp consensus (avg 12-25pt gap) |
-|| Tests | **872 passing** |
+|| Tests | **876 passing** |
 || Coverage | **82% statements, 88% functions** |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
@@ -389,7 +389,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 
 ## For maintainers
 
-- **Tests**: `npm test` (872 passing) — 5/5 reruns, deterministic
+- **Tests**: `npm test` (876 passing) — 5/5 reruns, deterministic
 - **Coverage**: `npm run test:coverage` (~82% statements, ~88% functions)
 - **Lint**: `npm run lint` (clean)
 - **Format**: `npm run format:check` (clean — `npm run format` to fix)
@@ -429,7 +429,9 @@ Detailed docs:
 - **`requirePreferredBook` ranker gate** — `lib/screen-ranker.js`. New option that drops rows where the user-requested book doesn't have a price in the row's `oddsMap`. Previously, when you asked for `books: ['Fliff']` and a match had only Pinnacle / Polymarket / Kalshi odds (no Fliff), the ranker fell through to the row's source book and reported Pinnacle's line as if it were Fliff's. Now those rows are dropped. A user asking "what should I bet on Fliff" gets plays that Fliff actually prices. Set automatically by `screen_ranked` and `runLeagueScreen` whenever the user passes an explicit `books` list; legacy behavior preserved when the user doesn't pass a book (uses preset default with the standard fallback).
 - **First direct unit tests for the ranker** — `test/screen-ranker.test.js` (6 new tests). The ranker was the most complex file in the project (916 LOC) without a direct test before this release; the only coverage was via handler-integration tests, which catch output regressions but not ranker-internal logic. Tests cover the happy path, the `requirePreferredBook` drop, the legacy fallback, and the v2.1.6 `allBookOdds` reconstruction.
 - 24 total tools (unchanged)
-- All 872 tests passing (was 866)
+- All 876 tests passing (was 866)
+
+> **New `playableOnly` flag** (added 2026-06-15 patch): pass `playableOnly: true` to `screen_ranked` to get rows where the user-requested book is within the normal market range (`executionQuality != "bad"`) even when `consensusEdge` is negative or zero. Default behavior still requires positive consensus edge for TIER 1-3 plays. Use this when you want signals on a specific book (e.g. Fliff) at executable prices, not just positive-EV opportunities. See the "playable, not best" note in the v2.1.7 release notes for the full rationale.
 
 ---
 
@@ -438,7 +440,7 @@ Detailed docs:
 - **Consensus-preservation fix** — `extractScreenRows` in `lib/screen-parser.js` was clobbering the full per-book odds map on expanded rows, causing every main-line screen row to cascade to `consensusBookCount: 0 / TIER 4 / PASS`. Live screen, `get_play_details`, `recommended_bets`, and `sharp_plays` calls all came back with `consensusEdge: null`, `executionQuality: "unknown"`, `screenScore: 0`, `gatePassed: false`. With this fix, `consensusBookCount` returns 5–19, `consensusStrength` reads "strong", and rows can now reach TIER 1–3.
 - **3 new regression tests** in `test/propprofessor-analysis.test.js` — live-shape fixture mirroring the actual `/screen` payload, v2.1.2 fallback preservation, and per-book `odds` contract preservation. Prevents recurrence of the consensus cascade.
 - 24 total tools (unchanged)
-- All 872 tests passing (was 843)
+- All 876 tests passing (was 843)
 
 ---
 
@@ -448,7 +450,7 @@ Detailed docs:
 - **CDP fallback gated by `PP_NO_CDP_FALLBACK=1`** for headless / CI environments.
 - **Watchdog cron is no longer required.** `scripts/pp-token-watchdog.js` stays in the repo as a manual escape hatch for diagnostics; you can remove any `*/5 18-23 * * *` cron driving it.
 - 24 total tools (unchanged)
-- Test count: 843 at release (was 826 at v2.1.4)
+- Test count: 843 at v2.1.5 release (was 826 at v2.1.4)
 
 ---
 

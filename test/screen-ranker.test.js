@@ -196,4 +196,139 @@ describe('screen-ranker (direct unit tests)', () => {
       assert.equal(ranked.length, 1, 'row should be kept when requirePreferredBook is not set');
     });
   });
+
+  describe('rankScreenRows with playableOnly', () => {
+    it('keeps "playable" execution rows under playableOnly (10¢ from best)', () => {
+      // Audit 2026-06-15: user wants "playable" Fliff plays — within normal
+      // market range, not wildly off-market. The playableOnly flag drops
+      // "bad" execution rows (where the user's book is 10+ cents worse than
+      // the comp consensus) but keeps "playable" and "best" rows even when
+      // the consensus edge is negative.
+      // For negative odds: targetOdds=-115, best=-105 means target is 10¢
+      // worse (you risk more), which classifies as "playable".
+      const rows = [
+        {
+          book: 'Fliff',
+          homeTeam: 'A',
+          awayTeam: 'B',
+          participant: 'A',
+          market: 'Moneyline',
+          selection1: 'A',
+          participant1: 'A',
+          selection1Id: 'Moneyline:A',
+          selection2: 'B',
+          participant2: 'B',
+          selection2Id: 'Moneyline:B',
+          allBookOdds: {
+            Fliff: { book: 'Fliff', odds1: -115, odds2: -130 },
+            Pinnacle: { book: 'Pinnacle', odds1: -105, odds2: -140 }
+          }
+        }
+      ];
+      const ranked = rankScreenRows(rows, {
+        limit: 10,
+        preferredBooks: ['Fliff', 'Pinnacle'],
+        includeAll: true,
+        playableOnly: true
+      });
+      assert.equal(ranked.length, 1, 'playable row is kept under playableOnly');
+      assert.equal(ranked[0].executionQuality, 'playable');
+    });
+
+    it('drops "bad" execution rows under playableOnly (15¢+ from best)', () => {
+      // Fliff is 20¢ worse than consensus best — should classify as "bad"
+      // and be dropped under playableOnly.
+      const rows = [
+        {
+          book: 'Fliff',
+          homeTeam: 'A',
+          awayTeam: 'B',
+          participant: 'A',
+          market: 'Moneyline',
+          selection1: 'A',
+          participant1: 'A',
+          selection1Id: 'Moneyline:A',
+          selection2: 'B',
+          participant2: 'B',
+          selection2Id: 'Moneyline:B',
+          allBookOdds: {
+            Fliff: { book: 'Fliff', odds1: -125, odds2: -130 },
+            Pinnacle: { book: 'Pinnacle', odds1: -105, odds2: -140 }
+          }
+        }
+      ];
+      const ranked = rankScreenRows(rows, {
+        limit: 10,
+        preferredBooks: ['Fliff', 'Pinnacle'],
+        includeAll: true,
+        playableOnly: true
+      });
+      assert.equal(ranked.length, 0, 'bad execution row should be dropped under playableOnly');
+    });
+
+    it('keeps "bad" execution rows when playableOnly is not set (default)', () => {
+      // Without playableOnly, the ranker surfaces all rows. The execution
+      // quality is still computed and exposed as a field, but it's not used
+      // as a filter. Callers who don't pass playableOnly get the full
+      // (ranker-gated) view.
+      const rows = [
+        {
+          book: 'Fliff',
+          homeTeam: 'A',
+          awayTeam: 'B',
+          participant: 'A',
+          market: 'Moneyline',
+          selection1: 'A',
+          participant1: 'A',
+          selection1Id: 'Moneyline:A',
+          selection2: 'B',
+          participant2: 'B',
+          selection2Id: 'Moneyline:B',
+          allBookOdds: {
+            Fliff: { book: 'Fliff', odds1: -125, odds2: -130 },
+            Pinnacle: { book: 'Pinnacle', odds1: -105, odds2: -140 }
+          }
+        }
+      ];
+      const ranked = rankScreenRows(rows, {
+        limit: 10,
+        preferredBooks: ['Fliff', 'Pinnacle'],
+        includeAll: true
+      });
+      assert.equal(ranked.length, 1, 'row kept under default settings (no playableOnly filter)');
+      assert.equal(ranked[0].executionQuality, 'bad');
+    });
+
+    it('keeps "best" execution rows under playableOnly', () => {
+      // Fliff is the best price on this match — execution quality is "best",
+      // should be kept under playableOnly.
+      const rows = [
+        {
+          book: 'Fliff',
+          homeTeam: 'A',
+          awayTeam: 'B',
+          participant: 'A',
+          market: 'Moneyline',
+          selection1: 'A',
+          participant1: 'A',
+          selection1Id: 'Moneyline:A',
+          selection2: 'B',
+          participant2: 'B',
+          selection2Id: 'Moneyline:B',
+          allBookOdds: {
+            Fliff: { book: 'Fliff', odds1: -110, odds2: -130 },
+            Pinnacle: { book: 'Pinnacle', odds1: -115, odds2: -135 }
+          }
+        }
+      ];
+      const ranked = rankScreenRows(rows, {
+        limit: 10,
+        preferredBooks: ['Fliff', 'Pinnacle'],
+        includeAll: true,
+        playableOnly: true
+      });
+      assert.equal(ranked.length, 1);
+      assert.equal(ranked[0].executionQuality, 'best');
+    });
+  });
 });

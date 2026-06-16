@@ -444,7 +444,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           // Audit 2026-06-15: same gate as screen_ranked — drop rows where
           // the user-requested book has no price. Without this, sharp_plays
           // could surface "Fliff -117" when Fliff never posted a line.
-          requirePreferredBook: requestedBooks.length > 0
+          requirePreferredBook: requestedBooks.length > 0,
+          // playableOnly flag (2026-06-15): see screen_ranked comment.
+          playableOnly: args.playableOnly === true
         })
     });
 
@@ -540,7 +542,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             // Audit 2026-06-15: see the screen_ranked comment. Same
             // requirePreferredBook gate prevents surfacing non-Fliff rows
             // as "Fliff -117" when Fliff never posted a line.
-            requirePreferredBook: requestedBooks.length > 0
+            requirePreferredBook: requestedBooks.length > 0,
+            // playableOnly (2026-06-15): see screen_ranked comment.
+            playableOnly: args.playableOnly === true
           })
       });
       if (screenResult?.result) {
@@ -828,7 +832,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             // price — otherwise a row whose allBookOdds only contains
             // Pinnacle/Polymarket/Kalshi gets reported as "Fliff -117"
             // when Fliff never posted a line.
-            requirePreferredBook: requestedBooks.length > 0
+            requirePreferredBook: requestedBooks.length > 0,
+            // Audit 2026-06-15 (playable): when the user opts in via
+            // playableOnly, the ranker keeps rows where Fliff's price is
+            // within normal market range (playable/best execution quality)
+            // even when the consensus edge is negative. The user said
+            // "playable, not best" — they want signals at executable prices,
+            // not just positive-EV plays.
+            playableOnly: args.playableOnly === true
           })
       });
       // Add market alias info to resultMeta if any aliases were used

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.7 (patch: playableOnly flag)
+
+**Added `playableOnly: true` option to `screen_ranked` (and the underlying tennis + sharp_plays paths).** When set, the ranker keeps rows where the user-requested book is within the normal market range (`executionQuality != "bad"`) even when `consensusEdge` is negative or zero. Use this when you want signals on a specific book at executable prices, not just positive-EV opportunities.
+
+### What changed
+
+- `lib/screen-ranker.js` `expandScreenRow` / `rankScreenRows` / `rankLeagueScreenRows` — new `playableOnly` option. When true, the row filter drops only `executionQuality === 'bad'` rows (where the user's book is 10+ cents worse than the comp consensus). `'playable'` and `'best'` rows are kept regardless of consensus edge direction.
+- `lib/screen-tennis.js` `rankTennisScreenRows` — same `playableOnly` option threaded through.
+- `scripts/server/handlers.js` `screen_ranked`, `runLeagueScreen` (sharp_plays path), `runTennisScreen` — pass `playableOnly: args.playableOnly === true` to the ranker.
+- `lib/propprofessor-tool-definitions.js` `screen_ranked` — added `playableOnly: { type: 'boolean', description: '...' }` to the inputSchema. The validator (added in v2.1.6 hardening) enforces the boolean type.
+- `test/screen-ranker.test.js` — 4 new tests covering playable/best/bad execution under `playableOnly=true` and the default behavior.
+
+### Why this is the right default for a "playable, not best" workflow
+
+The user reported that for Fliff Tennis, no TIER 1-3 plays surfaced even though many rows had real movement signals (`openToCurrentClvPct > 0`, `movementLabel: 'supportive'`). The default ranker gate requires `score >= 1.75`, which implicitly demands positive consensus edge — too strict for a bettor who just wants "executable price on a book where sharp money is moving in the right direction." The `playableOnly` flag relaxes the consensus edge requirement while still dropping rows where the user's book is wildly off-market (the `bad` execution quality classification).
+
+Example: with `books: ['Fliff']` and `playableOnly: true`, `screen_ranked` now surfaces Parry-Tauson at Fliff -145 (best -135) — a 10¢ spread, supportive movement, +1.74% CLV — that the default gate would have flagged PASS.
+
+### Stats
+
+- 876 tests passing (was 872 in v2.1.7; +4 playableOnly unit tests)
+- 24 tools (unchanged)
+- No behavior change for callers who don't pass `playableOnly` — full backwards compatibility.
+
 ## 2.1.7
 
 **Two related ranker bugs that mis-reported consensus / execution data on single-book queries — both surfaced during a live Fliff Tennis query on 2026-06-15.** The first was a missing sharp-book augmentation in `screen_ranked` (consensus fields were 0 on every row when the user requested a non-sharp book). The second was the ranker reporting a non-preferred book's odds as if they were the preferred book's, producing misleading "Fliff -117" output when Fliff never posted a line.
