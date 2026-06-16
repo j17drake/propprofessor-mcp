@@ -42,7 +42,11 @@
 
 ### Stats
 
-- 846 tests passing (was 843 in v2.1.5; +3 live-shape regression tests)
+- 866 tests passing (was 843 in v2.1.5; +23 tests: 3 live-shape consensus, 1 CDP URL-escape guard, 19 arg-validator)
+
+### Deferred
+
+- **`import/no-cycle` ESLint rule** — `eslint-plugin-import` does not yet support ESLint 10 (tracked at import-js/eslint-plugin-import#3227). The repo upgraded to eslint 10.5.0 in the same release cycle, so installing the plugin would force a downgrade. Re-evaluate once the plugin ships v10 support.
 - 24 tools (unchanged)
 - TIER 1/2 hit rate: pending re-validation against fresh data (was 51.5% on 575 plays in v2.1.5; should improve because more rows are now rankable instead of all defaulting to TIER 4)
 

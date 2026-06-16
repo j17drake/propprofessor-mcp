@@ -4,7 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-843%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-866%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -71,7 +71,7 @@ The ranking pipeline is validated against synthetic scenarios where the movement
 || TIER 4 > TIER 2 inversion | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2 |
 || Steam move detection | Coordinated sharp moves across 3+ books within a 90-min window |
 || Line lag detection | Target-book price divergence vs sharp consensus (avg 12-25pt gap) |
-|| Tests | **843 passing** |
+|| Tests | **866 passing** |
 || Coverage | **82% statements, 88% functions** |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
@@ -389,7 +389,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 
 ## For maintainers
 
-- **Tests**: `npm test` (843 passing) — 5/5 reruns, deterministic
+- **Tests**: `npm test` (866 passing) — 5/5 reruns, deterministic
 - **Coverage**: `npm run test:coverage` (~82% statements, ~88% functions)
 - **Lint**: `npm run lint` (clean)
 - **Format**: `npm run format:check` (clean — `npm run format` to fix)
@@ -423,13 +423,22 @@ Detailed docs:
 
 ---
 
+## What's new (v2.1.6)
+
+- **Consensus-preservation fix** — `extractScreenRows` in `lib/screen-parser.js` was clobbering the full per-book odds map on expanded rows, causing every main-line screen row to cascade to `consensusBookCount: 0 / TIER 4 / PASS`. Live screen, `get_play_details`, `recommended_bets`, and `sharp_plays` calls all came back with `consensusEdge: null`, `executionQuality: "unknown"`, `screenScore: 0`, `gatePassed: false`. With this fix, `consensusBookCount` returns 5–19, `consensusStrength` reads "strong", and rows can now reach TIER 1–3.
+- **3 new regression tests** in `test/propprofessor-analysis.test.js` — live-shape fixture mirroring the actual `/screen` payload, v2.1.2 fallback preservation, and per-book `odds` contract preservation. Prevents recurrence of the consensus cascade.
+- 24 total tools (unchanged)
+- All 866 tests passing (was 843)
+
+---
+
 ## What's new (v2.1.5)
 
 - **Vercel 429 self-heal** — `fetchAccessToken()` in `lib/propprofessor-auth.js` now automatically falls back to a Chrome DevTools Protocol fetch from a logged-in browser tab when the server-to-server `got-scraping` path is 429'd by Vercel's TLS-fingerprint challenge. No cron, no external schedule — the MCP heals itself on the next request. Failure mode shrinks from "anyone betting during Vercel gating" to "Chrome not running AND Vercel gating" (i.e. "I'm not at my Mac").
 - **CDP fallback gated by `PP_NO_CDP_FALLBACK=1`** for headless / CI environments.
 - **Watchdog cron is no longer required.** `scripts/pp-token-watchdog.js` stays in the repo as a manual escape hatch for diagnostics; you can remove any `*/5 18-23 * * *` cron driving it.
 - 24 total tools (unchanged)
-- All 843 tests passing (was 826)
+- Test count: 843 at release (was 826 at v2.1.4)
 
 ---
 

@@ -122,6 +122,41 @@ describe('fetchAccessTokenViaCDP', () => {
     );
   });
 
+  it('JSON-escapes the access-token URL in the Runtime.evaluate expression', async () => {
+    // Regression test for the unsafe `${ACCESS_TOKEN_URL}` template
+    // interpolation in the Runtime.evaluate expression. The current constant
+    // is a hardcoded HTTPS URL with no special characters, but the pattern
+    // is fragile — any future change to ACCESS_TOKEN_URL (or a maintainer
+    // who adds a second interpolated value) would silently re-introduce a
+    // CDP-eval injection. The fix wraps the URL in JSON.stringify before
+    // inlining, so we assert the produced expression contains the JSON
+    // string literal form (with quotes) rather than the raw URL.
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ webSocketDebuggerUrl: 'ws://127.0.0.1:9222/devtools/browser/abc' })
+    });
+    const responses = [
+      { id: 1, result: { targetInfos: [{ type: 'page', url: 'https://app.propprofessor.com/', targetId: 'T1' }] } },
+      { id: 2, result: { sessionId: 'S' } },
+      { id: 3, result: { result: { value: JSON.stringify({ token: 't', exp: 1, perm: {} }) } } }
+    ];
+    const { StubWebSocket, sent } = makeStubWebSocket(responses);
+    await fetchAccessTokenViaCDP({ fetchImpl, WebSocketImpl: StubWebSocket });
+    const evalCall = sent.find((m) => m.method === 'Runtime.evaluate');
+    const expr = evalCall.params.expression;
+    // The URL must appear as a JSON-stringified literal (with surrounding
+    // double quotes), NOT as a bare concatenation that could be hijacked.
+    assert.ok(
+      expr.includes('"https://app.propprofessor.com/api/access-token"'),
+      `Runtime.evaluate expression should JSON-escape the URL; got: ${expr}`
+    );
+    assert.ok(
+      !expr.includes("'https://app.propprofessor.com/api/access-token'"),
+      `Runtime.evaluate expression should not use the old single-quoted interpolation; got: ${expr}`
+    );
+  });
+
   it('happy path: version -> ws -> fetch -> returns token', async () => {
     const fetchImpl = async () => ({
       ok: true,

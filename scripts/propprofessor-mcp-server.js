@@ -20,6 +20,7 @@ const {
   createStdioMessageReader
 } = require('../lib/propprofessor-mcp-stdio');
 const { clearTierCache } = require('../lib/propprofessor-risk-score');
+const { validateArgs } = require('../lib/mcp-arg-validator');
 
 const mapWithConcurrency = mapWithConcurrencyFromHandlers;
 
@@ -71,6 +72,21 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
       const handler = handlers[toolName];
       if (!toolMap.has(toolName) || typeof handler !== 'function') {
         return createJsonRpcError(id, -32601, `Unknown tool: ${toolName}`);
+      }
+      // Enforce inputSchema at the server. The MCP client is expected to
+      // validate, but the server shouldn't trust that — a misbehaving
+      // client (or a hand-crafted JSON-RPC frame) can otherwise smuggle
+      // unexpected fields or type-mismatched values to the handler, which
+      // would either crash, silently coerce to NaN, or pass the bad value
+      // to the PropProfessor backend.
+      const toolDef = toolMap.get(toolName);
+      const argCheck = validateArgs(toolDef.inputSchema, params?.arguments);
+      if (!argCheck.ok) {
+        return createJsonRpcSuccess(id, {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, error: argCheck }, null, 2) }],
+          structuredContent: { ok: false, error: argCheck },
+          isError: true
+        });
       }
       try {
         const result = await handler(params?.arguments || {});
