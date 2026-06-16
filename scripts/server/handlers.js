@@ -61,6 +61,7 @@ const {
   suggestStakes
 } = require('../../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../../lib/propprofessor-player-context');
+const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
 const {
   formatRecommendedBetsMinimal,
   formatRecommendedBetsStandard,
@@ -372,13 +373,14 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
 }
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
-  const { TtlCache, getCacheTtlMs, getCacheMaxEntries } = require('../../lib/mcp-runtime-config');
+  const { getRuntimeCache, getCacheTtlMs } = require('../../lib/mcp-runtime-config');
 
-  // Shared response cache — keyed by query params, TTL-based expiration
-  const responseCache = new TtlCache({
-    ttlMs: getCacheTtlMs(),
-    maxEntries: getCacheMaxEntries()
-  });
+  // Shared response cache — keyed by query params, TTL-based expiration.
+  // Backed by the canonical LruCache (lib/propprofessor-lru-cache.js) so all
+  // caching in the project shares one implementation; the TTL is applied
+  // per-set since LruCache supports per-entry TTL.
+  const responseCache = getRuntimeCache();
+  const responseCacheTtlMs = getCacheTtlMs();
 
   function buildCacheKey(prefix, args, league) {
     return JSON.stringify({
@@ -460,7 +462,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // Store in cache
     if (cacheKey) {
-      responseCache.set(cacheKey, response);
+      responseCache.set(cacheKey, response, responseCacheTtlMs);
     }
 
     return response;
@@ -559,7 +561,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       // Store in cache
       if (cacheKey) {
-        responseCache.set(cacheKey, screenResult);
+        responseCache.set(cacheKey, screenResult, responseCacheTtlMs);
       }
       return screenResult;
     }
@@ -849,6 +851,43 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           markets_alias_used: marketResolution.aliasesUsed
         };
       }
+      // Pre-flight player research (v2.1.8): when includeResearch=true, run
+      // player_context on the top N ranked rows so the response includes
+      // injury/risk flags alongside the ranked plays. Agents can then drop
+      // high-risk plays before recommending. When riskDowngrade=true, plays
+      // with riskFlag='high' are removed from the result entirely (a hard
+      // filter, not a soft annotation).
+      if (args.includeResearch === true && Array.isArray(response.result) && response.result.length) {
+        const researchLimit = Number.isFinite(Number(args.researchLimit))
+          ? Math.max(1, Math.min(50, Number(args.researchLimit)))
+          : 10;
+        const research = await runResearchOnTopRows({
+          rows: response.result,
+          limit: researchLimit,
+          playerContextFn: handlers.player_context
+        });
+        response.research = research.results;
+        response.resultMeta = {
+          ...response.resultMeta,
+          researchRunCount: research.results.length,
+          researchRiskHighCount: research.results.filter((r) => r.riskFlag === 'high').length,
+          researchCachedCount: research.results.filter((r) => r.cached).length
+        };
+        if (args.riskDowngrade === true) {
+          const beforeCount = response.result.length;
+          const highRiskPlayers = new Set(
+            research.results.filter((r) => r.riskFlag === 'high').map((r) => String(r.player || '').toLowerCase())
+          );
+          response.result = response.result.filter((row) => {
+            const player = String(row.selection || row.participant || '').toLowerCase();
+            return !highRiskPlayers.has(player);
+          });
+          response.resultMeta = {
+            ...response.resultMeta,
+            riskDowngradedCount: beforeCount - response.result.length
+          };
+        }
+      }
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
       if (verbosity === 'minimal') return formatScreenRankedMinimal(response);
@@ -1083,27 +1122,67 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             })
             .slice(0, limit);
           if (recommended.length) {
+            // Pre-flight research (v2.1.8): when includeResearch=true, attach
+            // risk flags to each play. When riskDowngrade=true, drop plays
+            // with riskFlag='high' from the recommendation.
+            let researchResults = [];
+            let downgraded = 0;
+            if (args.includeResearch === true && recommended.length) {
+              const research = await runResearchOnTopRows({
+                rows: recommended,
+                limit: recommended.length,
+                playerContextFn: handlers.player_context
+              });
+              researchResults = research.results;
+              if (args.riskDowngrade === true) {
+                const beforeCount = recommended.length;
+                const highRiskPlayers = new Set(
+                  research.results.filter((r) => r.riskFlag === 'high').map((r) => String(r.player || '').toLowerCase())
+                );
+                for (let i = recommended.length - 1; i >= 0; i -= 1) {
+                  const player = String(recommended[i].selection || recommended[i].participant || '').toLowerCase();
+                  if (highRiskPlayers.has(player)) {
+                    recommended.splice(i, 1);
+                  }
+                }
+                downgraded = beforeCount - recommended.length;
+              }
+            }
             allRecommended.push({
               league,
               count: recommended.length,
               markets_queried: markets,
-              plays: recommended.map((row) => ({
-                game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
-                selection: row.selection || row.participant || null,
-                market: row._market || row.market || null,
-                start: row.start || null,
-                odds: row.targetBookOdds ?? null,
-                edge: row.consensusEdge,
-                clv: row.clvProxyPct,
-                consensusBookCount: row.consensusBookCount,
-                executionQuality: row.executionQuality,
-                movementGrade: row.movementGrade,
-                riskScore: row.riskScore,
-                kaiCall: row.kaiCall,
-                confidenceTier: row.confidenceTier,
-                rationale: row.rationale || buildRationale(row),
-                screenScore: row.screenScore
-              }))
+              downgradedCount: downgraded,
+              plays: recommended.map((row) => {
+                const playerName = String(row.selection || row.participant || '');
+                const research = researchResults.find(
+                  (r) => String(r.player || '').toLowerCase() === playerName.toLowerCase()
+                );
+                return {
+                  game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
+                  selection: row.selection || row.participant || null,
+                  market: row._market || row.market || null,
+                  start: row.start || null,
+                  odds: row.targetBookOdds ?? null,
+                  edge: row.consensusEdge,
+                  clv: row.clvProxyPct,
+                  consensusBookCount: row.consensusBookCount,
+                  executionQuality: row.executionQuality,
+                  movementGrade: row.movementGrade,
+                  riskScore: row.riskScore,
+                  kaiCall: row.kaiCall,
+                  confidenceTier: row.confidenceTier,
+                  rationale: row.rationale || buildRationale(row),
+                  screenScore: row.screenScore,
+                  ...(research
+                    ? {
+                        riskFlag: research.riskFlag,
+                        riskSummary: research.riskSummary,
+                        topTweet: research.topTweet
+                      }
+                    : {})
+                };
+              })
             });
           }
         } catch (error) {
@@ -1485,6 +1564,174 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         matchedRows: filtered.length
       };
       return response;
+    },
+
+    /**
+     * validate_play (v2.1.8): bundle a get_play_details + player_context +
+     * execution check into a single call. Returns a single BET / CONSIDER /
+     * PASS verdict with all supporting evidence so the agent doesn't have
+     * to chain three separate tool calls.
+     */
+    async validate_play(args = {}) {
+      const league = String(args.league || '').trim();
+      const gameId = String(args.gameId || '').trim();
+      const selection = String(args.selection || '').trim();
+      if (!league) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'league is required' } };
+      }
+      if (!gameId) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gameId is required' } };
+      }
+      if (!selection) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'selection is required' } };
+      }
+      const market = String(args.market || 'Moneyline').trim() || 'Moneyline';
+      const books = normalizeBookList(args.books);
+      const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
+      const skipResearch = args.skipResearch === true;
+
+      // Step 1: re-fetch the screen for this specific game.
+      let detailResult = null;
+      let detailError = null;
+      try {
+        detailResult = await handlers.get_play_details({
+          league,
+          market,
+          game_ids: [gameId],
+          books: books.length ? books : undefined,
+          lookbackHours
+        });
+      } catch (err) {
+        detailError = err?.message || String(err);
+      }
+
+      // Extract the specific row that matches the selection.
+      const matchingRow = Array.isArray(detailResult?.result)
+        ? detailResult.result.find(
+            (r) =>
+              String(r.selection || r.participant || '').toLowerCase() === selection.toLowerCase() ||
+              String(r.homeTeam || '')
+                .toLowerCase()
+                .includes(selection.toLowerCase()) ||
+              String(r.awayTeam || '')
+                .toLowerCase()
+                .includes(selection.toLowerCase())
+          )
+        : null;
+
+      // Step 2: run player_context research (unless skipped).
+      let research = null;
+      let researchError = null;
+      if (!skipResearch) {
+        try {
+          research = await handlers.player_context({
+            player: selection,
+            sport: league,
+            gameTime: matchingRow?.start || null
+          });
+        } catch (err) {
+          researchError = err?.message || String(err);
+        }
+      }
+
+      // Step 3: compute the verdict.
+      // We classify the play using the same signals the ranker uses,
+      // then layer on the risk-flag downgrade from research.
+      let verdict = 'PASS';
+      const reasons = [];
+      let tier = matchingRow?.confidenceTier || 'TIER 4';
+
+      if (matchingRow) {
+        // Base quality from the existing ranker output.
+        if (tier === 'TIER 1') {
+          verdict = 'BET';
+        } else if (tier === 'TIER 2' || tier === 'TIER 3') {
+          verdict = 'CONSIDER';
+        } else {
+          verdict = 'PASS';
+          reasons.push('TIER 4 (no signal)');
+        }
+
+        // Execution quality on the requested book.
+        const exec = String(matchingRow.executionQuality || '');
+        if (exec === 'bad') {
+          verdict = 'PASS';
+          reasons.push('execution quality is "bad" on the requested book');
+        } else if (exec === 'playable') {
+          reasons.push('execution quality is "playable" (within 10¢ of best)');
+        } else if (exec === 'best') {
+          reasons.push('execution quality is "best" (top of market)');
+        } else {
+          reasons.push(`execution quality is "${exec || 'unknown'}"`);
+        }
+
+        // Consensus/movement support.
+        const cbk = Number(matchingRow.consensusBookCount || 0);
+        if (cbk >= 3) reasons.push(`consensus: ${cbk} comp books agree`);
+        else if (cbk >= 1) reasons.push(`consensus: ${cbk} comp book (thin)`);
+        else reasons.push('no comp book consensus');
+      } else {
+        reasons.push(
+          detailError
+            ? `screen lookup failed: ${detailError}`
+            : `no row matched selection "${selection}" on gameId ${gameId}`
+        );
+      }
+
+      // Risk-flag override.
+      if (research && research.riskFlag === 'high') {
+        verdict = 'PASS';
+        reasons.push('player_context riskFlag = "high"');
+      } else if (research && research.riskFlag === 'medium') {
+        if (verdict === 'BET') verdict = 'CONSIDER';
+        reasons.push('player_context riskFlag = "medium" — proceed with caution');
+      } else if (research && research.riskFlag === 'low') {
+        reasons.push('player_context riskFlag = "low"');
+      }
+
+      return {
+        ok: true,
+        league,
+        market,
+        gameId,
+        selection,
+        executionBook: String(args.book || books[0] || ''),
+        verdict,
+        tier,
+        reasons,
+        play: matchingRow
+          ? {
+              gameId: matchingRow.gameId,
+              homeTeam: matchingRow.homeTeam,
+              awayTeam: matchingRow.awayTeam,
+              start: matchingRow.start,
+              odds: matchingRow.odds,
+              bestAvailableOdds: matchingRow.bestAvailableOdds,
+              executionQuality: matchingRow.executionQuality,
+              consensusEdge: matchingRow.consensusEdge,
+              consensusBookCount: matchingRow.consensusBookCount,
+              clvProxyPct: matchingRow.clvProxyPct,
+              openToCurrentClvPct: matchingRow.openToCurrentClvPct,
+              movementLabel: matchingRow.movementLabel,
+              kaiCall: matchingRow.kaiCall,
+              screenScore: matchingRow.screenScore
+            }
+          : null,
+        research: research
+          ? {
+              riskFlag: research.riskFlag,
+              riskSummary: research.summary || null,
+              topTweet:
+                Array.isArray(research.tweets) && research.tweets.length > 0
+                  ? research.tweets[0]?.text?.slice(0, 200) || null
+                  : null,
+              cached: Boolean(research.cached),
+              fetchedAt: research.fetchedAt
+            }
+          : skipResearch
+            ? { skipped: true }
+            : { error: researchError || 'research failed' }
+      };
     },
 
     async league_presets() {

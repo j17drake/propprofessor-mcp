@@ -19,6 +19,7 @@ const {
   encodeMessage,
   createStdioMessageReader
 } = require('../lib/propprofessor-mcp-stdio');
+const { redactSecrets } = require('../lib/propprofessor-redact');
 const { clearTierCache } = require('../lib/propprofessor-risk-score');
 const { validateArgs } = require('../lib/mcp-arg-validator');
 
@@ -97,6 +98,20 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
       } catch (error) {
         const categorized = categorizeError(error);
         const debugMode = params?.arguments?.debug === true;
+
+        // Server-side stderr logging for operators. The agent's `debug` flag
+        // controls what goes back in the *response*; this is independent and
+        // always-on so operators can see what's failing in their server
+        // process. The redactSecrets scrub keeps real tokens/cookies out of
+        // log aggregators (journald, Docker, Datadog, etc.).
+        const rawStack = error.stack || error.message || String(error);
+        const safeStack = redactSecrets(rawStack);
+        const safeMessage = redactSecrets(categorized.message);
+        process.stderr.write(
+          `[propprofessor-mcp] tool=${toolName} code=${categorized.code} category=${categorized.category} message=${safeMessage}\n` +
+            (safeStack ? `${safeStack}\n` : '')
+        );
+
         const failure = {
           ok: false,
           error: {

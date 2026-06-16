@@ -12,8 +12,10 @@ process.env.PP_CHECKPOINT_FILE = path.join(tmpDir, 'test-checkpoint.json');
 process.env.HOME = tmpDir;
 
 const {
+  CURRENT_PICKS_SCHEMA_VERSION,
   getPickHistory,
   getPickStats,
+  getPicksSchemaVersion,
   logPick,
   readCheckpoint,
   resolvePick,
@@ -127,5 +129,45 @@ describe('Alert Checkpoint', () => {
     const result = getPickHistory();
     assert.equal(result.ok, true);
     assert.equal(result.total, 0);
+  });
+});
+
+describe('picks.json schema versioning', () => {
+  const tmpDir2 = path.join(require('node:os').tmpdir(), 'pp-mcp-picks-schema-test-' + Date.now());
+  const testFile = path.join(tmpDir2, 'picks.json');
+
+  before(() => {
+    fs.mkdirSync(tmpDir2, { recursive: true });
+  });
+
+  after(() => {
+    fs.rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it('exports the current schema version constant', () => {
+    assert.equal(typeof CURRENT_PICKS_SCHEMA_VERSION, 'number');
+    assert.ok(CURRENT_PICKS_SCHEMA_VERSION >= 1);
+  });
+
+  it('getPicksSchemaVersion returns null when the file is missing', () => {
+    assert.equal(getPicksSchemaVersion(testFile), null);
+  });
+
+  it('getPicksSchemaVersion returns 0 for legacy files (no schemaVersion key)', () => {
+    fs.writeFileSync(testFile, JSON.stringify({ picks: [] }));
+    assert.equal(getPicksSchemaVersion(testFile), 0);
+  });
+
+  it('getPicksSchemaVersion returns the version number for new files', () => {
+    fs.writeFileSync(testFile, JSON.stringify({ schemaVersion: 1, picks: [] }));
+    assert.equal(getPicksSchemaVersion(testFile), 1);
+  });
+
+  it('getPicksSchemaVersion tolerates non-numeric schemaVersion values', () => {
+    fs.writeFileSync(testFile, JSON.stringify({ schemaVersion: 'oops', picks: [] }));
+    // 'oops' is not a finite number → falls back to 0 (legacy) per the
+    // function's defensive coercion.
+    const v = getPicksSchemaVersion(testFile);
+    assert.ok(v === 0 || v === null, `expected 0 or null for non-numeric version, got ${v}`);
   });
 });

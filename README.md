@@ -1,15 +1,15 @@
 # PropProfessor MCP
 
-> An MCP server that shows you what the sharp money is doing. 24 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
+> An MCP server that shows you what the sharp money is doing. 25 tools that screen 36 sportsbooks, detect sharp movement, surface line moves, and explain the consensus — so you can decide what to bet, not be told.
 
 [![Release](https://img.shields.io/github/v/release/j17drake/propprofessor-mcp?color=44cc11)](https://github.com/j17drake/propprofessor-mcp/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-876%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-924%20passing-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-82%25-44cc11)](https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-18%2B-44cc11)](https://img.shields.io/badge/node-18%2B-44cc11)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 24 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
+Connect it to Claude Desktop, Cursor, Cline, or any MCP client. Your agent gets 25 tools to screen odds across 36 books, detect coordinated sharp movement, surface steam moves and line lags, and explain why a play is being flagged — all backed by the actual data, not a black-box prediction. It needs a [PropProfessor](https://propprofessor.com) account to work.
 
 **Honest scope:** PropProfessor MCP is a **sharp-money signal feed**, not a betting oracle. The ranking pipeline reliably detects _what sharp books are doing_ (line moves, consensus, steam, independent sharp confirmation) — it does **not** reliably predict _which side will win_. The TIER 1/2/3/4 system is a quality rating on the signal strength, not a confidence claim about outcomes. Use it as a tool to inform your own handicapping, not to outsource your decisions.
 
@@ -71,7 +71,7 @@ The ranking pipeline is validated against synthetic scenarios where the movement
 || TIER 4 > TIER 2 inversion | **Fixed in v1.5.1**, held in v1.5.5 — TIER 4 ≤ TIER 2 |
 || Steam move detection | Coordinated sharp moves across 3+ books within a 90-min window |
 || Line lag detection | Target-book price divergence vs sharp consensus (avg 12-25pt gap) |
-|| Tests | **876 passing** |
+|| Tests | **924 passing** |
 || Coverage | **82% statements, 88% functions** |
 
 The tier system isn't magic. It's a transparent scoring formula that combines movement grade (green/yellow/red), risk score (1–10 weighted factors), and historical tier trajectory. You can read every line of the math in [`lib/propprofessor-risk-score.js`](lib/propprofessor-risk-score.js). See [How the ranking works](#how-the-ranking-works) for the full methodology.
@@ -107,7 +107,7 @@ flowchart LR
         T[Tier + risk score]
     end
 
-    subgraph OUTPUT["24 tools exposed via MCP"]
+    subgraph OUTPUT["25 tools exposed via MCP"]
         RB[recommended_bets]
         SP[sharp_plays]
         SC[sharp_consensus]
@@ -121,7 +121,7 @@ flowchart LR
     CLIENT -. "you decide what to bet" .- BOOKS
 ```
 
-The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 24 tools. The betting decision stays with the human.
+The pipeline is the _honest_ middle layer — it does one job well (detect what sharp books are doing) and surfaces it via 25 tools. The betting decision stays with the human.
 
 ---
 
@@ -248,7 +248,7 @@ Replace the path with wherever you cloned the repo. Token compression (smaller c
 
 ---
 
-## All 24 tools (reference)
+## All 25 tools (reference)
 
 ### For quick situational checks (the 5-minute scan)
 
@@ -271,6 +271,7 @@ Everything in casual, plus:
 || `find_best_price` | Line-shop across all books for the best price |
 || `league_presets` | Sport-specific ranking weights |
 || `novig_screen` | NoVigApp-specific screen |
+|| `validate_play` | One-call validation: re-fetches the play, runs player_context for injury news, checks execution quality, returns a single BET/CONSIDER/PASS verdict with all evidence |
 || `manage_hidden_bets` | Manage flagged-play visibility (action=list/hide/unhide/clear) |
 || `get_pick_history` | View logged picks |
 
@@ -300,6 +301,7 @@ Everything above, plus:
 || **Flagged Plays** | `recommended_bets`, `staking_plan`, `ev_candidates` |
 || **Line Shopping** | `find_best_price` |
 || **Player Context** | `player_context` |
+|| **Validation** | `validate_play` |
 || **Fantasy Optimizer** | `fantasy_optimizer` |
 || **UFC** | `ufc_card` |
 || **Bet Management** | `manage_hidden_bets` |
@@ -389,7 +391,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 
 ## For maintainers
 
-- **Tests**: `npm test` (876 passing) — 5/5 reruns, deterministic
+- **Tests**: `npm test` (924 passing) — 5/5 reruns, deterministic
 - **Coverage**: `npm run test:coverage` (~82% statements, ~88% functions)
 - **Lint**: `npm run lint` (clean)
 - **Format**: `npm run format:check` (clean — `npm run format` to fix)
@@ -423,13 +425,27 @@ Detailed docs:
 
 ---
 
+## What's new (v2.1.8)
+
+- **Player-context research as a first-class pre-flight** — `includeResearch: true` is now an opt-in flag on `screen_ranked` and `recommended_bets`. When set, the system runs `player_context` on the top N ranked rows (default 10, configurable via `researchLimit`, max 50) and attaches a `research` array with `riskFlag` (low/medium/high), `riskSummary`, and `topTweet` per row. Use this to surface injury/availability concerns alongside the ranked plays.
+- **`riskDowngrade: true`** (pairs with `includeResearch`) — drops plays with `riskFlag='high'` from the result entirely. Without this, the risk flags are just attached metadata; with it, high-risk plays are filtered out as a hard gate. Default false.
+- **New `validate_play` tool** — given a `gameId` + `selection` from a prior `screen_ranked` result, runs `get_play_details` + `player_context` + execution-quality check in one call and returns a single `BET` / `CONSIDER` / `PASS` verdict with all supporting evidence. Saves the agent from chaining 3 separate tool calls to validate a single play. Pass `skipResearch: true` for ultra-fast validation when you only need the odds/execution check.
+- 25 total tools (was 24; +`validate_play`)
+- All 924 tests passing (was 866)
+
+> **Example workflow** (post-v2.1.8): `screen_ranked({ books: ['Fliff'], playableOnly: true, includeResearch: true, riskDowngrade: true, researchLimit: 10 })` returns the top 10 Fliff plays at executable prices, with player-context research attached, and any high-risk play already filtered out. The agent just needs to look at the verdict and riskFlag for each play.
+
+> **Tennis-specific news (atptour.com / wtatennis.com) deferred to v2.1.9.** The current `player_context` uses X/Google News/ESPN, which is thin for tennis players specifically. Adding tour-website scraping is the next quality-of-life improvement.
+
+---
+
 ## What's new (v2.1.7)
 
 - **`screen_ranked` augments the backend query with the league's sharp-book set** — `scripts/server/handlers.js:793`. The `runLeagueScreen` helper (used by `sharp_plays`) already did this, but the standalone `screen_ranked` handler shipped with its own copy of the same logic that didn't. Symptom: every `screen_ranked` call on a non-sharp book (e.g. `books: ['Fliff']`) returned `consensusBookCount: 0` on every row, making the ranker effectively useless. After the fix, the sharp books are queried alongside the user's book, consensus data populates, and the ranker produces real tier calls.
 - **`requirePreferredBook` ranker gate** — `lib/screen-ranker.js`. New option that drops rows where the user-requested book doesn't have a price in the row's `oddsMap`. Previously, when you asked for `books: ['Fliff']` and a match had only Pinnacle / Polymarket / Kalshi odds (no Fliff), the ranker fell through to the row's source book and reported Pinnacle's line as if it were Fliff's. Now those rows are dropped. A user asking "what should I bet on Fliff" gets plays that Fliff actually prices. Set automatically by `screen_ranked` and `runLeagueScreen` whenever the user passes an explicit `books` list; legacy behavior preserved when the user doesn't pass a book (uses preset default with the standard fallback).
 - **First direct unit tests for the ranker** — `test/screen-ranker.test.js` (6 new tests). The ranker was the most complex file in the project (916 LOC) without a direct test before this release; the only coverage was via handler-integration tests, which catch output regressions but not ranker-internal logic. Tests cover the happy path, the `requirePreferredBook` drop, the legacy fallback, and the v2.1.6 `allBookOdds` reconstruction.
 - 24 total tools (unchanged)
-- All 876 tests passing (was 866)
+- All 924 tests passing (was 866)
 
 > **New `playableOnly` flag** (added 2026-06-15 patch): pass `playableOnly: true` to `screen_ranked` to get rows where the user-requested book is within the normal market range (`executionQuality != "bad"`) even when `consensusEdge` is negative or zero. Default behavior still requires positive consensus edge for TIER 1-3 plays. Use this when you want signals on a specific book (e.g. Fliff) at executable prices, not just positive-EV opportunities. See the "playable, not best" note in the v2.1.7 release notes for the full rationale.
 
@@ -440,7 +456,7 @@ Detailed docs:
 - **Consensus-preservation fix** — `extractScreenRows` in `lib/screen-parser.js` was clobbering the full per-book odds map on expanded rows, causing every main-line screen row to cascade to `consensusBookCount: 0 / TIER 4 / PASS`. Live screen, `get_play_details`, `recommended_bets`, and `sharp_plays` calls all came back with `consensusEdge: null`, `executionQuality: "unknown"`, `screenScore: 0`, `gatePassed: false`. With this fix, `consensusBookCount` returns 5–19, `consensusStrength` reads "strong", and rows can now reach TIER 1–3.
 - **3 new regression tests** in `test/propprofessor-analysis.test.js` — live-shape fixture mirroring the actual `/screen` payload, v2.1.2 fallback preservation, and per-book `odds` contract preservation. Prevents recurrence of the consensus cascade.
 - 24 total tools (unchanged)
-- All 876 tests passing (was 843)
+- All 924 tests passing (was 843)
 
 ---
 

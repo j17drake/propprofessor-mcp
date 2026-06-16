@@ -281,7 +281,8 @@ describe('propprofessor MCP server stdio contract', () => {
         'sharp_consensus',
         'sharp_plays',
         'staking_plan',
-        'ufc_card'
+        'ufc_card',
+        'validate_play'
       ]);
     } finally {
       proc.kill('SIGTERM');

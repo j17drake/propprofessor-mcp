@@ -125,8 +125,8 @@ if (allToolsSection) {
 // CHECK 3: Test count
 // ----------------------------------------------------------------------------
 
-const skipTests = process.argv.includes('--skip-tests');
-console.log(`\nTest count:${skipTests ? ' (skipped via --skip-tests)' : ''}`);
+const skipTests = process.argv.includes('--skip-tests') || process.argv.includes('--quick');
+console.log(`\nTest count:${skipTests ? ' (skipped via --skip-tests or --quick)' : ''}`);
 
 if (!skipTests) {
   try {
@@ -183,73 +183,83 @@ if (!skipTests) {
 // CHECK 4: Backtest structural claims
 // ----------------------------------------------------------------------------
 
-console.log('\nBacktest claims:');
-try {
-  const { runBacktest, setRandomSeed, resetRandomSeed } = require(backtestPath);
-  setRandomSeed(42);
-  const result = runBacktest({ scenarios: 3000, verbose: false });
-  resetRandomSeed();
+const quick = process.argv.includes('--quick');
+console.log(`\nBacktest claims:${quick ? ' (skipped via --quick)' : ''}`);
 
-  const t1 = result.results['TIER 1'] || { wins: 0, losses: 0 };
-  const t2 = result.results['TIER 2'] || { wins: 0, losses: 0 };
-  const t3 = result.results['TIER 3'] || { wins: 0, losses: 0 };
-  const t4 = result.results['TIER 4'] || { wins: 0, losses: 0 };
+if (quick) {
+  console.log('  -- Skipped (--quick mode). Run without --quick to verify TIER 4 ≤ TIER 2 ordering.');
+} else {
+  runBacktestCheck();
+}
 
-  const t1Total = t1.wins + t1.losses;
-  const t2Total = t2.wins + t2.losses;
-  const t3Total = t3.wins + t3.losses;
-  const t4Total = t4.wins + t4.losses;
+function runBacktestCheck() {
+  try {
+    const { runBacktest, setRandomSeed, resetRandomSeed } = require(backtestPath);
+    setRandomSeed(42);
+    const result = runBacktest({ scenarios: 3000, verbose: false });
+    resetRandomSeed();
 
-  const rate = (w, total) => (total > 0 ? ((w / total) * 100).toFixed(1) + '%' : 'N/A');
+    const t1 = result.results['TIER 1'] || { wins: 0, losses: 0 };
+    const t2 = result.results['TIER 2'] || { wins: 0, losses: 0 };
+    const t3 = result.results['TIER 3'] || { wins: 0, losses: 0 };
+    const t4 = result.results['TIER 4'] || { wins: 0, losses: 0 };
 
-  console.log(`  TIER 1: ${rate(t1.wins, t1Total)} (${t1.wins}W/${t1.losses}L/${t1Total} plays)`);
-  console.log(`  TIER 2: ${rate(t2.wins, t2Total)} (${t2.wins}W/${t2.losses}L/${t2Total} plays)`);
-  console.log(`  TIER 3: ${rate(t3.wins, t3Total)} (${t3.wins}W/${t3.losses}L/${t3Total} plays)`);
-  console.log(`  TIER 4: ${rate(t4.wins, t4Total)} (${t4.wins}W/${t4.losses}L/${t4Total} plays)`);
+    const t1Total = t1.wins + t1.losses;
+    const t2Total = t2.wins + t2.losses;
+    const t3Total = t3.wins + t3.losses;
+    const t4Total = t4.wins + t4.losses;
 
-  // The README's strongest directional claim: "TIER 4 > TIER 2 inversion | Fixed in v1.5.1"
-  // This is reported as a WARNING, not a failure, because the synthetic backtest's
-  // TIER 2 sample is small (typically <30 plays) and noisy — a single seed run can
-  // show the inversion even when the algorithm is directionally correct. Treat
-  // sustained inversion across multiple runs (or a real code change to risk scoring)
-  // as the signal that the claim is stale. A warning here means "review the
-  // numbers in README's 'The numbers' section" — not "ship is blocked".
-  if (t2Total === 0 || t4Total === 0) {
-    warn(`TIER 2 or TIER 4 has 0 plays — can't verify inversion fix claim`);
-  } else if (t4.wins / t4Total > t2.wins / t2Total) {
-    const gap = ((t4.wins / t4Total - t2.wins / t2Total) * 100).toFixed(1);
-    warn(
-      `TIER 4 hit rate (${rate(t4.wins, t4Total)}) > TIER 2 hit rate (${rate(t2.wins, t2Total)}, +${gap}pp) in this run. The README's "TIER 4 > TIER 2 inversion fixed in v1.5.1" claim is based on a small TIER 2 sample (${t2Total} plays) — review whether the README's "The numbers" section is still accurate. NOT a release blocker.`
-    );
-  } else {
-    ok(
-      `TIER 4 ≤ TIER 2 ordering holds (${rate(t4.wins, t4Total)} ≤ ${rate(t2.wins, t2Total)}) — README's "TIER 4 inversion fixed" claim is directionally supported in this run`
-    );
+    const rate = (w, total) => (total > 0 ? ((w / total) * 100).toFixed(1) + '%' : 'N/A');
+
+    console.log(`  TIER 1: ${rate(t1.wins, t1Total)} (${t1.wins}W/${t1.losses}L/${t1Total} plays)`);
+    console.log(`  TIER 2: ${rate(t2.wins, t2Total)} (${t2.wins}W/${t2.losses}L/${t2Total} plays)`);
+    console.log(`  TIER 3: ${rate(t3.wins, t3Total)} (${t3.wins}W/${t3.losses}L/${t3Total} plays)`);
+    console.log(`  TIER 4: ${rate(t4.wins, t4Total)} (${t4.wins}W/${t4.losses}L/${t4Total} plays)`);
+
+    // The README's strongest directional claim: "TIER 4 > TIER 2 inversion | Fixed in v1.5.1"
+    // This is reported as a WARNING, not a failure, because the synthetic backtest's
+    // TIER 2 sample is small (typically <30 plays) and noisy — a single seed run can
+    // show the inversion even when the algorithm is directionally correct. Treat
+    // sustained inversion across multiple runs (or a real code change to risk scoring)
+    // as the signal that the claim is stale. A warning here means "review the
+    // numbers in README's 'The numbers' section" — not "ship is blocked".
+    if (t2Total === 0 || t4Total === 0) {
+      warn(`TIER 2 or TIER 4 has 0 plays — can't verify inversion fix claim`);
+    } else if (t4.wins / t4Total > t2.wins / t2Total) {
+      const gap = ((t4.wins / t4Total - t2.wins / t2Total) * 100).toFixed(1);
+      warn(
+        `TIER 4 hit rate (${rate(t4.wins, t4Total)}) > TIER 2 hit rate (${rate(t2.wins, t2Total)}, +${gap}pp) in this run. The README's "TIER 4 > TIER 2 inversion fixed in v1.5.1" claim is based on a small TIER 2 sample (${t2Total} plays) — review whether the README's "The numbers" section is still accurate. NOT a release blocker.`
+      );
+    } else {
+      ok(
+        `TIER 4 ≤ TIER 2 ordering holds (${rate(t4.wins, t4Total)} ≤ ${rate(t2.wins, t2Total)}) — README's "TIER 4 inversion fixed" claim is directionally supported in this run`
+      );
+    }
+
+    // Minimum TIER 1 sample size for the README's hit rate claim to be
+    // statistically meaningful. Below this threshold the hit rate is just noise
+    // on a 3-5 play sample, and any claim of "TIER 1 hit rate is X%" is
+    // unsupportable. 100 plays gives a ~10pp margin at 95% confidence, which
+    // is enough to detect whether the algorithm is meaningfully better than
+    // random.
+    const MIN_TIER_1_SAMPLE = 100;
+    if (t1Total < MIN_TIER_1_SAMPLE) {
+      fail(
+        `TIER 1 sample too small (${t1Total} plays) for the README's hit rate claim to be statistically meaningful. ` +
+          `Need at least ${MIN_TIER_1_SAMPLE}. The scenario mix or cache reset logic has regressed.`
+      );
+    } else {
+      ok(`TIER 1 sample (${t1Total} plays) is large enough for a meaningful hit rate claim`);
+    }
+
+    // Note about TIER 1 hit rate
+    if (t1Total < 10) {
+      console.log(`\n  info  TIER 1 sample (${t1Total} plays) is too small for a meaningful hit rate claim.`);
+      console.log(`  info  The README's "TIER 1 hit rate" number is not auto-verified — review manually.`);
+    }
+  } catch (err) {
+    warn(`Backtest check failed: ${err.message}`);
   }
-
-  // Minimum TIER 1 sample size for the README's hit rate claim to be
-  // statistically meaningful. Below this threshold the hit rate is just noise
-  // on a 3-5 play sample, and any claim of "TIER 1 hit rate is X%" is
-  // unsupportable. 100 plays gives a ~10pp margin at 95% confidence, which
-  // is enough to detect whether the algorithm is meaningfully better than
-  // random.
-  const MIN_TIER_1_SAMPLE = 100;
-  if (t1Total < MIN_TIER_1_SAMPLE) {
-    fail(
-      `TIER 1 sample too small (${t1Total} plays) for the README's hit rate claim to be statistically meaningful. ` +
-        `Need at least ${MIN_TIER_1_SAMPLE}. The scenario mix or cache reset logic has regressed.`
-    );
-  } else {
-    ok(`TIER 1 sample (${t1Total} plays) is large enough for a meaningful hit rate claim`);
-  }
-
-  // Note about TIER 1 hit rate
-  if (t1Total < 10) {
-    console.log(`\n  info  TIER 1 sample (${t1Total} plays) is too small for a meaningful hit rate claim.`);
-    console.log(`  info  The README's "TIER 1 hit rate" number is not auto-verified — review manually.`);
-  }
-} catch (err) {
-  warn(`Backtest check failed: ${err.message}`);
 }
 
 // ----------------------------------------------------------------------------

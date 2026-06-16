@@ -42,7 +42,14 @@ async function loginAndSaveAuth(options = {}) {
   }
 
   logger.log('Launching browser...');
-  const browser = await chromium.launch({ headless: false });
+  // PP_LOGIN_HEADLESS=true forces headless mode (no visible browser window).
+  // The CLAUDE.md taste rule says: "Don't open Chrome during propprofessor-mcp
+  // work; if a browser step is required, run it headless instead of launching
+  // a visible window." Headless is the default in CI; set the env var to
+  // opt out only when the user explicitly wants to log in via a visible
+  // browser tab.
+  const headless = process.env.PP_LOGIN_HEADLESS !== 'false';
+  const browser = await chromium.launch({ headless });
   const context = await browser.newContext();
   const page = await context.newPage();
 

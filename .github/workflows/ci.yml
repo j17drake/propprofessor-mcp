@@ -29,8 +29,25 @@ jobs:
       - name: Check version consistency
         run: npm run check:version
 
+      - name: Check for credential leaks
+        # Fails if auth.json, token-cache.json, or .propprofessor/ are ever
+        # committed. Belt-and-suspenders alongside .gitignore.
+        run: npm run check:secrets
+
       - name: Run lint
         run: npm run lint
+
+      - name: Check JSDoc types
+        # Type-check files that have opted in via `// @ts-check` directives.
+        # Currently scoped to newly-added modules; expand gradually as more
+        # files add the directive and fix any errors revealed.
+        run: npm run check:types
+
+      - name: Check for circular dependencies
+        # Substitutes for the blocked `eslint-plugin-import/no-cycle` rule
+        # (waiting on upstream support for ESLint 10). madge runs as a
+        # standalone tool and exits non-zero on any cycle.
+        run: npm run check:circular
 
       - name: Check formatting
         run: npm run format:check

@@ -1,5 +1,50 @@
 # Changelog
 
+## 2.1.8
+
+**Player-context research as a first-class pre-flight across the tool surface, plus a new one-call validation tool.** The `player_context` tool has existed since v1.5.x but was only integrated as a pre-flight in `novig_screen`. v2.1.8 brings it to `screen_ranked` and `recommended_bets` as an opt-in flag, and introduces `validate_play` for the common "is this specific play worth betting on?" workflow.
+
+### What's new for users
+
+- **`includeResearch: true` on `screen_ranked`** — runs `player_context` on the top N ranked rows (default 10, configurable via `researchLimit`, max 50) and attaches the result as a `research` array on the response. Each entry has `player`, `riskFlag` (low/medium/high), `riskSummary`, and `topTweet`. Use this to surface injury/availability concerns alongside the ranked plays.
+- **`includeResearch: true` on `recommended_bets`** — same idea but applied to TIER 1-2 recommendations. The `riskFlag` and `topTweet` get attached to each play in the response.
+- **`riskDowngrade: true` (pairs with `includeResearch`)** — when both flags are set, plays with `riskFlag='high'` are removed from the result entirely (hard filter, not a soft annotation). Without `riskDowngrade`, the risk flags are just attached metadata.
+- **New `validate_play` tool** — bundles `get_play_details` + `player_context` + execution-quality check into a single call. Given a `gameId` + `selection` from a prior `screen_ranked` result, returns a single `BET` / `CONSIDER` / `PASS` verdict with all supporting evidence (the play's tier, consensus edge, execution quality on the requested book, the player's riskFlag, and a top tweet if riskFlag=high). Saves the agent from chaining 3 separate tool calls to validate one play.
+
+### What changed under the hood
+
+- `lib/propprofessor-research-runner.js` (new) — `runResearchOnTopRows({ rows, limit, playerContextFn, maxAgeMinutes })` runs player_context on the top N rows by screenScore, captures per-row errors without aborting, and returns a normalized result array. Lives in its own module so the same code path serves `screen_ranked`, `recommended_bets`, and the future riskDowngrade path.
+- `lib/propprofessor-tool-definitions.js` — added `validate_play` tool definition. Added `includeResearch`, `researchLimit`, `riskDowngrade` to `screen_ranked` and `recommended_bets` inputSchemas. The v2.1.6 arg validator enforces the types.
+- `scripts/server/handlers.js` — `screen_ranked`, `recommended_bets`, and the new `validate_play` all use the research runner. When `riskDowngrade` is set, plays with high riskFlag are removed from the response and the count is surfaced in `resultMeta.riskDowngradedCount`.
+- `test/propprofessor-research-runner.test.js` (new, 8 tests) — covers empty input, missing function, sort order, limit, error handling, missing selection, and tweet truncation.
+- `test/propprofessor-validate-play.test.js` (new, 7 tests) — covers the validation errors, skipResearch, high/medium riskFlag downgrades, and the no-match-found path.
+- `test/propprofessor-mcp-server.test.js` — added `validate_play` to the stdio-contract tool list assertion.
+- `docs/openapi.json` — regenerated for the new tool.
+
+### Why this is the right shape for the v2.1.7 "playable, not best" workflow
+
+In v2.1.7 the user reported: "i dont need Fliff to have the best executable price. just a playable price." After that fix, the next natural question was: "ok so once I have a Fliff play flagged as playable, how do I know the player isn't injured?" The answer in v2.1.7 was: "you have to call `player_context` separately for each play." v2.1.8 collapses that into one flag on the same call.
+
+`screen_ranked({ books: ['Fliff'], playableOnly: true, includeResearch: true, riskDowngrade: true, researchLimit: 10 })` now returns the top 10 Fliff plays at playable prices, with player-context research attached, and any play with riskFlag='high' removed from the result. The agent just needs to look at the verdict and riskFlag for each play.
+
+`validate_play({ league: 'Tennis', gameId: '...', selection: 'Parry' })` is the one-call version for when you already have a specific play in mind — e.g. picked from a prior `screen_ranked` result — and want a single yes/no answer with the evidence trail.
+
+### Live impact (Fliff Tennis example)
+
+Before v2.1.8, a Fliff Tennis `screen_ranked` with `playableOnly: true` returned 22 plays but the agent had to call `player_context` separately for each to validate. After v2.1.8, the same call with `includeResearch: true` returns the same 22 plays plus a `research` array with `riskFlag` for each. Add `riskDowngrade: true` and the high-risk ones are filtered out.
+
+### Deferred
+
+- **Tennis-specific news source (atptour.com / wtatennis.com)** — defer to v2.1.9. The current `player_context` flow uses X/Google News/ESPN, which works for NBA/MLB but is thin for tennis player news. Adding atptour/wtatennis requires scraping (no clean RSS) and has a meaningful maintenance burden. The v2.1.8 riskFlag for tennis players is "no consensus news found" more often than ideal; v2.1.9 will close that gap.
+
+### Stats
+
+- 891 tests passing (was 876 in v2.1.7; +15 tests: 8 research-runner, 7 validate-play)
+- 25 tools (was 24; +validate_play)
+- 0 npm audit vulns
+- 82.4%+ coverage (above c8 thresholds)
+- Full backwards compatibility — all new options default to false, the new tool is opt-in.
+
 ## 2.1.7 (patch: playableOnly flag)
 
 **Added `playableOnly: true` option to `screen_ranked` (and the underlying tennis + sharp_plays paths).** When set, the ranker keeps rows where the user-requested book is within the normal market range (`executionQuality != "bad"`) even when `consensusEdge` is negative or zero. Use this when you want signals on a specific book at executable prices, not just positive-EV opportunities.

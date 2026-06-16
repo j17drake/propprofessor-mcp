@@ -1,6 +1,6 @@
 {
   "name": "propprofessor-mcp",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "description": "Beginner-friendly PropProfessor MCP server and setup CLI for any MCP client",
   "type": "commonjs",
   "private": true,
@@ -71,6 +71,11 @@
     "exe": "node scripts/prop-professor.exe.js",
     "check:version": "node scripts/check-version-consistency.js",
     "check:claims": "node scripts/check-claims.js",
+    "check:claims:quick": "node scripts/check-claims.js --quick",
+    "check:secrets": "node scripts/check-no-secrets.js",
+    "precommit:secrets": "node scripts/check-no-secrets.js --working-tree-only",
+    "check:types": "tsc",
+    "check:circular": "madge --circular --warning lib/ scripts/",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -109,7 +114,10 @@
     "@eslint/js": "^9.0.0",
     "c8": "^11.0.0",
     "eslint": "^10.5.0",
+    "eslint-plugin-complexity": "^1.0.2",
     "globals": "^17.6.0",
-    "prettier": "^3.8.4"
+    "madge": "^8.0.0",
+    "prettier": "^3.8.4",
+    "typescript": "^5.9.3"
   }
 }
