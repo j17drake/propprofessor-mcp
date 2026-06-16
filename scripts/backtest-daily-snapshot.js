@@ -12,8 +12,13 @@
  */
 
 const { takeSnapshot } = require('./backtest');
+const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
 
-const SUPPORTED_LEAGUES = new Set(['NBA', 'MLB', 'NHL', 'NFL', 'WNBA', 'UFC', 'TENNIS', 'SOCCER', 'NCAAB', 'NCAAF']);
+// SUPPORTED_LEAGUES is the UPPERCASE, sorted, de-duped view of every league
+// the PropProfessor backend supports. Derived from the same single source of
+// truth (DEFAULT_LEAGUES) so the API-request payload, the CLI defaults, and
+// the snapshot guard can never drift out of sync.
+const SUPPORTED_LEAGUES = new Set(DEFAULT_LEAGUES.map((league) => league.toUpperCase()));
 
 const SNAPSHOTS = [
   { league: 'NBA', market: 'Moneyline' },

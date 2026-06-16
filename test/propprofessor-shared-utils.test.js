@@ -54,3 +54,26 @@ describe('compactRow', () => {
     assert.notEqual(out, input);
   });
 });
+
+describe('DEFAULT_LEAGUES', () => {
+  const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
+
+  it('exports every league the PropProfessor backend supports', () => {
+    const expected = ['NBA', 'MLB', 'NFL', 'NHL', 'WNBA', 'NCAAB', 'NCAAF', 'Soccer', 'Tennis', 'UFC'];
+    assert.deepEqual([...DEFAULT_LEAGUES], expected);
+  });
+
+  it('is frozen so callers cannot accidentally mutate the source of truth', () => {
+    assert.ok(Object.isFrozen(DEFAULT_LEAGUES), 'DEFAULT_LEAGUES should be frozen');
+  });
+
+  it('covers both the main US sports and the international / niche leagues', () => {
+    // Sanity guards — if a league is added or removed, update the test on the
+    // line above and re-verify the propprofessor backend actually supports it.
+    assert.ok(DEFAULT_LEAGUES.includes('NBA'), 'must include NBA');
+    assert.ok(DEFAULT_LEAGUES.includes('NFL'), 'must include NFL');
+    assert.ok(DEFAULT_LEAGUES.includes('Soccer'), 'must include Soccer');
+    assert.ok(DEFAULT_LEAGUES.includes('Tennis'), 'must include Tennis');
+    assert.ok(!DEFAULT_LEAGUES.includes(''), 'must not contain empty string');
+  });
+});

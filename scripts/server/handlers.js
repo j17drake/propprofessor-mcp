@@ -25,7 +25,7 @@ const {
   extractScreenRows,
   enrichTennisEvCandidates
 } = require('../../lib/propprofessor-screen-utils');
-const { resolveMarketName } = require('../../lib/propprofessor-shared-utils');
+const { resolveMarketName, DEFAULT_LEAGUES } = require('../../lib/propprofessor-shared-utils');
 const { buildUfcShortlist } = require('../../lib/propprofessor-sharp-plays');
 const { findBestPrice } = require('../../lib/propprofessor-best-price');
 const {
@@ -919,7 +919,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ? args.leagues
           : args.league
             ? [args.league]
-            : ['NBA', 'MLB', 'NHL', 'WNBA', 'UFC'];
+            : Array.from(DEFAULT_LEAGUES);
       // Resolve markets using aliases for each league
       const markets =
         Array.isArray(args.markets) && args.markets.length
@@ -1054,10 +1054,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // ─── Betting ────────────────────────────────────────────────────
     async recommended_bets(args = {}) {
-      const leagues =
-        Array.isArray(args.leagues) && args.leagues.length
-          ? args.leagues
-          : ['NBA', 'WNBA', 'MLB', 'NHL', 'Tennis', 'UFC', 'SOCCER'];
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : Array.from(DEFAULT_LEAGUES);
       // Resolve markets using aliases for each league
       const allAliasesUsed = [];
       const resolvedMarketsByLeague = {};
@@ -1362,11 +1359,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // ─── Screening & Ranking (continued) ────────────────────────────
     async all_slates(args = {}) {
-      const DEFAULT_LEAGUES = ['NBA', 'MLB', 'NHL', 'TENNIS', 'WNBA', 'Soccer', 'UFC'];
       const leagues =
         Array.isArray(args.leagues) && args.leagues.length
           ? args.leagues.map((l) => String(l).trim()).filter(Boolean)
-          : DEFAULT_LEAGUES;
+          : Array.from(DEFAULT_LEAGUES);
       const allAliasesUsed = [];
       const marketResolutionByLeague = {};
       for (const league of leagues) {
@@ -1866,7 +1862,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         sportsbooks: Array.isArray(args.sportsbooks)
           ? args.sportsbooks
           : ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle'],
-        leagues: Array.isArray(args.leagues) ? args.leagues : ['NBA', 'MLB', 'NHL', 'WNBA'],
+        leagues: Array.isArray(args.leagues) ? args.leagues : Array.from(DEFAULT_LEAGUES),
         league: args.league,
         market: args.market,
         minOdds: args.minOdds,
@@ -2102,8 +2098,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // ─── Alerts ─────────────────────────────────────────────────────
     async get_alerts(args = {}) {
-      const leagues =
-        Array.isArray(args.leagues) && args.leagues.length ? args.leagues : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA'];
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : Array.from(DEFAULT_LEAGUES);
       const lookbackHours = Number.isFinite(Number(args.lookbackHours))
         ? Math.min(48, Math.max(1, Number(args.lookbackHours)))
         : 6;

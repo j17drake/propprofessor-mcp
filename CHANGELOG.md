@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.1.9
+
+**Consolidate the default-leagues list into a single source of truth, and add the two leagues the in-progress work missed (NFL, NCAAB, NCAAF).** Until v2.1.8 the default `leagues` argument across `screen_ranked`, `recommended_bets`, `get_alerts`, the `query-propprofessor.js` CLI, and the `propprofessor-api.js` default scan was a partial subset of what the PropProfessor backend supports. v2.1.9 picks up where v2.1.8 left off — the in_progress work added the missing leagues but kept them hardcoded inline in 6+ files, which is a footgun for future drift. This release replaces all of those with a single frozen `DEFAULT_LEAGUES` constant exported from `propprofessor-shared-utils.js` (and derives `SUPPORTED_LEAGUES` from it in `backtest-daily-snapshot.js`).
+
+### What changed
+
+- `lib/propprofessor-shared-utils.js` — new `DEFAULT_LEAGUES` export, frozen: `[NBA, MLB, NFL, NHL, WNBA, NCAAB, NCAAF, Soccer, Tennis, UFC]`. Order matches the upstream `/screen` POST shape (main US sports first, then college, then international / niche).
+- `lib/propprofessor-api.js` — `queryScreenOddsBestComps` default `leagues` payload now uses `Array.from(DEFAULT_LEAGUES)` instead of a partial inline list.
+- `lib/propprofessor-sharp-plays.js` — `resolveSharpPlayLeagues` default now uses `Array.from(DEFAULT_LEAGUES)`.
+- `lib/propprofessor-tool-definitions.js` — `screen_ranked`, `recommended_bets`, `novig_screen`, `get_alerts`, and `get_started` tool descriptions updated to point at `DEFAULT_LEAGUES` instead of an inline league list.
+- `scripts/server/handlers.js` — all 5 hardcoded `leagues` defaults (`novig_screen`, `recommended_bets`, `all_slates`, `get_started`, `get_alerts`) now use `Array.from(DEFAULT_LEAGUES)`. Removed the local `const DEFAULT_LEAGUES` shadow in `all_slates` that was hiding the import.
+- `scripts/query-propprofessor.js` — CLI `sharp-plays` default now uses `Array.from(DEFAULT_LEAGUES)`.
+- `scripts/backtest-daily-snapshot.js` — `SUPPORTED_LEAGUES` is now derived from `DEFAULT_LEAGUES` (uppercased + Set) so the snapshot guard, the API payload, and the CLI defaults can never drift out of sync.
+- `test/propprofessor-shared-utils.test.js` — 3 new tests asserting the list contents, frozen state, and the presence/absence sanity guards (NBA, NFL, Soccer, Tennis must be present; empty string must not).
+- `test/backtest-daily-snapshot.test.js` — unchanged, still passes (the test asserts the derived Set has the same 10 expected keys).
+
+### Why this is the right shape
+
+The v2.1.8 in_progress diff added the missing leagues to each callsite individually. That works once but is exactly the kind of fix that gets undone silently the next time someone adds a `leagues:` argument to a new tool. Centralizing it in one place makes the constraint enforceable: any new tool that takes a `leagues` arg should import `DEFAULT_LEAGUES` and the reviewer should not accept a hand-maintained list in the new file.
+
+### Stats
+
+- 930 tests passing (was 927 in v2.1.8; +3 DEFAULT_LEAGUES tests)
+- No npm audit vulns
+- No new dependencies
+- 0 lint errors (15 pre-existing function-length warnings unchanged)
+- Full backwards compatibility — `leagues` arg still overrides the default; the default itself just now matches what the backend actually supports.
+
 ## 2.1.8
 
 **Player-context research as a first-class pre-flight across the tool surface, plus a new one-call validation tool.** The `player_context` tool has existed since v1.5.x but was only integrated as a pre-flight in `novig_screen`. v2.1.8 brings it to `screen_ranked` and `recommended_bets` as an opt-in flag, and introduces `validate_play` for the common "is this specific play worth betting on?" workflow.

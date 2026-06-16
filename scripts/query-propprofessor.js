@@ -4,6 +4,7 @@
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
+const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
 
 const {
   createPropProfessorClient,
@@ -582,7 +583,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
           .filter(Boolean)
       : opts.league
         ? [opts.league]
-        : ['NBA', 'MLB', 'NHL', 'Tennis', 'WNBA', 'UFC'];
+        : Array.from(DEFAULT_LEAGUES);
     const markets = opts.markets
       ? String(opts.markets)
           .split(',')
