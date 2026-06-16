@@ -32,3 +32,10 @@ jobs:
 
       - name: Run live smoke
         run: npm run smoke:live
+
+      - name: Clean up auth.json
+        # The runner filesystem is ephemeral, but explicit removal prevents the
+        # file from being captured by any future debug-step that uploads
+        # artifacts or dumps the workspace.
+        if: always()
+        run: rm -f auth.json

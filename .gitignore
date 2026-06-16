@@ -2,8 +2,11 @@
 .env
 .hermes/
 auth.json
+*.cookies.json
+cookies.json
 token-cache.json
 .propprofessor/
+.archive/
 node_modules
 npm-debug.log*
 ranked-screen-rows.json
