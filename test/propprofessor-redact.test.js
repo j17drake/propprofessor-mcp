@@ -92,6 +92,32 @@ describe('redactSecrets', () => {
     });
   });
 
+  describe('generic cookie name=value pairs', () => {
+    it('redacts a long cookie-shaped value in a Cookie header', () => {
+      const output = redactSecrets('Cookie: session_id=abcdefghijklmnopqrstuvwxyz123456; theme=dark');
+      assert.ok(!output.includes('abcdefghijklmnopqrstuvwxyz123456'));
+      assert.ok(output.includes('session_id=[REDACTED]'));
+      assert.ok(output.includes('theme=dark'), 'short value must be preserved');
+    });
+
+    it('redacts a JWT-shaped cookie value', () => {
+      const jwt =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
+        '.' +
+        'eyJzdWIiOiIxMjM0NTY3ODkwIn0' +
+        '.' +
+        'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+      const output = redactSecrets(`Cookie: auth=${jwt}`);
+      assert.ok(!output.includes(jwt));
+      assert.ok(output.includes('auth=[REDACTED]'));
+    });
+
+    it('preserves short query-string-style values', () => {
+      const input = 'page=2 limit=10 q=nba';
+      assert.equal(redactSecrets(input), input);
+    });
+  });
+
   describe('redaction does not crash on weird input', () => {
     it('handles empty string', () => {
       assert.equal(redactSecrets(''), '');
