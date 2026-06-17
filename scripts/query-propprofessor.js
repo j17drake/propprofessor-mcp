@@ -614,12 +614,20 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     return;
   }
   if (command === 'tennis') {
+    // --book (singular) sets the focus/preferred book; --books (plural) sets
+    // the full list. --book wins when both are provided. The full list defaults
+    // to the standard sharp set so consensus comparison still has data; the
+    // focus book defaults to NoVigApp (the most common user request for tennis).
+    const focusBookName = opts.book ? String(opts.book).trim() : null;
     const tennisBooks = opts.books
       ? String(opts.books)
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean)
-      : ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+      : focusBookName
+        ? [focusBookName, 'Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']
+        : ['NoVigApp', 'Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'];
+    const preferredBookName = focusBookName || tennisBooks[0];
     const result = await buildRankedScreenResponse({
       client,
       payloads: Array.isArray(payloads) && payloads.length ? payloads : [payload],
@@ -633,13 +641,13 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
         debug
       },
       league: 'Tennis',
-      focusBook: tennisBooks[0] || 'Pinnacle',
+      focusBook: preferredBookName,
       rankRows: (hydratedRows, { debug: rankedDebug } = {}) =>
         rankTennisScreenRows(hydratedRows, {
           limit: opts.limit ? Number(opts.limit) : 12,
           includeAll: true,
           maxAgeMs: opts.maxAgeMs ? Number(opts.maxAgeMs) : null,
-          preferredBook: tennisBooks[0] || 'Pinnacle',
+          preferredBook: preferredBookName,
           debug: rankedDebug
         }),
       resultMeta: {
