@@ -73,6 +73,7 @@ When a tool returns ranked rows, each row may include:
 {
   "ok": true,
   "totalRecommended": 8,
+  "focusBook": "Fliff",       // v2.2.0: the execution book from the user's `books` param
   "markets_queried": ["Moneyline", "Spread", "Total"],
   "leagues": [
     {
@@ -81,12 +82,78 @@ When a tool returns ranked rows, each row may include:
       "markets_queried": ["Moneyline", "Spread", "Total"],
       "downgradedCount": 0,
       "plays": [
+        {
+          "game": "Lakers @ Celtics",
+          "selection": "Lakers ML",
+          "book": "Fliff",    // v2.2.0: the book this play is executable on
+          "odds": -135,
+          "edge": 2.4,
+          "tier": "TIER 1",
+          ...
+        }
         /* tier-tagged rows with optional research attached */
       ]
     }
   ],
   "summary": { "TIER 1": 2, "TIER 2": 6 },
   "tierFilter": ["TIER 1", "TIER 2"]
+}
+```
+
+### `quick_screen` (v2.2.0) / `novig_screen`
+
+```jsonc
+{
+  "ok": true,
+  "targetBook": "Fliff",
+  "targetBooks": ["Fliff"],
+  "leagues": ["NBA", "MLB"],
+  "markets": ["Moneyline", "Spread", "Total"],
+  "totalCandidates": 5,
+  "results": [
+    {
+      "league": "NBA",
+      "market": "Moneyline",
+      "candidates": [
+        {
+          "game": "Lakers @ Celtics",
+          "selection": "Lakers ML",
+          "odds": -135,
+          "edge": 2.4,
+          "confidenceTier": "TIER 1",
+          "rationale": "...",
+          ...
+        }
+      ]
+    }
+  ],
+  "research": [
+    { "player": "Tatum", "riskFlag": "low", "riskSummary": "..." }
+  ],
+  "workflow": "Fliff target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.",
+  "markets_alias_used": []
+}
+```
+
+### `ask` (v2.2.0)
+
+```jsonc
+{
+  "ok": true,
+  "raw": "best plays on Fliff today",
+  "parsed": {
+    "league": null,
+    "book": "Fliff",
+    "market": null,
+    "side": null,
+    "line": null,
+    "player": null
+  },
+  "suggestedTool": {
+    "tool": "quick_screen",
+    "args": { "books": ["Fliff"] }
+  },
+  "workflow": "Parsed the natural language query. Call the suggested tool with the suggested args to get results back."
 }
 ```
 

@@ -260,6 +260,7 @@ describe('propprofessor MCP server stdio contract', () => {
       const toolNames = toolsResponse.result.tools.map((tool) => tool.name).sort();
       assert.deepEqual(toolNames, [
         'all_slates',
+        'ask',
         'clear_score_timeline',
         'ev_candidates',
         'fantasy_optimizer',
@@ -275,6 +276,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'manage_hidden_bets',
         'novig_screen',
         'player_context',
+        'quick_screen',
         'recommended_bets',
         'resolve_pick',
         'screen',

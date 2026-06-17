@@ -84,6 +84,7 @@ const {
   resolvePick,
   writeCheckpoint
 } = require('../../lib/propprofessor-picks');
+const { parseNaturalLanguagePropQuery } = require('../../lib/propprofessor-query-parser');
 
 // Strip undefined values so they don't override API client defaults via spread
 function defined(obj) {
@@ -902,14 +903,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return response;
     },
 
-    async novig_screen(args = {}) {
+    // quick_screen: the generalised version of novig_screen. Accepts any book(s)
+    // via the `books` param and runs sharp_plays + player_context for each
+    // (league, market) pair. Defaults to ['NoVigApp'] for backward compat.
+    async quick_screen(args = {}) {
+      const targetBooks =
+        Array.isArray(args.books) && args.books.length ? args.books : args.book ? [args.book] : ['NoVigApp'];
       const leagues =
         Array.isArray(args.leagues) && args.leagues.length
           ? args.leagues
           : args.league
             ? [args.league]
             : Array.from(DEFAULT_LEAGUES);
-      // Resolve markets using aliases for each league
       const markets =
         Array.isArray(args.markets) && args.markets.length
           ? args.markets
@@ -922,10 +927,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const includeResearch = args.includeResearch !== undefined ? Boolean(args.includeResearch) : true;
       const debug = Boolean(args.debug);
 
-      // Track aliases used across all leagues
       const allAliasesUsed = [];
 
-      // Pre-resolve markets for each league
       const resolvedMarketsByLeague = {};
       for (const league of leagues) {
         const marketResolution = resolveMarkets({ markets }, league);
@@ -941,9 +944,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       for (const league of leagues) {
         for (const market of resolvedMarketsByLeague[league] || []) {
           try {
-            // Step 1: Run sharp_plays with NoVigApp as target, relaxed price requirements
             const spResult = await handlers.sharp_plays({
-              targetBooks: ['NoVigApp'],
+              targetBooks,
               league,
               market,
               limit: scanLimit,
@@ -958,7 +960,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
             if (!candidates.length) continue;
 
-            // Step 2: Run player context research on each candidate
             if (includeResearch) {
               for (const row of candidates) {
                 const player = row.selection || row.participant || row.pick;
@@ -1027,18 +1028,24 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
+      const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
       return {
         ok: true,
-        targetBook: 'NoVigApp',
+        targetBook: bookList,
+        targetBooks,
         leagues,
         markets,
         totalCandidates: allCandidates.reduce((sum, l) => sum + (l.candidates?.length || 0), 0),
         results: allCandidates,
         research: researchResults,
-        workflow:
-          'NoVigApp target book. Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.',
+        workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
+    },
+
+    // Backward-compat alias: novig_screen delegates to quick_screen with NoVigApp
+    async novig_screen(args = {}) {
+      return handlers.quick_screen({ ...args, books: ['NoVigApp'] });
     },
 
     // ─── Betting ────────────────────────────────────────────────────
@@ -1164,11 +1171,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   const research = researchResults.find(
                     (r) => String(r.player || '').toLowerCase() === playerName.toLowerCase()
                   );
+                  // Resolve which book this play is executable on. If the user
+                  // passed an explicit books list, use the focus book from that
+                  // list (screen_ranked routes it as preferredBook). Otherwise
+                  // fall back to the row's book field or oddsSource.
+                  const leagueBooks = Array.isArray(args.books) && args.books.length ? args.books : [];
+                  const focusBook = leagueBooks[0] || row.book || row.oddsSource || null;
                   return {
                     game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                     selection: row.selection || row.participant || null,
                     market: row._market || row.market || null,
                     start: row.start || null,
+                    book: focusBook,
                     odds: row.targetBookOdds ?? null,
                     edge: row.consensusEdge,
                     clv: row.clvProxyPct,
@@ -1206,9 +1220,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         { concurrency: 4 }
       );
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
+      const leagueBooks = Array.isArray(args.books) && args.books.length ? args.books : [];
+      const focusBook = leagueBooks[0] || null;
       const response = {
         ok: true,
         totalRecommended: total,
+        focusBook,
         markets_queried: markets,
         leagues: allRecommended.filter((l) => l.count > 0),
         emptyLeagues: allRecommended.filter((l) => !l.count && !l.error).map((l) => l.league),
@@ -1947,6 +1964,55 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     // ─── Meta ──────────────────────────────────────────────────────
+    async ask(args = {}) {
+      const query = String(args.query || '').trim();
+      if (!query) {
+        const error = new Error(
+          'query is required. Pass a natural language bet query, e.g. "best plays on Fliff today" or "Tatum over 29.5 points".'
+        );
+        error.code = 'MISSING_PARAMS';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+      const parsed = parseNaturalLanguagePropQuery(query);
+      return {
+        ok: true,
+        raw: parsed.raw,
+        parsed: {
+          league: parsed.league,
+          book: parsed.book,
+          market: parsed.market,
+          side: parsed.side,
+          line: parsed.line,
+          player: parsed.player
+        },
+        suggestedTool: parsed.book
+          ? {
+              tool: 'quick_screen',
+              args: {
+                books: [parsed.book],
+                ...(parsed.league ? { leagues: [parsed.league] } : {}),
+                ...(parsed.market ? { markets: [parsed.market] } : {})
+              }
+            }
+          : parsed.player
+            ? {
+                tool: 'player_context',
+                args: { player: parsed.player, ...(parsed.league ? { sport: parsed.league } : {}) }
+              }
+            : {
+                tool: 'recommended_bets',
+                args: {
+                  ...(parsed.league ? { leagues: [parsed.league] } : {}),
+                  ...(parsed.market ? { markets: [parsed.market] } : {})
+                }
+              },
+        workflow:
+          'Parsed the natural language query. Call the suggested tool with the suggested args to get results back. You can also modify the args before calling — the parser is a suggestion, not a mandate.'
+      };
+    },
+
     async get_started(args = {}) {
       const userType = args.user_type || 'intermediate';
 
