@@ -850,7 +850,8 @@ describe('propprofessor MCP server stdio contract', () => {
       league: 'NBA',
       market: 'Moneyline',
       includeAll: true,
-      books: ['NoVigApp']
+      books: ['NoVigApp'],
+      debug: true
     });
 
     assert.equal(calls.queryScreenOddsBestComps.length, 1);

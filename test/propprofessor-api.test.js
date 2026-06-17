@@ -759,7 +759,8 @@ describe('createPropProfessorClient', () => {
       league: 'NBA',
       market: 'Moneyline',
       books: ['NoVigApp'],
-      lookbackHours: 6
+      lookbackHours: 6,
+      debug: true
     });
     assert.equal(result.ok, true);
     assert.equal(result.freshness.rowCount, 2);

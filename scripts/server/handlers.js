@@ -227,7 +227,7 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
   const rows = Array.isArray(candidates) ? candidates.filter((play) => play && typeof play === 'object') : [];
   const requestedBooks = normalizeBookList(args.books);
   const limit = getLimit(args);
-  const debug = getDebugFlag(args.debug, true);
+  const debug = getDebugFlag(args.debug, false);
   const lookbackHoursUsed = getLookbackHours(args);
   const maxAgeMs = getMaxAgeMs(args);
   const queryHistoryMemoized = createOddsHistoryMemoizedQuery(client);
@@ -732,7 +732,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       const payload = await client.querySportsbook(
         defined({
-          isLive: args.isLive,
+          isLive: args.is_live !== undefined ? Boolean(args.is_live) : Boolean(args.isLive),
           showBreakOnly: args.showBreakOnly,
           showTimeoutOnly: args.showTimeoutOnly,
           showPeriodEndOnly: args.showPeriodEndOnly,
@@ -1899,7 +1899,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // ─── Fantasy Optimizer ──────────────────────────────────────────────
     async fantasy_optimizer(args = {}) {
       const filters = {
-        isLive: args.isLive,
+        isLive: args.is_live !== undefined ? Boolean(args.is_live) : Boolean(args.isLive),
         showBreakOnly: args.showBreakOnly,
         showTimeoutOnly: args.showTimeoutOnly,
         showPeriodEndOnly: args.showPeriodEndOnly,
