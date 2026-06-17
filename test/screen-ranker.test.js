@@ -606,6 +606,29 @@ describe('getKaiCall (Bug #2, 2026-06-17)', () => {
     assert.equal(call, 'CONSIDER');
   });
 
+  it('also caps CONSIDER when focusBookMissing lives on item.row (intermediate ranker state)', () => {
+    // The call site in lib/screen-ranker.js passes the intermediate ranker
+    // object to getKaiCall, which has focusBookMissing on item.row (the
+    // raw row from expandScreenRow), not at the top level. The check must
+    // look at both locations.
+    const item = {
+      row: { focusBookMissing: true },
+      consensusBookCount: 8,
+      executionQuality: 'best',
+      movementLabel: 'supportive',
+      movementQuality: 'high',
+      multiWindowScore: 1.0,
+      consensusEdge: 2.0,
+      clvProxyPct: 5.0,
+      consensusWindowCount: 6,
+      totalConsensusWindows: 6,
+      hasConsensus: true,
+      steamMove: true,
+      steamBooks: ['Pinnacle', 'BetOnline', 'Circa']
+    };
+    assert.equal(getKaiCall(item), 'CONSIDER');
+  });
+
   it('still returns BET for focusBookMissing=false rows with green grade and low risk', () => {
     const item = {
       focusBookMissing: false,
