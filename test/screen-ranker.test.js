@@ -169,7 +169,12 @@ describe('screen-ranker (direct unit tests)', () => {
       assert.equal(ranked[0].odds, 100);
     });
 
-    it('keeps all rows when requirePreferredBook=false (default)', () => {
+    it('keeps all rows when requirePreferredBook=false (default), but moves fallback rows to focusBookMissingRows', () => {
+      // As of 2026-06-17, fallback rows (no focus-book price) are split out
+      // of the main result array into `focusBookMissingRows` so users can
+      // filter the main array by tier and only get rows executable on the
+      // focus book. The row IS still kept (just on the non-enumerable
+      // focusBookMissingRows property, not the main array).
       const rows = [
         {
           book: 'Pinnacle',
@@ -193,7 +198,10 @@ describe('screen-ranker (direct unit tests)', () => {
         preferredBooks: ['Fliff', 'Pinnacle', 'Polymarket'],
         includeAll: true
       });
-      assert.equal(ranked.length, 1, 'row should be kept when requirePreferredBook is not set');
+      assert.equal(ranked.length, 0, 'main array excludes the fallback row');
+      assert.equal(ranked.focusBookMissingRows.length, 1, 'fallback row is preserved on focusBookMissingRows');
+      assert.equal(ranked.focusBookMissingRows[0].book, 'Pinnacle');
+      assert.equal(ranked.focusBookMissingRows[0].focusBookMissingReason, 'no price for Fliff');
     });
   });
 
@@ -366,16 +374,19 @@ describe('screen-ranker (direct unit tests)', () => {
         requirePreferredBook: false,
         limit: 10
       });
-      assert.equal(ranked.length, 1);
+      // As of 2026-06-17, the fallback row is moved to focusBookMissingRows
+      // (not in the main array) so filtering result by tier only returns
+      // rows executable on the focus book. The row IS still preserved.
+      assert.equal(ranked.length, 0, 'main array excludes the fallback row');
+      assert.equal(ranked.focusBookMissingRows.length, 1, 'fallback row is on focusBookMissingRows');
       assert.equal(ranked.coverageGaps.length, 1, 'should record one coverage gap');
       assert.equal(ranked.coverageGaps[0].preferredBook, 'NoVigApp');
       assert.deepEqual(ranked.coverageGaps[0].availableBooks.sort(), ['FanDuel', 'Pinnacle']);
       assert.equal(ranked.coverageGaps[0].matchup, 'Warriors vs Lakers');
       assert.equal(ranked.coverageGaps[0].reason, 'no_price_fallback');
       assert.equal(ranked.coverageGaps[0].focusBookMissingReason, 'no price for NoVigApp');
-      assert.equal(ranked[0].book, 'Pinnacle', 'ranker still reports the book it fell back to');
-      assert.equal(ranked[0].focusBookMissing, true, 'per-row flag is set');
-      assert.equal(ranked[0].focusBookMissingReason, 'no price for NoVigApp');
+      assert.equal(ranked.focusBookMissingRows[0].book, 'Pinnacle', 'fallback row reports the book it fell back to');
+      assert.equal(ranked.focusBookMissingRows[0].focusBookMissingReason, 'no price for NoVigApp');
     });
 
     it('records a coverage gap for rows dropped because the focus book has no price (requirePreferredBook=true)', () => {
@@ -433,7 +444,7 @@ describe('screen-ranker (direct unit tests)', () => {
       assert.equal(ranked.coverageGaps.length, 0, 'no gap when focus book has a price');
     });
 
-    it('attaches coverageGaps as a non-enumerable property so JSON.stringify and Array.map work normally', () => {
+    it('attaches coverageGaps and focusBookMissingRows as non-enumerable properties', () => {
       const row = {
         book: 'Pinnacle',
         league: 'NBA',
@@ -453,14 +464,20 @@ describe('screen-ranker (direct unit tests)', () => {
         }
       };
       const ranked = rankScreenRows([row], { preferredBook: 'NoVigApp', limit: 10 });
-      assert.equal(ranked.length, 1);
-      // JSON.stringify should not include the coverageGaps property
+      // Pinnacle is in allBookOdds but NoVigApp is not, so this row is a
+      // fallback. The main array is empty; the row lives on focusBookMissingRows.
+      assert.equal(ranked.length, 0);
+      assert.equal(ranked.focusBookMissingRows.length, 1);
+      // JSON.stringify should not include either non-enumerable property
       const json = JSON.stringify(ranked);
       assert.ok(!json.includes('coverageGaps'), 'coverageGaps should not be in JSON output');
-      // But the property is still accessible
+      assert.ok(!json.includes('focusBookMissingRows'), 'focusBookMissingRows should not be in JSON output');
+      // But the properties are still accessible
       assert.ok(Array.isArray(ranked.coverageGaps));
-      // And Object.keys should not include it
+      assert.ok(Array.isArray(ranked.focusBookMissingRows));
+      // And Object.keys should not include them
       assert.ok(!Object.keys(ranked).includes('coverageGaps'));
+      assert.ok(!Object.keys(ranked).includes('focusBookMissingRows'));
     });
   });
 

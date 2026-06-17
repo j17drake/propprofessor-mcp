@@ -1152,13 +1152,18 @@ describe('createPropProfessorClient', () => {
       }
     });
 
-    const result = await handlers.screen({ league: 'Tennis', market: 'Moneyline', limit: 5 });
-    assert.equal(result.result[0].hasConsensus, true);
-    assert.equal(result.result[0].hasLineMovement, true);
-    assert.equal(typeof result.result[0].rankingReason, 'string');
-    assert.ok(result.result[0].rankingReason.includes('consensus edge'));
-    assert.equal(typeof result.result[0].scoreBreakdown, 'object');
-    assert.equal(typeof result.result[0].scoreBreakdown.total, 'number');
+    // Pass book: 'NoVigApp' so the rows aren't fallbacks (the fixture
+    // has NoVigApp odds, not Pinnacle). As of 2026-06-17, the ranker
+    // splits fallback rows out of result[] into focusBookMissingRows.
+    const result = await handlers.screen({ league: 'Tennis', market: 'Moneyline', limit: 5, book: 'NoVigApp' });
+    assert.ok(result.result.length > 0, 'should have rows in result when focus book has odds');
+    const row = result.result[0];
+    assert.equal(row.hasConsensus, true);
+    assert.equal(row.hasLineMovement, true);
+    assert.equal(typeof row.rankingReason, 'string');
+    assert.ok(row.rankingReason.includes('consensus edge'));
+    assert.equal(typeof row.scoreBreakdown, 'object');
+    assert.equal(typeof row.scoreBreakdown.total, 'number');
   });
 
   it('retries once after a 401 by refreshing the access token', async () => {

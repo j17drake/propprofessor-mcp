@@ -259,6 +259,8 @@ function parseArgs(argv) {
       opts.includePasses = true;
     } else if (arg === '--hide-passes' || arg === '--hidePasses') {
       opts.hidePasses = true;
+    } else if (arg === '--focus-book-only' || arg === '--focusBookOnly') {
+      opts.focusBookOnly = true;
     } else if (arg === '--allow-recent-only' || arg === '--allowRecentOnly') {
       opts.allowRecentOnly = true;
     } else if (arg === '--source') {
@@ -679,6 +681,18 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     } else {
       result.result = normalized;
       result.count = normalized.length;
+    }
+    // --focus-book-only: drop focusBookMissingRows from the response. By
+    // default the ranker surfaces these as a separate top-level field so
+    // users can see "what did the ranker find that I can't execute on my
+    // focus book?" — the flag is for users who want a pure focus-book
+    // response (e.g. "all TIER 1 bets on NoVigApp today" returns exactly
+    // the 2 rows executable on NoVigApp, not 3 with one fallback).
+    if (opts.focusBookOnly) {
+      const fallbackCount = (result.focusBookMissingRows || []).length;
+      delete result.focusBookMissingRows;
+      result.resultMeta = result.resultMeta || {};
+      result.resultMeta.hiddenFallbackRowsCount = fallbackCount;
     }
     result.sample = normalized;
     result.notes = {

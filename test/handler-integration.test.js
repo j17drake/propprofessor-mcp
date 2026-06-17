@@ -235,11 +235,19 @@ describe('handler integration: screen_ranked', () => {
     // (2 events × 4 books × 2 sides = 8 for Aswell, plus 2 × 2 × 2 = 4 for
     // Chandler, so at least 8 rows post-ranking; we don't assert exact
     // count because the ranker may filter more, but > 0 is the bug check).
-    assert.ok(result.result.length > 0, `Expected UFC rows post-fix, got 0. Pre-fix this was the bug.`);
+    // As of 2026-06-17, fallback rows (rows where the focus book had no
+    // price) are moved to `focusBookMissingRows`. Pinnacle has no UFC
+    // moneyline odds, so all UFC rows are fallbacks. Count both arrays.
+    const fallbackCount = (result.focusBookMissingRows || []).length;
+    assert.ok(
+      result.result.length + fallbackCount > 0,
+      `Expected UFC rows post-fix, got 0 in result and ${fallbackCount} in focusBookMissingRows. Pre-fix this was the bug.`
+    );
     // None of the rows should have book='Pinnacle' (since Pinnacle has no
     // odds in our fixture) — the defensive fallback should have used the
     // books that DO have odds.
-    const books = new Set(result.result.map((r) => r.book).filter(Boolean));
+    const allRows = [...result.result, ...(result.focusBookMissingRows || [])];
+    const books = new Set(allRows.map((r) => r.book).filter(Boolean));
     for (const book of books) {
       assert.notEqual(book, 'Pinnacle', 'Should not surface Pinnacle rows when Pinnacle has no odds');
     }

@@ -36,6 +36,7 @@ function createRankedScreenClientStub({
             selection2Id: 'Moneyline:Stub_Away',
             odds: {
               NoVigApp: { odds1: -118, odds2: 104 },
+              Fliff: { odds1: -118, odds2: 104 },
               Polymarket: { odds1: -125, odds2: 110 }
             }
           }
@@ -1136,7 +1137,7 @@ describe('propprofessor MCP server stdio contract', () => {
       'DraftKings'
     ]);
     assert.ok(calls.queryScreenOddsBestComps[2].books.length >= 5); // sharp book group
-    assert.equal(result.result.length, 2);
+    assert.equal(result.result.length, 4);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
   });
