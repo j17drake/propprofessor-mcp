@@ -665,9 +665,34 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     });
     // Correct tennis match times via SportScore before localizing
     if (result?.result) {
+      // Preserve the non-enumerable focusBookMissingRows before replacing
+      // result.result with the corrected array (which loses the property).
+      const fallbackRows = result.result.focusBookMissingRows;
       result.result = await correctTennisTimes(result.result);
+      if (fallbackRows) {
+        Object.defineProperty(result.result, 'focusBookMissingRows', {
+          value: fallbackRows,
+          enumerable: false,
+          writable: false,
+          configurable: false
+        });
+      }
     }
     const normalized = normalizeScreenRowTimes(result.result);
+    // After normalizeScreenRowTimes (which returns a new array), re-attach
+    // the non-enumerable focusBookMissingRows if the original result had them.
+    if (result.result.focusBookMissingRows) {
+      Object.defineProperty(normalized, 'focusBookMissingRows', {
+        value: result.result.focusBookMissingRows,
+        enumerable: false,
+        writable: false,
+        configurable: false
+      });
+    }
+    // Preserve focusBookMissingRows across the filter/slice. normalizeScreenRowTimes
+    // returns a new array; `filter` below also returns a new array. Hold it
+    // on the outer response object so it's always reachable.
+    const fallbackRows = result.focusBookMissingRows || result.result.focusBookMissingRows || null;
     // --hide-passes: drop kaiCall=PASS rows. The ranker still ranks them
     // (so PASS rows are surfaced at lower positions in the slate), but the
     // default response can drown the user in noise on a wide slate — 42 of
@@ -689,12 +714,12 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     // response (e.g. "all TIER 1 bets on NoVigApp today" returns exactly
     // the 2 rows executable on NoVigApp, not 3 with one fallback).
     if (opts.focusBookOnly) {
-      const fallbackCount = (result.focusBookMissingRows || []).length;
-      delete result.focusBookMissingRows;
+      const fallbackCount = (fallbackRows || []).length;
       result.resultMeta = result.resultMeta || {};
       result.resultMeta.hiddenFallbackRowsCount = fallbackCount;
+    } else {
+      result.focusBookMissingRows = fallbackRows || [];
     }
-    result.sample = normalized;
     result.notes = {
       ...(result.notes || {}),
       movementAvailable: normalized.some((row) => row.lineHistoryUsable || row.clvProxyPct !== null),
@@ -702,6 +727,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       clvProxy: 'open odds vs current odds when history fields are present',
       timeInterpretation: `start values without an explicit timezone are treated as UTC, displayed in ${getLocalTimezone()}`
     };
+    result.sample = normalized;
     emitJson(logger, result);
     return;
   }
