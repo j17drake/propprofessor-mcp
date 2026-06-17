@@ -43,6 +43,20 @@ describe('query-propprofessor CLI parsing', () => {
     assert.equal(disabled.opts.debug, false);
   });
 
+  it('accepts --hide-passes flag and camelCase alias', () => {
+    const dashed = parseArgs(['node', 'query', 'tennis', '--hide-passes']);
+    assert.equal(dashed.opts.hidePasses, true);
+    assert.equal(dashed.command, 'tennis');
+
+    const camel = parseArgs(['node', 'query', 'tennis', '--hidePasses']);
+    assert.equal(camel.opts.hidePasses, true);
+  });
+
+  it('does not set hidePasses by default', () => {
+    const parsed = parseArgs(['node', 'query', 'tennis']);
+    assert.notEqual(parsed.opts.hidePasses, true);
+  });
+
   it('accepts positive EV discovery flags', () => {
     const parsed = parseArgs([
       'node',

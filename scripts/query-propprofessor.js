@@ -257,6 +257,8 @@ function parseArgs(argv) {
       opts.strict = false;
     } else if (arg === '--include-passes' || arg === '--includePasses') {
       opts.includePasses = true;
+    } else if (arg === '--hide-passes' || arg === '--hidePasses') {
+      opts.hidePasses = true;
     } else if (arg === '--allow-recent-only' || arg === '--allowRecentOnly') {
       opts.allowRecentOnly = true;
     } else if (arg === '--source') {
@@ -664,8 +666,20 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
       result.result = await correctTennisTimes(result.result);
     }
     const normalized = normalizeScreenRowTimes(result.result);
-    result.result = normalized;
-    result.count = normalized.length;
+    // --hide-passes: drop kaiCall=PASS rows. The ranker still ranks them
+    // (so PASS rows are surfaced at lower positions in the slate), but the
+    // default response can drown the user in noise on a wide slate — 42 of
+    // the 100 rows in the last live tennis query were TIER 4 PASS.
+    if (opts.hidePasses) {
+      const hiddenPassesCount = normalized.filter((row) => row.kaiCall === 'PASS').length;
+      result.result = normalized.filter((row) => row.kaiCall !== 'PASS');
+      result.count = result.result.length;
+      result.resultMeta = result.resultMeta || {};
+      result.resultMeta.hiddenPassesCount = hiddenPassesCount;
+    } else {
+      result.result = normalized;
+      result.count = normalized.length;
+    }
     result.sample = normalized;
     result.notes = {
       ...(result.notes || {}),
