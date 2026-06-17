@@ -331,4 +331,136 @@ describe('screen-ranker (direct unit tests)', () => {
       assert.equal(ranked[0].executionQuality, 'best');
     });
   });
+
+  describe('focus-book coverage gaps', () => {
+    it('flags a row as focusBookMissing when the focus book has no price and ranker falls back to a different book', () => {
+      // P0 fix: when the user asks for --book NoVigApp but the screen
+      // endpoint only returns Pinnacle/FanDuel for this match, the ranker
+      // used to silently fall through and report `book: 'Pinnacle'` as if it
+      // were NoVigApp. Now the row carries focusBookMissing: true and the
+      // ranker's coverageGaps surface the missing coverage.
+      // Odds chosen to produce consensusEdge large enough to clear the NBA gate.
+      const row = {
+        book: 'Pinnacle',
+        league: 'NBA',
+        homeTeam: 'Lakers',
+        awayTeam: 'Warriors',
+        participant: 'Lakers',
+        selection: 'Lakers',
+        market: 'Moneyline',
+        selection1: 'Lakers',
+        participant1: 'Lakers',
+        selection1Id: 'Moneyline:Lakers',
+        selection2: 'Warriors',
+        participant2: 'Warriors',
+        selection2Id: 'Moneyline:Warriors',
+        lineHistory: [],
+        allBookOdds: {
+          Pinnacle: { book: 'Pinnacle', odds1: -110, odds2: -110 },
+          FanDuel: { book: 'FanDuel', odds1: -150, odds2: 130 }
+          // No NoVigApp — that's the gap
+        }
+      };
+      const ranked = rankScreenRows([row], {
+        preferredBook: 'NoVigApp',
+        requirePreferredBook: false,
+        limit: 10
+      });
+      assert.equal(ranked.length, 1);
+      assert.equal(ranked.coverageGaps.length, 1, 'should record one coverage gap');
+      assert.equal(ranked.coverageGaps[0].preferredBook, 'NoVigApp');
+      assert.deepEqual(ranked.coverageGaps[0].availableBooks.sort(), ['FanDuel', 'Pinnacle']);
+      assert.equal(ranked.coverageGaps[0].matchup, 'Warriors vs Lakers');
+      assert.equal(ranked.coverageGaps[0].reason, 'no_price_fallback');
+      assert.equal(ranked.coverageGaps[0].focusBookMissingReason, 'no price for NoVigApp');
+      assert.equal(ranked[0].book, 'Pinnacle', 'ranker still reports the book it fell back to');
+      assert.equal(ranked[0].focusBookMissing, true, 'per-row flag is set');
+      assert.equal(ranked[0].focusBookMissingReason, 'no price for NoVigApp');
+    });
+
+    it('records a coverage gap for rows dropped because the focus book has no price (requirePreferredBook=true)', () => {
+      const row = {
+        book: 'Pinnacle',
+        league: 'NBA',
+        homeTeam: 'Celtics',
+        awayTeam: 'Heat',
+        participant: 'Celtics',
+        market: 'Moneyline',
+        selection1: 'Celtics',
+        participant1: 'Celtics',
+        selection1Id: 'Moneyline:Celtics',
+        selection2: 'Heat',
+        participant2: 'Heat',
+        selection2Id: 'Moneyline:Heat',
+        allBookOdds: {
+          Pinnacle: { book: 'Pinnacle', odds1: -150, odds2: 130 }
+        }
+      };
+      const ranked = rankScreenRows([row], {
+        preferredBook: 'NoVigApp',
+        requirePreferredBook: true,
+        limit: 10
+      });
+      assert.equal(ranked.length, 0, 'row should be dropped');
+      assert.equal(ranked.coverageGaps.length, 1, 'dropped row should still be reported as a coverage gap');
+      assert.equal(ranked.coverageGaps[0].reason, 'no_price_dropped');
+      assert.equal(ranked.coverageGaps[0].preferredBook, 'NoVigApp');
+      assert.deepEqual(ranked.coverageGaps[0].availableBooks, ['Pinnacle']);
+    });
+
+    it('does not record a coverage gap when the focus book has a price', () => {
+      const row = {
+        book: 'NoVigApp',
+        league: 'NBA',
+        homeTeam: 'Bulls',
+        awayTeam: 'Knicks',
+        participant: 'Bulls',
+        market: 'Moneyline',
+        selection1: 'Bulls',
+        participant1: 'Bulls',
+        selection1Id: 'Moneyline:Bulls',
+        selection2: 'Knicks',
+        participant2: 'Knicks',
+        selection2Id: 'Moneyline:Knicks',
+        allBookOdds: {
+          NoVigApp: { book: 'NoVigApp', odds1: -110, odds2: -110 },
+          Pinnacle: { book: 'Pinnacle', odds1: -150, odds2: 130 }
+        }
+      };
+      const ranked = rankScreenRows([row], { preferredBook: 'NoVigApp', limit: 10 });
+      assert.equal(ranked.length, 1);
+      assert.equal(ranked[0].focusBookMissing, false);
+      assert.equal(ranked.coverageGaps.length, 0, 'no gap when focus book has a price');
+    });
+
+    it('attaches coverageGaps as a non-enumerable property so JSON.stringify and Array.map work normally', () => {
+      const row = {
+        book: 'Pinnacle',
+        league: 'NBA',
+        homeTeam: 'A',
+        awayTeam: 'B',
+        participant: 'A',
+        market: 'Moneyline',
+        selection1: 'A',
+        participant1: 'A',
+        selection1Id: 'Moneyline:A',
+        selection2: 'B',
+        participant2: 'B',
+        selection2Id: 'Moneyline:B',
+        allBookOdds: {
+          Pinnacle: { book: 'Pinnacle', odds1: -110, odds2: -110 },
+          FanDuel: { book: 'FanDuel', odds1: -150, odds2: 130 }
+        }
+      };
+      const ranked = rankScreenRows([row], { preferredBook: 'NoVigApp', limit: 10 });
+      assert.equal(ranked.length, 1);
+      // JSON.stringify should not include the coverageGaps property
+      const json = JSON.stringify(ranked);
+      assert.ok(!json.includes('coverageGaps'), 'coverageGaps should not be in JSON output');
+      // But the property is still accessible
+      assert.ok(Array.isArray(ranked.coverageGaps));
+      // And Object.keys should not include it
+      assert.ok(!Object.keys(ranked).includes('coverageGaps'));
+    });
+  });
 });

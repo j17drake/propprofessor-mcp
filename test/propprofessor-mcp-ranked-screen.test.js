@@ -260,6 +260,51 @@ describe('buildRankedScreenResponse', () => {
     assert.equal(result.result[0].rowCount, 1);
     assert.equal(result.result[0].recentWindowHours, 1);
   });
+
+  it('surfaces coverageGaps from the ranker in resultMeta (P0: focus-book coverage gap)', async () => {
+    // When the ranker reports that the focus book has no price for a match,
+    // buildRankedScreenResponse must propagate that into resultMeta.coverageGaps
+    // so callers can see "you asked for NoVigApp but the screen endpoint
+    // didn't return it for 3 of 12 matches" without losing the surviving rows.
+    const payload = {
+      rows: [
+        {
+          book: 'Pinnacle',
+          homeTeam: 'Lakers',
+          awayTeam: 'Warriors',
+          market: 'Moneyline',
+          timestamp: Date.now() - 60000
+        }
+      ]
+    };
+    const fakeGap = {
+      preferredBook: 'NoVigApp',
+      availableBooks: ['Pinnacle', 'FanDuel'],
+      matchup: 'Warriors vs Lakers',
+      market: 'moneyline',
+      reason: 'no_price_fallback',
+      focusBookMissingReason: 'no price for NoVigApp'
+    };
+    const rankRows = (rows) => {
+      const result = rows.map((r) => ({ ...r, book: 'Pinnacle', focusBookMissing: true }));
+      Object.defineProperty(result, 'coverageGaps', { value: [fakeGap], enumerable: false });
+      return result;
+    };
+    const result = await buildRankedScreenResponse({
+      client: null,
+      payloads: [payload],
+      args: { debug: false, lookbackHours: 6 },
+      rankRows,
+      focusBook: 'NoVigApp'
+    });
+    assert.ok(Array.isArray(result.resultMeta.coverageGaps));
+    assert.equal(result.resultMeta.coverageGaps.length, 1);
+    assert.equal(result.resultMeta.coverageGaps[0].preferredBook, 'NoVigApp');
+    assert.equal(result.resultMeta.coverageGaps[0].reason, 'no_price_fallback');
+    // Focus-book coverage gap should also show up in degradedDataWarningCount or
+    // similar surfaced count — at minimum, the gap info is reachable via resultMeta.
+    assert.equal(result.resultMeta.focusBook, 'NoVigApp');
+  });
 });
 
 describe('buildDegradedDataWarnings — line field backfill (v2.1.3)', () => {
