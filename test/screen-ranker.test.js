@@ -463,4 +463,165 @@ describe('screen-ranker (direct unit tests)', () => {
       assert.ok(!Object.keys(ranked).includes('coverageGaps'));
     });
   });
+
+  describe('side-resolution fallback (Bug #1, 2026-06-17)', () => {
+    it('picks up the price from the alternate odds key when the resolved side is non-finite', () => {
+      // Regression: Charaeva had NoVigApp at -1036 on odds1, but resolveExtractedScreenSide
+      // returned odds2 (the empty side). The row was being created with
+      // targetBookOdds: null even though the price was on the book. Now we flip
+      // to the alternate side and surface the real price.
+      const row = {
+        book: 'NoVigApp',
+        league: 'Tennis',
+        homeTeam: 'Kulikova',
+        awayTeam: 'Charaeva',
+        participant: 'Charaeva',
+        selection: 'Charaeva',
+        market: 'Moneyline',
+        selection1: 'Charaeva',
+        participant1: 'Charaeva',
+        selection1Id: 'Moneyline:Charaeva',
+        selection2: 'Kulikova',
+        participant2: 'Kulikova',
+        selection2Id: 'Moneyline:Kulikova',
+        // The selection ID will resolve to odds2 (Kulikova's side), but the
+        // real price for Charaeva is on odds1.
+        allBookOdds: {
+          NoVigApp: { book: 'NoVigApp', odds1: -1036, odds2: 480 }
+        }
+      };
+      const [out] = expandScreenRow(row, { preferredBook: 'NoVigApp' });
+      assert.equal(out.targetBookOdds, -1036, 'should pick up the price from odds1 even when side resolved to odds2');
+      assert.equal(out.odds, -1036);
+      assert.equal(out.currentOdds, -1036);
+    });
+
+    it('does not flip the side when the resolved side already has a finite price', () => {
+      // Normal case: both sides are finite, the side we picked wins.
+      const row = {
+        book: 'NoVigApp',
+        league: 'Tennis',
+        homeTeam: 'A',
+        awayTeam: 'B',
+        participant: 'A',
+        selection: 'A',
+        market: 'Moneyline',
+        selection1: 'A',
+        participant1: 'A',
+        selection1Id: 'Moneyline:A',
+        selection2: 'B',
+        participant2: 'B',
+        selection2Id: 'Moneyline:B',
+        allBookOdds: {
+          NoVigApp: { book: 'NoVigApp', odds1: -150, odds2: 130 }
+        }
+      };
+      const [out] = expandScreenRow(row, { preferredBook: 'NoVigApp' });
+      assert.equal(out.targetBookOdds, -150);
+    });
+  });
+
+  describe('compDataMissing flag (Bug #3, 2026-06-17)', () => {
+    it('flags compDataMissing when the focus book has a price but no comp book has a same-side price', () => {
+      // Ferro/Olmo case: NoVigApp posted the only price, so we have nothing
+      // to compare execution quality against. Previously executionQuality
+      // was silently 'unknown' with no explanation. Now the row carries an
+      // explicit compDataMissing: true flag.
+      const row = {
+        book: 'NoVigApp',
+        league: 'Tennis',
+        homeTeam: 'Ferro',
+        awayTeam: 'Gorgodze',
+        participant: 'Ferro',
+        selection: 'Ferro',
+        market: 'Moneyline',
+        selection1: 'Ferro',
+        participant1: 'Ferro',
+        selection1Id: 'Moneyline:Ferro',
+        selection2: 'Gorgodze',
+        participant2: 'Gorgodze',
+        selection2Id: 'Moneyline:Gorgodze',
+        allBookOdds: {
+          NoVigApp: { book: 'NoVigApp', odds1: -517, odds2: 380 }
+        }
+      };
+      const ranked = rankScreenRows([row], { preferredBook: 'NoVigApp', limit: 10, includeAll: true });
+      assert.equal(ranked.length, 1);
+      assert.equal(ranked[0].compDataMissing, true);
+      assert.equal(ranked[0].executionQuality, 'unknown');
+    });
+
+    it('does not flag compDataMissing when comp books have a same-side price', () => {
+      const row = {
+        book: 'NoVigApp',
+        league: 'Tennis',
+        homeTeam: 'A',
+        awayTeam: 'B',
+        participant: 'A',
+        selection: 'A',
+        market: 'Moneyline',
+        selection1: 'A',
+        participant1: 'A',
+        selection1Id: 'Moneyline:A',
+        selection2: 'B',
+        participant2: 'B',
+        selection2Id: 'Moneyline:B',
+        allBookOdds: {
+          NoVigApp: { book: 'NoVigApp', odds1: -110, odds2: -110 },
+          Pinnacle: { book: 'Pinnacle', odds1: -112, odds2: -108 }
+        }
+      };
+      const ranked = rankScreenRows([row], { preferredBook: 'NoVigApp', limit: 10 });
+      assert.equal(ranked.length, 1);
+      assert.equal(ranked[0].compDataMissing, false);
+    });
+  });
+});
+
+const { getKaiCall } = require('../lib/propprofessor-risk-score');
+
+describe('getKaiCall (Bug #2, 2026-06-17)', () => {
+  it('caps verdict at CONSIDER for rows with focusBookMissing=true even when risk is low', () => {
+    // Regression: a TIER 1/2 BET verdict on a row where the focus book has no
+    // price implies the user can place the bet on the focus book. When
+    // focusBookMissing is true, the row fell back to a different book, so
+    // the verdict is misleading. Now it caps at CONSIDER.
+    const item = {
+      focusBookMissing: true,
+      consensusBookCount: 8,
+      executionQuality: 'best',
+      movementLabel: 'supportive',
+      movementQuality: 'high',
+      multiWindowScore: 1.0,
+      consensusEdge: 2.0,
+      clvProxyPct: 5.0,
+      consensusWindowCount: 6,
+      totalConsensusWindows: 6,
+      hasConsensus: true,
+      steamMove: true,
+      steamBooks: ['Pinnacle', 'BetOnline', 'Circa']
+    };
+    const call = getKaiCall(item);
+    assert.notEqual(call, 'BET', 'focusBookMissing rows should not get BET — user cannot execute on focus book');
+    assert.equal(call, 'CONSIDER');
+  });
+
+  it('still returns BET for focusBookMissing=false rows with green grade and low risk', () => {
+    const item = {
+      focusBookMissing: false,
+      consensusBookCount: 8,
+      executionQuality: 'best',
+      movementLabel: 'supportive',
+      movementQuality: 'high',
+      multiWindowScore: 1.0,
+      consensusEdge: 2.0,
+      clvProxyPct: 5.0,
+      consensusWindowCount: 6,
+      totalConsensusWindows: 6,
+      hasConsensus: true,
+      steamMove: true,
+      steamBooks: ['Pinnacle', 'BetOnline', 'Circa']
+    };
+    assert.equal(getKaiCall(item), 'BET');
+  });
 });
