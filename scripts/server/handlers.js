@@ -67,6 +67,7 @@ const {
   suggestStakes
 } = require('../../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../../lib/propprofessor-player-context');
+const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
 const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
 const {
   formatRecommendedBetsMinimal,
@@ -636,19 +637,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     };
   }
 
-  async function runSportScreen(args = {}) {
-    const requestedLeague = String(args.league || '').trim();
-    if (!requestedLeague) {
-      const error = new Error('league is required. Pass a league parameter, e.g. league: "NBA"');
-      error.code = 'LEAGUE_REQUIRED';
-      error.category = 'validation';
-      error.status = 400;
-      throw error;
-    }
-    const presetLeague = getLeagueRankingPreset(requestedLeague).league;
-    return presetLeague === 'TENNIS' ? runTennisScreen(args) : runLeagueScreen(args, presetLeague || requestedLeague);
-  }
-
   async function runUfcCard(args = {}) {
     const marketResolution = resolveMarkets(args, 'UFC');
     const normalizedMarkets = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
@@ -695,13 +683,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
 
   // ===== CONSOLIDATED HANDLER MAP =====
-  // 32 old tools → 21 new tools:
+  // 30 old tools → 20 new tools:
   //   ev_candidates          ← query_positive_ev_candidates + query_validated_positive_ev_candidates
   //   screen_raw             ← query_screen_odds + query_screen_odds_best_comps
   //   screen_ranked          ← query_screen_odds_ranked
-  //   screen                 ← query_sport_screen + query_nba_screen + query_wnba_screen + query_mlb_screen
-  //                              + query_nfl_screen + query_nhl_screen + query_ufc_screen + query_soccer_screen
-  //                              + query_ncaab_screen + query_ncaaf_screen + query_tennis_screen
   //   sharp_plays            ← query_sharp_plays
   //   sharp_consensus        ← query_sharp_consensus_windows
   //   all_slates             ← query_all_slates
@@ -886,16 +871,46 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return response;
     },
 
-    async screen(args = {}) {
-      return runSportScreen(args);
-    },
-
     // ─── Sharp Movement ─────────────────────────────────────────────
     async sharp_plays(args = {}) {
       const response = await runSharpPlays(args, {
         queryLeagueScreen: runLeagueScreen,
         queryTennisScreen: (rankedArgs) => runTennisScreen(rankedArgs)
       });
+      // Research: when includeResearch=true (default), run player_context
+      // on the top N ranked rows to attach injury/risk flags.
+      const includeResearch = args.includeResearch !== undefined ? Boolean(args.includeResearch) : true;
+      if (includeResearch && Array.isArray(response.result) && response.result.length) {
+        const researchLimit = Number.isFinite(Number(args.researchLimit))
+          ? Math.max(1, Math.min(50, Number(args.researchLimit)))
+          : 10;
+        const research = await runResearchOnTopRows({
+          rows: response.result,
+          limit: researchLimit,
+          playerContextFn: handlers.player_context
+        });
+        response.research = research.results;
+        response.resultMeta = {
+          ...response.resultMeta,
+          researchRunCount: research.results.length,
+          researchRiskHighCount: research.results.filter((r) => r.riskFlag === 'high').length,
+          researchCachedCount: research.results.filter((r) => r.cached).length
+        };
+        if (args.riskDowngrade === true) {
+          const beforeCount = response.result.length;
+          const highRiskPlayers = new Set(
+            research.results.filter((r) => r.riskFlag === 'high').map((r) => String(r.player || '').toLowerCase())
+          );
+          response.result = response.result.filter((row) => {
+            const player = String(row.selection || row.participant || '').toLowerCase();
+            return !highRiskPlayers.has(player);
+          });
+          response.resultMeta = {
+            ...response.resultMeta,
+            riskDowngradedCount: beforeCount - response.result.length
+          };
+        }
+      }
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
       if (verbosity === 'minimal') return formatSharpPlaysMinimal(response);
@@ -903,9 +918,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return response;
     },
 
-    // quick_screen: the generalised version of novig_screen. Accepts any book(s)
-    // via the `books` param and runs sharp_plays + player_context for each
-    // (league, market) pair. Defaults to ['NoVigApp'] for backward compat.
+    // quick_screen: Accepts any book(s) via the `books` param and runs
+    // sharp_plays + player_context for each (league, market) pair.
+    // Defaults to ['NoVigApp'].
     async quick_screen(args = {}) {
       const targetBooks =
         Array.isArray(args.books) && args.books.length ? args.books : args.book ? [args.book] : ['NoVigApp'];
@@ -954,6 +969,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               is_live: Boolean(args.is_live),
               strict: false,
               includePasses: false,
+              includeResearch: false,
               debug
             });
 
@@ -1041,11 +1057,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
-    },
-
-    // Backward-compat alias: novig_screen delegates to quick_screen with NoVigApp
-    async novig_screen(args = {}) {
-      return handlers.quick_screen({ ...args, books: ['NoVigApp'] });
     },
 
     // ─── Betting ────────────────────────────────────────────────────
@@ -1138,7 +1149,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               // with riskFlag='high' from the recommendation.
               let researchResults = [];
               let downgraded = 0;
-              if (args.includeResearch === true && recommended.length) {
+              if ((args.includeResearch !== undefined ? Boolean(args.includeResearch) : true) && recommended.length) {
                 const research = await runResearchOnTopRows({
                   rows: recommended,
                   limit: recommended.length,
@@ -1591,6 +1602,28 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     /**
+     * mlb_game_context: pull game-level context for an MLB game.
+     * Returns probable/confirmed pitchers, venue + park factor, hourly
+     * weather at first pitch, and lineup lock status with a risk flag
+     * for weather/park effects.
+     */
+    async mlb_game_context(args = {}) {
+      const gamePk = String(args.gamePk || '').trim();
+      if (!gamePk) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gamePk is required' } };
+      }
+      if (!/^\d{4,}$/.test(gamePk)) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gamePk must be a numeric MLB game ID' } };
+      }
+      try {
+        const result = await getMlbGameContext({ gamePk });
+        return result;
+      } catch (err) {
+        return { ok: false, gamePk, error: { code: 'API_ERROR', message: err?.message || String(err) } };
+      }
+    },
+
+    /**
      * validate_play (v2.1.8): bundle a get_play_details + player_context +
      * execution check into a single call. Returns a single BET / CONSIDER /
      * PASS verdict with all supporting evidence so the agent doesn't have
@@ -1653,9 +1686,55 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             }
           })();
 
-      const [detailOutcome, researchOutcome] = await Promise.all([detailPromise, researchPromise]);
+      // MLB game-level context (pitcher, weather, park, lineup). Only runs
+      // for league=MLB. The screen row's gameId is the format
+      // "MLB:PREMATCH:<homeSlug>:<awaySlug>:<unixStart>" — note the
+      // <home>:<away> order, not the more intuitive away-first. The last
+      // segment is a Unix timestamp, NOT the MLB gamePk. We resolve the
+      // real gamePk via the schedule endpoint using the homeSlug + awaySlug
+      // + the start date derived from the Unix timestamp. The lookup is
+      // best-effort: if the schedule fetch fails or no match is found,
+      // gameContext stays null and the verdict is unaffected. Skipped on
+      // skipResearch to honor that opt-out.
+      const isMlb = league.toUpperCase() === 'MLB';
+      // The screen gameId encodes the matchup; parse it to seed the lookup.
+      const gameIdParts = isMlb && gameId ? gameId.split(':') : [];
+      // Convention: index 2 = HOME slug, index 3 = AWAY slug.
+      const seedHomeTeam = gameIdParts[2] ? gameIdParts[2].replace(/_/g, ' ') : '';
+      const seedAwayTeam = gameIdParts[3] ? gameIdParts[3].replace(/_/g, ' ') : '';
+      // Start date is the date of the Unix timestamp (last segment).
+      const seedStartDate =
+        gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4])
+          ? new Date(Number(gameIdParts[4]) * 1000).toISOString().slice(0, 10)
+          : '';
+      const gameContextPromise =
+        !isMlb || !seedAwayTeam || !seedHomeTeam || !seedStartDate || skipResearch
+          ? Promise.resolve(null)
+          : (async () => {
+              try {
+                const gamePk = await findMlbGamePk({
+                  isoDate: seedStartDate,
+                  awayTeam: seedAwayTeam,
+                  homeTeam: seedHomeTeam
+                });
+                if (!gamePk) {
+                  return { ok: false, error: 'no MLB gamePk found for matchup' };
+                }
+                return { ok: true, value: await handlers.mlb_game_context({ gamePk }) };
+              } catch (err) {
+                return { ok: false, error: err?.message || String(err) };
+              }
+            })();
+
+      const [detailOutcome, researchOutcome, gameContextOutcome] = await Promise.all([
+        detailPromise,
+        researchPromise,
+        gameContextPromise
+      ]);
       const detailResult = detailOutcome?.ok ? detailOutcome.value : null;
       const detailError = detailOutcome?.ok ? null : detailOutcome.error;
+      const gameContext = gameContextOutcome?.ok ? gameContextOutcome.value : null;
+      const gameContextError = gameContextOutcome?.ok ? null : gameContextOutcome?.error || null;
 
       // Extract the specific row that matches the selection.
       const matchingRow = Array.isArray(detailResult?.result)
@@ -1735,6 +1814,22 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         reasons.push('player_context riskFlag = "low"');
       }
 
+      // MLB game-context risk override (weather / park / lineup). Applied
+      // AFTER player_context so a high weather flag can still PASS a play
+      // that survived the player-news check. Same downgrades as
+      // player_context so the agent's reasoning doesn't have to branch.
+      if (gameContext && gameContext.riskFlag === 'high') {
+        verdict = 'PASS';
+        reasons.push(
+          `mlb_game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`
+        );
+      } else if (gameContext && gameContext.riskFlag === 'medium') {
+        if (verdict === 'BET') verdict = 'CONSIDER';
+        reasons.push(`mlb_game_context riskFlag = "medium" — ${gameContext.riskSummary || 'proceed with caution'}`);
+      } else if (gameContext && gameContext.riskFlag === 'low') {
+        reasons.push(`mlb_game_context riskFlag = "low" — ${gameContext.riskSummary || 'minor flag'}`);
+      }
+
       return {
         ok: true,
         league,
@@ -1776,7 +1871,28 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             }
           : skipResearch
             ? { skipped: true }
-            : { error: researchError || 'research failed' }
+            : { error: researchError || 'research failed' },
+        gameContext: gameContext
+          ? {
+              gamePk: gameContext.gamePk,
+              venue: gameContext.venue || null,
+              pitchers: gameContext.pitchers || null,
+              park: gameContext.park || null,
+              weather: gameContext.weather || null,
+              lineups: gameContext.lineups || null,
+              riskFlag: gameContext.riskFlag,
+              riskSummary: gameContext.riskSummary || null,
+              signals: gameContext.signals || null,
+              cached: Boolean(gameContext.cached),
+              fetchedAt: gameContext.fetchedAt
+            }
+          : isMlb
+            ? skipResearch
+              ? { skipped: true }
+              : gameContextError
+                ? { error: gameContextError }
+                : null
+            : null
       };
     },
 
@@ -1898,6 +2014,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // ─── Fantasy Optimizer ──────────────────────────────────────────────
     async fantasy_optimizer(args = {}) {
+      // v2.x.x: apply numeric defaults here so the upstream slipgen backend
+      // doesn't KeyError on missing keys (it reads minOdds/minLegEV/minHoursAway
+      // etc. directly from the body with no defaults of its own). Without
+      // this, callers that omit these fields get 500s that surface as
+      // "'minOdds'"/"'minLegEV'"/"'minHoursAway'" from the backend.
+      const num = (v, fallback) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
       const filters = {
         isLive: args.is_live !== undefined ? Boolean(args.is_live) : Boolean(args.isLive),
         showBreakOnly: args.showBreakOnly,
@@ -1913,21 +2035,21 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         leagues: Array.isArray(args.leagues) ? args.leagues : Array.from(DEFAULT_LEAGUES),
         league: args.league,
         market: args.market,
-        minOdds: args.minOdds,
-        maxOdds: args.maxOdds,
-        minValue: args.minValue,
-        maxValue: args.maxValue,
-        minLegEV: args.minLegEV,
-        maxLegEV: args.maxLegEV,
-        minSlipEV: args.minSlipEV,
-        maxSlipEV: args.maxSlipEV,
+        minOdds: num(args.minOdds, -1000),
+        maxOdds: num(args.maxOdds, 1000),
+        minValue: num(args.minValue, -100),
+        maxValue: num(args.maxValue, 100),
+        minLegEV: num(args.minLegEV, -100),
+        maxLegEV: num(args.maxLegEV, 100),
+        minSlipEV: num(args.minSlipEV, -100),
+        maxSlipEV: num(args.maxSlipEV, 100),
         hiddenBets: Array.isArray(args.hiddenBets) ? args.hiddenBets : [],
         liveStatus: Array.isArray(args.liveStatus) ? args.liveStatus : [],
         periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : ['Full Game'],
-        minHoursAway: args.minHoursAway,
-        maxHoursAway: args.maxHoursAway,
-        minLiquidity: args.minLiquidity,
-        maxLiquidity: args.maxLiquidity
+        minHoursAway: num(args.minHoursAway, 0),
+        maxHoursAway: num(args.maxHoursAway, 336),
+        minLiquidity: num(args.minLiquidity, 0),
+        maxLiquidity: num(args.maxLiquidity, 1000)
       };
       const result = await client.queryFantasyPicks(filters);
       return {

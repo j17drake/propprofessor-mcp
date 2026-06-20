@@ -80,17 +80,6 @@ const RESPONSE_SCHEMAS = {
       resultMeta: { type: 'object' }
     }
   },
-  novig_screen: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      targetBook: { type: 'string' },
-      leagues: { type: 'array', items: { type: 'string' } },
-      totalCandidates: { type: 'integer' },
-      results: { type: 'array', items: { type: 'object' } },
-      research: { type: 'array', items: { type: 'object' } }
-    }
-  },
   all_slates: {
     type: 'object',
     properties: {

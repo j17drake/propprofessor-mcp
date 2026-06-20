@@ -253,7 +253,6 @@ Composite tools internally call these primitives:
 | `recommended_bets`          | `screen_ranked` (per league × market, parallelized, concurrency 4)  |
 | `staking_plan`              | `recommended_bets`                                                  |
 | `validate_play`             | `get_play_details` + `player_context` (parallelized)                |
-| `novig_screen`              | `sharp_plays({ targetBooks: ["NoVigApp"], includeResearch: true })` |
 | `ev_candidates` (validated) | `ev_candidates` (raw) + `screen_ranked` (validation pass)           |
 | `all_slates`                | `screen_ranked` per league, parallelized                            |
 

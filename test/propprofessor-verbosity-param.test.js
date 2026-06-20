@@ -14,8 +14,6 @@ describe('verbosity parameter in tool definitions', () => {
     'recommended_bets',
     'sharp_plays',
     'screen_ranked',
-    'screen',
-    'novig_screen',
     'all_slates',
     'staking_plan',
     'ev_candidates',

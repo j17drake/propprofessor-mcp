@@ -254,39 +254,6 @@ describe('handler integration: screen_ranked', () => {
   });
 });
 
-// ─── screen (league-specific) ──────────────────────────────────────
-
-describe('handler integration: screen', () => {
-  it('returns NBA screen with resultMeta', async () => {
-    const handlers = createHandlers();
-    const result = await handlers.screen({
-      league: 'NBA',
-      market: 'Moneyline',
-      books: ['NoVigApp'],
-      limit: 5,
-      includeAll: true
-    });
-
-    assert.equal(result.ok, true);
-    assert.equal(result.league, 'NBA');
-    assert.ok(Array.isArray(result.result));
-    assert.ok(result.resultMeta);
-  });
-
-  it('returns MLB screen from fixture', async () => {
-    const handlers = createHandlers();
-    const result = await handlers.screen({
-      league: 'MLB',
-      market: 'Moneyline',
-      limit: 5,
-      includeAll: true
-    });
-
-    assert.equal(result.ok, true);
-    assert.equal(result.league, 'MLB');
-  });
-});
-
 // ─── sharp_plays ───────────────────────────────────────────────────
 
 describe('handler integration: sharp_plays', () => {

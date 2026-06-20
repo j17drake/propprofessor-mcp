@@ -274,12 +274,11 @@ describe('propprofessor MCP server stdio contract', () => {
         'league_presets',
         'log_pick',
         'manage_hidden_bets',
-        'novig_screen',
+        'mlb_game_context',
         'player_context',
         'quick_screen',
         'recommended_bets',
         'resolve_pick',
-        'screen',
         'screen_ranked',
         'sharp_consensus',
         'sharp_plays',
@@ -801,11 +800,11 @@ describe('propprofessor MCP server stdio contract', () => {
     { league: 'NCAAB' },
     { league: 'NCAAF' }
   ]) {
-    it(`screen(${league}) returns a structured ranked response`, async () => {
+    it(`screen_ranked(${league}) returns a structured ranked response`, async () => {
       const { client, calls } = createRankedScreenClientStub();
       const handlers = createMcpHandlers({ client });
 
-      const result = await handlers.screen({ league, market: 'Moneyline', books: ['Pinnacle'], includeAll: true });
+      const result = await handlers.screen_ranked({ league, market: 'Moneyline', books: ['Pinnacle'], includeAll: true });
 
       assert.equal(calls.queryScreenOddsBestComps.length, 1);
       assert.equal(calls.queryScreenOddsBestComps[0].league, league);
@@ -1197,50 +1196,6 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.ufcShortlist.bestLooks[0].participant, 'Costa');
   });
 
-  it('screen routes non-tennis leagues through the ranked league flow', async () => {
-    const { client, calls } = createRankedScreenClientStub();
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.screen({ league: 'WNBA', market: 'Moneyline', includeAll: true });
-
-    assert.equal(calls.queryScreenOddsBestComps.length, 1);
-    assert.equal(calls.queryScreenOddsBestComps[0].league, 'WNBA');
-    assertBasicRankedResponse(result, 'WNBA');
-  });
-
-  it('screen routes tennis through the tennis-specific query path', async () => {
-    const { client, calls } = createRankedScreenClientStub();
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.screen({
-      league: 'Tennis',
-      market: 'Moneyline',
-      book: 'Pinnacle',
-      includeAll: true
-    });
-
-    assert.ok(calls.queryScreenOdds.length >= 1);
-    assert.equal(calls.queryScreenOddsBestComps.length, 0);
-    for (const call of calls.queryScreenOdds) {
-      assert.equal(call.league, 'Tennis');
-    }
-    assertBasicRankedResponse(result, 'Tennis');
-  });
-
-  it('screen (Tennis) uses Tennis queries and carries the preferred book into the request set', async () => {
-    const { client, calls } = createRankedScreenClientStub();
-    const handlers = createMcpHandlers({ client });
-
-    const result = await handlers.screen({ league: 'Tennis', market: 'Moneyline', book: 'Pinnacle', includeAll: true });
-
-    assert.ok(calls.queryScreenOdds.length >= 1);
-    for (const call of calls.queryScreenOdds) {
-      assert.equal(call.league, 'Tennis');
-      assert.ok(call.books.includes('Pinnacle'));
-    }
-    assertBasicRankedResponse(result, 'Tennis');
-  });
-
   it('health_status returns auth error when auth is invalid', async () => {
     const healthPayload = {
       ok: true,
@@ -1281,7 +1236,7 @@ describe('propprofessor MCP server stdio contract', () => {
 
   // NOTE: screen_raw (bestComps) MLB test removed — tool deprecated in v1.6.3.
 
-  it('screen(Soccer) sends the backend-supported Soccer league casing', async () => {
+  it('screen_ranked(Soccer) forwards the league casing as supplied', async () => {
     const calls = [];
     const handlers = createMcpHandlers({
       client: {
@@ -1293,14 +1248,14 @@ describe('propprofessor MCP server stdio contract', () => {
       }
     });
 
-    const result = await handlers.screen({
+    const result = await handlers.screen_ranked({
       league: 'Soccer',
       market: 'Moneyline',
       books: ['NoVigApp'],
       includeAll: true
     });
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].league, 'SOCCER');
+    assert.equal(calls[0].league, 'Soccer');
     assert.equal(calls[0].market, 'Moneyline');
     assert.equal(result.ok, true);
   });

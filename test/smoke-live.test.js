@@ -172,21 +172,6 @@ live('live API integration tests', { timeout: TIMEOUT }, () => {
     assert.ok(result.freshness);
   });
 
-  it('tennis screen does not crash (may be empty on quiet days)', async () => {
-    const result = await handlers.screen({
-      league: 'Tennis',
-      market: 'Moneyline',
-      book: 'Pinnacle',
-      limit: 5,
-      includeAll: true,
-      debug: false
-    });
-    assert.equal(result.ok, true);
-    assert.equal(result.league, 'Tennis');
-    assert.ok(Array.isArray(result.result));
-    assert.ok(result.resultMeta || result.warning);
-  });
-
   it('all_slates returns consolidated results', async () => {
     const result = await handlers.all_slates({
       leagues: [LEAGUE],
