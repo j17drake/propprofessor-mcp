@@ -17,11 +17,14 @@ const {
   createJsonRpcSuccess,
   createJsonRpcError,
   encodeMessage,
-  createStdioMessageReader
+  createStdioMessageReader,
+  createCoalescingWriter
 } = require('../lib/propprofessor-mcp-stdio');
 const { redactSecrets } = require('../lib/propprofessor-redact');
 const { clearTierCache } = require('../lib/propprofessor-risk-score');
 const { validateArgs, normalizeArgs } = require('../lib/mcp-arg-validator');
+const { getPreWarmConfig } = require('../lib/mcp-runtime-config');
+const { prewarmOddsHistoryCache } = require('../lib/propprofessor-prewarm');
 
 const mapWithConcurrency = mapWithConcurrencyFromHandlers;
 
@@ -189,12 +192,34 @@ function createMcpServer({
 }
 
 async function serveStdio(options = {}) {
-  const server = createMcpServer(options);
+  const { createPropProfessorClient } = require('../lib/propprofessor-api');
+  const client = options.client || createPropProfessorClient();
+  const handlers = createMcpHandlers({ client });
+  const server = createMcpServer({ handlers, toolDefinitions: buildToolDefinitions({ mode: TOOL_MODE }) });
+
+  // Opt-in write coalescing: controlled by PROPPROFESSOR_MCP_STDIO_COALESCE_MS env var.
+  // Default 0 = no coalescing (current behavior preserved).
+  const coalesceMs = Number(process.env.PROPPROFESSOR_MCP_STDIO_COALESCE_MS || 0);
+  const outputWriter = createCoalescingWriter({ coalesceMs });
+
   const reader = createStdioMessageReader(async (message) => {
     const response = await server.handleRequest(message);
     if (response && message && Object.prototype.hasOwnProperty.call(message, 'id')) {
-      process.stdout.write(encodeMessage(response));
+      outputWriter(encodeMessage(response));
     }
+  });
+
+  // Schedule pre-warm after the server is created but before stdin processing
+  // uses setImmediate to avoid blocking the initialize response
+  setImmediate(() => {
+    const preWarmConfig = getPreWarmConfig();
+    prewarmOddsHistoryCache({
+      client,
+      runtimeConfig: preWarmConfig,
+      logger: process.stderr.write.bind(process.stderr)
+    }).catch(() => {
+      // Pre-warm is best-effort; swallow errors
+    });
   });
 
   process.stdin.on('data', (chunk) => {
