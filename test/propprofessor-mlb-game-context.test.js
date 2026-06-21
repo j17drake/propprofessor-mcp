@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, before, after, beforeEach } = require('node:test');
+const { describe, it, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const cp = require('child_process');
 
