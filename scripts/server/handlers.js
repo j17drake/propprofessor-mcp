@@ -29,7 +29,9 @@ const {
   resolveMarketName,
   DEFAULT_LEAGUES,
   mapWithConcurrency,
-  createCrossCallMemoizedQuery
+  createCrossCallMemoizedQuery,
+  canonicalizeScreenArgs,
+  createCanonicalScreenCache
 } = require('../../lib/propprofessor-shared-utils');
 const { getOddsHistoryCache, getOddsHistoryCacheTtlMs } = require('../../lib/mcp-runtime-config');
 const { buildUfcShortlist } = require('../../lib/propprofessor-sharp-plays');
@@ -372,6 +374,115 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   // per-set since LruCache supports per-entry TTL.
   const responseCache = getRuntimeCache();
   const responseCacheTtlMs = getCacheTtlMs();
+
+  // Canonical screen cache for stable (gameId, market, book) tuples.
+  // Keyed on canonical tuple rather than full request signature.
+  // Only used when gameId is present (full-league scans bypass).
+  const canonicalScreenCache = createCanonicalScreenCache({
+    ttlMs: responseCacheTtlMs,
+    maxEntries: 100
+  });
+
+  // ─── Screen implementations (used by both the cache-wrapped handlers and
+  // direct callers like recommended_bets → handlers.screen_ranked). ───
+
+  async function runScreenRankedImpl(client, args = {}) {
+    const requestedBooks = normalizeBookList(args.books);
+    const league = args.league || 'NBA';
+    const marketResolution = resolveMarkets(args, league);
+    const market = marketResolution.single;
+    // focusBook: only set if the user explicitly asked for one. Defaulting to
+    // preset.preferredBooks[0] (Pinnacle for most leagues) breaks UFC/Soccer
+    // because Pinnacle doesn't post those moneylines — the focusPlays filter
+    // in extractScreenRows would then drop every row.
+    // Fix shipped 2026-06-14: the screen_ranked handler used to default the
+    // focus book to the preset's preferred book, which worked for NBA/NFL/MLB
+    // but eliminated every UFC row. Now we only set focusBook when the user
+    // explicitly passed books, leaving focusPlays empty (= expand to all
+    // books in the payload) otherwise.
+    const focusBook = requestedBooks.length ? requestedBooks[0] : '';
+    // Auto-augment the backend query with the league's sharp-book set so
+    // consensus data populates. The user-requested book (e.g. Fliff) typically
+    // is NOT a sharp book, so without augmentation the backend returns just
+    // that one book and consensusBookCount=0 on every row. The ranker needs
+    // at least 2-3 comp books in allBookOdds to compute consensusEdge.
+    // Audit 2026-06-15: this augmentation was present in runLeagueScreen
+    // (used by sharp_plays) but missing from screen_ranked. Symptom: every
+    // screen_ranked call on a single non-sharp book returned consBk=0.
+    const sharpBookSet = getSharpBookComparisonSet({ league, market });
+    const augmentedBooks = uniqueBooks([...requestedBooks, ...sharpBookSet]);
+    const payload = await client.queryScreenOddsBestComps({
+      market,
+      league,
+      games: Array.isArray(args.games) ? args.games : [],
+      participants: Array.isArray(args.participants) ? args.participants : [],
+      books: augmentedBooks,
+      is_live: Boolean(args.is_live)
+    });
+    const response = await buildRankedScreenResponseShared({
+      client,
+      payloads: [payload],
+      args: { ...args, historySportsbooks: augmentedBooks },
+      league,
+      focusBook,
+      rankRows: (hydratedRows, { debug } = {}) =>
+        rankLeagueScreenRows(hydratedRows, {
+          league,
+          market,
+          limit: getLimit(args),
+          books: requestedBooks.length ? requestedBooks : undefined,
+          includeAll: getIncludeAll(args),
+          maxAgeMs: getMaxAgeMs(args),
+          debug,
+          requirePreferredBook: requestedBooks.length > 0,
+          playableOnly: args.playableOnly === true
+        })
+    });
+    if (marketResolution.aliasesUsed.length) {
+      response.resultMeta = {
+        ...response.resultMeta,
+        markets_alias_used: marketResolution.aliasesUsed
+      };
+    }
+    // Pre-flight player research (v2.1.8): when includeResearch=true, run
+    // player_context on the top N ranked rows so the response includes
+    // injury/risk flags alongside the ranked plays.
+    if (args.includeResearch === true && Array.isArray(response.result) && response.result.length) {
+      const researchLimit = Number.isFinite(Number(args.researchLimit))
+        ? Math.max(1, Math.min(50, Number(args.researchLimit)))
+        : 10;
+      const research = await runResearchOnTopRows({
+        rows: response.result,
+        limit: researchLimit,
+        playerContextFn: handlers.player_context
+      });
+      response.research = research.results;
+      response.resultMeta = {
+        ...response.resultMeta,
+        researchRunCount: research.results.length,
+        researchRiskHighCount: research.results.filter((r) => r.riskFlag === 'high').length,
+        researchCachedCount: research.results.filter((r) => r.cached).length
+      };
+      if (args.riskDowngrade === true) {
+        const beforeCount = response.result.length;
+        const highRiskPlayers = new Set(
+          research.results.filter((r) => r.riskFlag === 'high').map((r) => String(r.player || '').toLowerCase())
+        );
+        response.result = response.result.filter((row) => {
+          const player = String(row.selection || row.participant || '').toLowerCase();
+          return !highRiskPlayers.has(player);
+        });
+        response.resultMeta = {
+          ...response.resultMeta,
+          riskDowngradedCount: beforeCount - response.result.length
+        };
+      }
+    }
+    const verbosity = String(args.verbosity || 'full').toLowerCase();
+    if (verbosity === 'minimal') return formatScreenRankedMinimal(response);
+    if (verbosity === 'standard') return formatScreenRankedStandard(response);
+    return response;
+  }
 
   function buildCacheKey(prefix, args, league) {
     return JSON.stringify({
@@ -758,117 +869,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async screen_ranked(args = {}) {
-      const requestedBooks = normalizeBookList(args.books);
-      const league = args.league || 'NBA';
-      const marketResolution = resolveMarkets(args, league);
-      const market = marketResolution.single;
-      // focusBook: only set if the user explicitly asked for one. Defaulting to
-      // preset.preferredBooks[0] (Pinnacle for most leagues) breaks UFC/Soccer
-      // because Pinnacle doesn't post those moneylines — the focusPlays filter
-      // in extractScreenRows would then drop every row.
-      // Fix shipped 2026-06-14: the screen_ranked handler used to default the
-      // focus book to the preset's preferred book, which worked for NBA/NFL/MLB
-      // but eliminated every UFC row. Now we only set focusBook when the user
-      // explicitly passed books, leaving focusPlays empty (= expand to all
-      // books in the payload) otherwise.
-      const focusBook = requestedBooks.length ? requestedBooks[0] : '';
-      // Auto-augment the backend query with the league's sharp-book set so
-      // consensus data populates. The user-requested book (e.g. Fliff) typically
-      // is NOT a sharp book, so without augmentation the backend returns just
-      // that one book and consensusBookCount=0 on every row. The ranker needs
-      // at least 2-3 comp books in allBookOdds to compute consensusEdge.
-      // Audit 2026-06-15: this augmentation was present in runLeagueScreen
-      // (used by sharp_plays) but missing from screen_ranked. Symptom: every
-      // screen_ranked call on a single non-sharp book returned consBk=0.
-      const sharpBookSet = getSharpBookComparisonSet({ league, market });
-      const augmentedBooks = uniqueBooks([...requestedBooks, ...sharpBookSet]);
-      const payload = await client.queryScreenOddsBestComps({
-        market,
-        league,
-        games: Array.isArray(args.games) ? args.games : [],
-        participants: Array.isArray(args.participants) ? args.participants : [],
-        books: augmentedBooks,
-        is_live: Boolean(args.is_live)
-      });
-      const response = await buildRankedScreenResponseShared({
-        client,
-        payloads: [payload],
-        args: { ...args, historySportsbooks: augmentedBooks },
-        league,
-        focusBook,
-        rankRows: (hydratedRows, { debug } = {}) =>
-          rankLeagueScreenRows(hydratedRows, {
-            league,
-            market,
-            limit: getLimit(args),
-            books: requestedBooks.length ? requestedBooks : undefined,
-            includeAll: getIncludeAll(args),
-            maxAgeMs: getMaxAgeMs(args),
-            debug,
-            // Audit 2026-06-15: when the user passes an explicit books list,
-            // the ranker must drop rows where the preferred book has no
-            // price — otherwise a row whose allBookOdds only contains
-            // Pinnacle/Polymarket/Kalshi gets reported as "Fliff -117"
-            // when Fliff never posted a line.
-            requirePreferredBook: requestedBooks.length > 0,
-            // Audit 2026-06-15 (playable): when the user opts in via
-            // playableOnly, the ranker keeps rows where Fliff's price is
-            // within normal market range (playable/best execution quality)
-            // even when the consensus edge is negative. The user said
-            // "playable, not best" — they want signals at executable prices,
-            // not just positive-EV plays.
-            playableOnly: args.playableOnly === true
-          })
-      });
-      // Add market alias info to resultMeta if any aliases were used
-      if (marketResolution.aliasesUsed.length) {
-        response.resultMeta = {
-          ...response.resultMeta,
-          markets_alias_used: marketResolution.aliasesUsed
-        };
+      // Canonical cache key for stable (gameId, market, book) tuples
+      const canonicalKey = canonicalizeScreenArgs(args);
+
+      // If gameId is present, use the canonical cache; otherwise proceed without caching
+      if (canonicalKey) {
+        return canonicalScreenCache.memoize(async () => {
+          return await runScreenRankedImpl(client, args);
+        }, canonicalKey);
       }
-      // Pre-flight player research (v2.1.8): when includeResearch=true, run
-      // player_context on the top N ranked rows so the response includes
-      // injury/risk flags alongside the ranked plays. Agents can then drop
-      // high-risk plays before recommending. When riskDowngrade=true, plays
-      // with riskFlag='high' are removed from the result entirely (a hard
-      // filter, not a soft annotation).
-      if (args.includeResearch === true && Array.isArray(response.result) && response.result.length) {
-        const researchLimit = Number.isFinite(Number(args.researchLimit))
-          ? Math.max(1, Math.min(50, Number(args.researchLimit)))
-          : 10;
-        const research = await runResearchOnTopRows({
-          rows: response.result,
-          limit: researchLimit,
-          playerContextFn: handlers.player_context
-        });
-        response.research = research.results;
-        response.resultMeta = {
-          ...response.resultMeta,
-          researchRunCount: research.results.length,
-          researchRiskHighCount: research.results.filter((r) => r.riskFlag === 'high').length,
-          researchCachedCount: research.results.filter((r) => r.cached).length
-        };
-        if (args.riskDowngrade === true) {
-          const beforeCount = response.result.length;
-          const highRiskPlayers = new Set(
-            research.results.filter((r) => r.riskFlag === 'high').map((r) => String(r.player || '').toLowerCase())
-          );
-          response.result = response.result.filter((row) => {
-            const player = String(row.selection || row.participant || '').toLowerCase();
-            return !highRiskPlayers.has(player);
-          });
-          response.resultMeta = {
-            ...response.resultMeta,
-            riskDowngradedCount: beforeCount - response.result.length
-          };
-        }
-      }
-      // Apply verbosity formatting
-      const verbosity = String(args.verbosity || 'full').toLowerCase();
-      if (verbosity === 'minimal') return formatScreenRankedMinimal(response);
-      if (verbosity === 'standard') return formatScreenRankedStandard(response);
-      return response;
+
+      // Full-league scan - no caching
+      return runScreenRankedImpl(client, args);
     },
 
     // ─── Sharp Movement ─────────────────────────────────────────────
