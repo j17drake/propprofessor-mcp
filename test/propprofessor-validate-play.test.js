@@ -3,6 +3,8 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
+const { createMockClient } = require('./fixtures/mock-client');
+const { UFC_MONEYLINE_PAYLOAD } = require('./fixtures/screen-payloads');
 
 function makeClient({
   detailRows: _detailRows = [],
@@ -152,5 +154,81 @@ describe('validate_play handler', () => {
     assert.equal(result.play, null);
     assert.equal(result.verdict, 'PASS');
     assert.ok(result.reasons.some((r) => /no row matched/.test(r)));
+  });
+
+  describe('UFC row resolution (Pinnacle-less events)', () => {
+    function makeUfcPayload() {
+      const now = Date.now();
+      return {
+        ok: true,
+        game_data: [
+          {
+            id: 'UFC:PREMATCH:Chandler:Ruffy:1781484000:Chandler',
+            gameId: 'UFC:PREMATCH:Chandler:Ruffy:1781484000',
+            start: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
+            league: 'UFC',
+            homeTeam: 'Chandler',
+            awayTeam: 'Ruffy',
+            isLive: false,
+            market: 'Moneyline',
+            defaultKey: 'null',
+            selections: {
+              null: {
+                selection1: 'Chandler',
+                selection2: 'Ruffy',
+                selection1Id: 'Moneyline:Chandler',
+                selection2Id: 'Moneyline:Ruffy',
+                odds: {
+                  BetOnline: { book: 'BetOnline', odds1: 415, odds2: -535 },
+                  FanDuel: { book: 'FanDuel', odds1: 400, odds2: -550 }
+                  // NOTE: no Pinnacle — Pinnacle doesn't post UFC moneylines.
+                }
+              }
+            }
+          }
+        ]
+      };
+    }
+
+    it('get_play_details returns rows for UFC when no books param (regression)', async () => {
+      const { client } = createMockClient({
+        screenPayloads: { 'UFC:Moneyline': makeUfcPayload() }
+      });
+      const handlers = createMcpHandlers({ client });
+      const result = await handlers.get_play_details({
+        league: 'UFC',
+        game_ids: ['UFC:PREMATCH:Chandler:Ruffy:1781484000'],
+        market: 'Moneyline'
+      });
+      // Should find the row — no longer dropped by Pinnacle-only focusBook.
+      assert.equal(result.ok, true);
+      assert.ok(Array.isArray(result.result));
+      assert.ok(result.result.length > 0, 'should return at least one UFC row');
+      // 4 rows = 2 sides (Chandler, Ruffy) × 2 books (BetOnline, FanDuel)
+      assert.ok(result.resultMeta.matchedRows > 0, 'should have matched at least one row');
+      assert.ok(
+        result.result.some((r) => String(r.selection || '').toLowerCase().includes('chandler')),
+        'should include Chandler in results'
+      );
+    });
+
+    it('validate_play finds the matching UFC row when no books param', async () => {
+      const { client } = createMockClient({
+        screenPayloads: { 'UFC:Moneyline': makeUfcPayload() }
+      });
+      const handlers = createMcpHandlers({ client });
+      handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [], cached: false });
+      const result = await handlers.validate_play({
+        league: 'UFC',
+        gameId: 'UFC:PREMATCH:Chandler:Ruffy:1781484000',
+        selection: 'Chandler',
+        skipResearch: true
+      });
+      // The row should be found even though Pinnacle has no odds.
+      assert.equal(result.ok, true);
+      assert.ok(result.play !== null, 'play should not be null when row is found. reasons: ' + JSON.stringify(result.reasons));
+      assert.equal(result.gameId, 'UFC:PREMATCH:Chandler:Ruffy:1781484000');
+      assert.ok(result.tier, 'should have a tier assignment');
+    });
   });
 });

@@ -169,12 +169,11 @@ describe('screen-ranker (direct unit tests)', () => {
       assert.equal(ranked[0].odds, 100);
     });
 
-    it('keeps all rows when requirePreferredBook=false (default), but moves fallback rows to focusBookMissingRows', () => {
-      // As of 2026-06-17, fallback rows (no focus-book price) are split out
-      // of the main result array into `focusBookMissingRows` so users can
-      // filter the main array by tier and only get rows executable on the
-      // focus book. The row IS still kept (just on the non-enumerable
-      // focusBookMissingRows property, not the main array).
+    it('keeps all rows when requirePreferredBook=false (default), moves fallback to focusBookMissingRows when requirePreferredBook=true', () => {
+      // As of 2026-06-21, fallback rows are only partitioned into
+      // focusBookMissingRows when requirePreferredBook=true (user explicitly
+      // requested a book). With requirePreferredBook=false (default), the
+      // fallback row stays in the main array. Both paths keep coverageGaps.
       const rows = [
         {
           book: 'Pinnacle',
@@ -193,15 +192,23 @@ describe('screen-ranker (direct unit tests)', () => {
           }
         }
       ];
-      const ranked = rankScreenRows(rows, {
+      // With requirePreferredBook=false (default): fallback row stays in main result
+      const rankedDefault = rankScreenRows(rows, {
         limit: 10,
         preferredBooks: ['Fliff', 'Pinnacle', 'Polymarket'],
         includeAll: true
       });
-      assert.equal(ranked.length, 0, 'main array excludes the fallback row');
-      assert.equal(ranked.focusBookMissingRows.length, 1, 'fallback row is preserved on focusBookMissingRows');
-      assert.equal(ranked.focusBookMissingRows[0].book, 'Pinnacle');
-      assert.equal(ranked.focusBookMissingRows[0].focusBookMissingReason, 'no price for Fliff');
+      assert.ok(rankedDefault.length > 0, 'main array includes the fallback row when requirePreferredBook=false');
+      assert.equal(rankedDefault[0].book, 'Pinnacle', 'fallback row has the actual book');
+      assert.equal(rankedDefault[0].focusBookMissingReason, 'no price for Fliff');
+      // With requirePreferredBook=true: row is dropped (expandScreenRow returns [])
+      const rankedStrict = rankScreenRows(rows, {
+        limit: 10,
+        preferredBooks: ['Fliff', 'Pinnacle', 'Polymarket'],
+        includeAll: true,
+        requirePreferredBook: true
+      });
+      assert.equal(rankedStrict.length, 0, 'main array excludes the dropped row when requirePreferredBook=true');
     });
   });
 
@@ -374,19 +381,23 @@ describe('screen-ranker (direct unit tests)', () => {
         requirePreferredBook: false,
         limit: 10
       });
-      // As of 2026-06-17, the fallback row is moved to focusBookMissingRows
-      // (not in the main array) so filtering result by tier only returns
-      // rows executable on the focus book. The row IS still preserved.
-      assert.equal(ranked.length, 0, 'main array excludes the fallback row');
-      assert.equal(ranked.focusBookMissingRows.length, 1, 'fallback row is on focusBookMissingRows');
+      // As of 2026-06-21, fallback rows stay in the main result when
+      // requirePreferredBook=false (no explicit user book request).
+      // The row carries focusBookMissing=true so callers can detect it.
+      assert.ok(ranked.length > 0, 'main array includes the fallback row');
+      assert.equal(ranked[0].focusBookMissing, true, 'row carries focusBookMissing flag');
+      assert.equal(ranked[0].focusBookMissingReason, 'no price for NoVigApp');
+      assert.equal(ranked[0].book, 'Pinnacle', 'fallback row reports the book it fell back to');
       assert.equal(ranked.coverageGaps.length, 1, 'should record one coverage gap');
       assert.equal(ranked.coverageGaps[0].preferredBook, 'NoVigApp');
       assert.deepEqual(ranked.coverageGaps[0].availableBooks.sort(), ['FanDuel', 'Pinnacle']);
       assert.equal(ranked.coverageGaps[0].matchup, 'Warriors vs Lakers');
       assert.equal(ranked.coverageGaps[0].reason, 'no_price_fallback');
       assert.equal(ranked.coverageGaps[0].focusBookMissingReason, 'no price for NoVigApp');
-      assert.equal(ranked.focusBookMissingRows[0].book, 'Pinnacle', 'fallback row reports the book it fell back to');
-      assert.equal(ranked.focusBookMissingRows[0].focusBookMissingReason, 'no price for NoVigApp');
+      // The fallback row is in the main array (not focusBookMissingRows)
+      // since requirePreferredBook=false. focusBookMissing is set on the row.
+      assert.equal(ranked[0].focusBookMissing, true, 'fallback row has focusBookMissing flag');
+      assert.equal(ranked[0].focusBookMissingReason, 'no price for NoVigApp');
     });
 
     it('records a coverage gap for rows dropped because the focus book has no price (requirePreferredBook=true)', () => {
@@ -463,18 +474,26 @@ describe('screen-ranker (direct unit tests)', () => {
           FanDuel: { book: 'FanDuel', odds1: -150, odds2: 130 }
         }
       };
-      const ranked = rankScreenRows([row], { preferredBook: 'NoVigApp', limit: 10 });
-      // Pinnacle is in allBookOdds but NoVigApp is not, so this row is a
-      // fallback. The main array is empty; the row lives on focusBookMissingRows.
+      // With requirePreferredBook=true — simulates explicit user book request.
+      const ranked = rankScreenRows([row], {
+        preferredBook: 'NoVigApp', limit: 10,
+        requirePreferredBook: true
+      });
+      // With requirePreferredBook=true, expandScreenRow drops the row entirely
+      // (NoVigApp has no odds in allBookOdds) — it never reaches the partition
+      // step. The main array is empty, focusBookMissingRows stays undefined,
+      // and coverageGaps captures the missing coverage.
       assert.equal(ranked.length, 0);
-      assert.equal(ranked.focusBookMissingRows.length, 1);
-      // JSON.stringify should not include either non-enumerable property
+      assert.equal(ranked.focusBookMissingRows, undefined,
+        'with requirePreferredBook=true, row is dropped before partition — focusBookMissingRows stays undefined');
+      // coverageGaps is still populated by the expandScreenRow-returns-[] branch
+      assert.ok(Array.isArray(ranked.coverageGaps));
+      assert.ok(ranked.coverageGaps.length > 0, 'should have at least one coverage gap');
+      // JSON.stringify should not include coverageGaps (non-enumerable)
       const json = JSON.stringify(ranked);
       assert.ok(!json.includes('coverageGaps'), 'coverageGaps should not be in JSON output');
-      assert.ok(!json.includes('focusBookMissingRows'), 'focusBookMissingRows should not be in JSON output');
-      // But the properties are still accessible
+      // But the property is still accessible
       assert.ok(Array.isArray(ranked.coverageGaps));
-      assert.ok(Array.isArray(ranked.focusBookMissingRows));
       // And Object.keys should not include them
       assert.ok(!Object.keys(ranked).includes('coverageGaps'));
       assert.ok(!Object.keys(ranked).includes('focusBookMissingRows'));

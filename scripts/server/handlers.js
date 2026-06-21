@@ -504,8 +504,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const marketResolution = resolveMarkets(args, league);
     const market = marketResolution.single;
     const requestedBooks = normalizeBookList(args.books);
-    const preset = getLeagueRankingPreset(league, market);
-    const focusBook = requestedBooks[0] || preset.preferredBooks[0];
+    // BUGFIX: don't default focusBook to the preset's preferred book
+    // (Pinnacle for most leagues). Pinnacle doesn't post UFC/Tennis/Soccer
+    // moneylines, so focusPlays in extractScreenRows would drop every row
+    // whose odds don't include Pinnacle — which is most non-NA-sports rows.
+    // Only set focusBook when the user explicitly passed books. Same fix
+    // as runScreenRankedImpl (shipped 2026-06-14).
+    const focusBook = requestedBooks.length ? requestedBooks[0] : '';
 
     // Fetch full screen data (with history hydration — this is the detailed view)
     let payload;
@@ -579,11 +584,29 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const gameIdSet = new Set(gameIds);
     const safeResult = Array.isArray(response.result) ? response.result : [];
     const filtered = safeResult.filter((row) => gameIdSet.has(row && row.gameId));
-    response.result = filtered;
+    // BUGFIX (2026-06-21): when the ranker's preferred book (Pinnacle for most
+    // leagues) has no odds for a match — e.g. Pinnacle doesn't post UFC/Tennis
+    // moneylines — all rows land in `focusBookMissingRows` instead of `result`.
+    // Merge those back in so that get_play_details and validate_play actually
+    // return a row for the requested gameId.
+    const fallbackRows = Array.isArray(response.focusBookMissingRows)
+      ? response.focusBookMissingRows
+      : [];
+    const merged = [...filtered];
+    for (const fbRow of fallbackRows) {
+      if (gameIdSet.has(fbRow && fbRow.gameId)) {
+        // Set the focusBookMissing flag so callers know this is a fallback row
+        merged.push({ ...fbRow, __focusBookMissing: true });
+      }
+    }
+    response.result = merged;
+    // Drop the non-enumerable focusBookMissingRows from the response —
+    // they've been merged into result.
+    response.focusBookMissingRows = undefined;
     response.resultMeta = {
       ...response.resultMeta,
       queryGameIds: gameIds,
-      matchedRows: filtered.length
+      matchedRows: merged.length
     };
     return response;
   }
