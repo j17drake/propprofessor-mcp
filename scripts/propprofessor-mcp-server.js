@@ -10,7 +10,7 @@
  * for backward compatibility with existing imports.
  */
 
-const { buildToolDefinitions, LITE_MODE_TOOLS } = require('../lib/propprofessor-tool-definitions');
+const { buildToolDefinitions, LITE_MODE_TOOLS, TOOL_CATEGORIES } = require('../lib/propprofessor-tool-definitions');
 const { createMcpHandlers, mapWithConcurrency: mapWithConcurrencyFromHandlers } = require('./server/handlers');
 const {
   categorizeError,
@@ -80,13 +80,14 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
       // humans inspecting the response) can see whether they're in lite or
       // full mode without having to grep env vars. Helps debugging when an
       // expected tool is missing.
+      const fullToolCount = Object.keys(TOOL_CATEGORIES).length;
       return createJsonRpcSuccess(id, {
         tools: toolDefinitions,
         _meta: {
           mode: TOOL_MODE,
           toolCount: toolDefinitions.length,
           liteToolCount: LITE_MODE_TOOLS.size,
-          fullToolCount: LITE_MODE_TOOLS.size + 16 // lite + the 16 hidden ones
+          fullToolCount
         }
       });
     }
