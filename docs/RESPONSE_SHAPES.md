@@ -248,12 +248,12 @@ At `minimal` verbosity, the `ok` and `result` fields are replaced with `{ summar
 
 Composite tools internally call these primitives:
 
-| Tool                        | Calls                                                               |
-| --------------------------- | ------------------------------------------------------------------- |
-| `recommended_bets`          | `screen_ranked` (per league × market, parallelized, concurrency 4)  |
-| `staking_plan`              | `recommended_bets`                                                  |
-| `validate_play`             | `get_play_details` + `player_context` (parallelized)                |
-| `ev_candidates` (validated) | `ev_candidates` (raw) + `screen_ranked` (validation pass)           |
-| `all_slates`                | `screen_ranked` per league, parallelized                            |
+| Tool                        | Calls                                                              |
+| --------------------------- | ------------------------------------------------------------------ |
+| `recommended_bets`          | `screen_ranked` (per league × market, parallelized, concurrency 4) |
+| `staking_plan`              | `recommended_bets`                                                 |
+| `validate_play`             | `get_play_details` + `player_context` (parallelized)               |
+| `ev_candidates` (validated) | `ev_candidates` (raw) + `screen_ranked` (validation pass)          |
+| `all_slates`                | `screen_ranked` per league, parallelized                           |
 
 When in doubt: **prefer the leaf tool** (`screen_ranked`, `get_play_details`, `player_context`) for full control. The composite tools (`recommended_bets`, `staking_plan`, `validate_play`) trade flexibility for convenience.

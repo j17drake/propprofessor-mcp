@@ -95,8 +95,13 @@ if (readmeToolCount !== null) {
   warn(`Could not find "N tools" claim in README to verify`);
 }
 
-// Tool name validation in README's "All N tools" reference section
-const allToolsSection = readme.match(/## All \d+ tools[\s\S]*?(?=\n## |\n---\n\n|$)/);
+// Tool name validation in README's canonical reference section.
+// The README uses "## 📊 Available Tools" with three tool-table subsections
+// (Quick Situational Checks / Deeper Signal Analysis / Research & Bet
+// Management) followed by "### Output Tuning" (parameter names, not tools).
+// Stop the section match at Output Tuning so we don't false-positive on
+// `minimal` / `standard` / `full` / `true` / `false` from the parameter table.
+const allToolsSection = readme.match(/## (?:.*? )?Available Tools[\s\S]*?(?=\n### Output Tuning|\n## |\n---\n\n|$)/);
 // Known non-tool identifiers that legitimately appear in backticks within the
 // "All N tools" section (parameter names, type annotations, etc.).
 const NON_TOOL_IDENTIFIERS = new Set(['verbosity', 'compact']);
@@ -143,8 +148,15 @@ if (!skipTests) {
       warn(`Could not parse test count from npm test output`);
     } else {
       const testCount = parseInt(passMatch[1], 10);
-      // Find any "M tests passing" or "M passing" claim in README
-      const testClaimMatches = [...readme.matchAll(/(\d+)\s+(?:tests?\s+)?passing/gi)];
+      // Find any test-count claim in README. Matches three forms:
+      //   - "966 passing" / "966 tests passing" (prose)
+      //   - "# 966 tests, 0 failures" / "full suite (966 tests)" (maintainers prose)
+      //   - badge URL "tests-966%20passing" (URL-encoded whitespace)
+      const testClaimMatches = [
+        ...readme.matchAll(/(\d+)\s+(?:tests?\s+)?passing/gi),
+        ...readme.matchAll(/[#(\s](\d+)\s+tests\b/gi),
+        ...readme.matchAll(/tests-(\d+)%20passing/gi)
+      ];
       if (testClaimMatches.length === 0) {
         warn(`No test count claim found in README to verify against actual ${testCount}`);
       } else {

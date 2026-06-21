@@ -15,7 +15,7 @@ npm install
 ## Running Tests
 
 ```bash
-npm test                         # full suite (489 tests)
+npm test                         # full suite (966 tests)
 npm run smoke:live               # live API smoke (requires auth.json)
 npm run smoke:player-context     # player context smoke (requires Nitter or X session)
 ```

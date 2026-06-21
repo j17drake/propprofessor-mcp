@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a new tool, option, or behavior change.
+title: '[Feature] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. A few quick questions help us evaluate fit:
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case. What are you trying to accomplish that the current tools don't support?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should this work? If you're proposing a new tool, sketch the inputs/outputs and what tool it would slot near.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Could this be solved with existing tools (e.g. a different argument to `quick_screen`)? If so, why isn't that enough?
+    validations:
+      required: false

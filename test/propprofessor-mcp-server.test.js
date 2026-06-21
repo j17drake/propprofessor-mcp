@@ -804,7 +804,12 @@ describe('propprofessor MCP server stdio contract', () => {
       const { client, calls } = createRankedScreenClientStub();
       const handlers = createMcpHandlers({ client });
 
-      const result = await handlers.screen_ranked({ league, market: 'Moneyline', books: ['Pinnacle'], includeAll: true });
+      const result = await handlers.screen_ranked({
+        league,
+        market: 'Moneyline',
+        books: ['Pinnacle'],
+        includeAll: true
+      });
 
       assert.equal(calls.queryScreenOddsBestComps.length, 1);
       assert.equal(calls.queryScreenOddsBestComps[0].league, league);

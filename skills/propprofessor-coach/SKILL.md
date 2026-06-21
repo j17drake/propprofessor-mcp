@@ -42,22 +42,22 @@ The response should surface the validate_play reasoning, not just the screen's t
 
 ## Tool routing table
 
-| User intent | First tool to call | Then | Notes |
-|---|---|---|---|
-| "best plays today" / "what should I bet" | `mcp_propprofessor_recommended_bets` (default TIER 1+2, markets=[Moneyline, Spread, Total]) | **`mcp_propprofessor_validate_play` on top 2-3 per league** → format with tier table | If empty slate → call `mcp_propprofessor_sharp_plays` with `strict: false` for the next-best set |
-| "should I bet on [team/player] [line]" | `mcp_propprofessor_validate_play` directly with the gameId | surface verdict + reasons | Skip the screen if the user named a specific play |
-| "sharp money on [team/player]" | `mcp_propprofessor_sharp_consensus` filtered to that entity | format movement + consensus | Multi-window sharp signal |
-| "steam move" | `mcp_propprofessor_steam_move` (or `mcp_propprofessor_get_alerts`) | format steam details | Multi-book agreement |
-| "best price for [team] [line]" | `mcp_propprofessor_find_best_price` | format price table | Cross-book comparison |
-| "line shop [game]" | `mcp_propprofessor_find_best_price` for each market | format side-by-side | Markets: Moneyline, Spread, Total |
-| "player prop for [player] [market] [line]" | `mcp_propprofessor_player_context` first (injury/news check) | then `mcp_propprofessor_validate_play` (passes the player name as selection) | NEVER bet without context check |
-| "MLB game context" / "who's pitching" / "weather for [game]" | `mcp_propprofessor_mlb_game_context` directly with `gamePk` | format context | Auto-called by validate_play for MLB; use this directly only if user asks |
-| "log this bet" | `mcp_propprofessor_log_pick` | confirm with pick ID | Returns UUID for later resolve |
-| "my record" / "how am I doing" | `mcp_propprofessor_get_pick_stats` | format win rate + P&L | Optional: `days` filter |
-| "hide this bet from fantasy" | `mcp_propprofessor_hide_bet` | confirm hidden | Use betId from prior response |
-| "show hidden bets" | `mcp_propprofessor_get_hidden_bets` | list | |
-| "fantasy optimizer" / "dfs picks" / "fantasy plays" | `mcp_propprofessor_fantasy_optimizer` | filter by league/app/market, return ranked rows | Requires Fantasy Optimizer subscription |
-| "is [book] sharp on this?" | `mcp_propprofessor_screen_ranked` filtered to that book | cross-reference with sharp books list | Sharp books: Pinnacle, BetOnline, Circa, BookMaker, 4cx, OnyxOdds, Kalshi, Polymarket, NoVigApp |
+| User intent                                                  | First tool to call                                                                          | Then                                                                                 | Notes                                                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| "best plays today" / "what should I bet"                     | `mcp_propprofessor_recommended_bets` (default TIER 1+2, markets=[Moneyline, Spread, Total]) | **`mcp_propprofessor_validate_play` on top 2-3 per league** → format with tier table | If empty slate → call `mcp_propprofessor_sharp_plays` with `strict: false` for the next-best set |
+| "should I bet on [team/player] [line]"                       | `mcp_propprofessor_validate_play` directly with the gameId                                  | surface verdict + reasons                                                            | Skip the screen if the user named a specific play                                                |
+| "sharp money on [team/player]"                               | `mcp_propprofessor_sharp_consensus` filtered to that entity                                 | format movement + consensus                                                          | Multi-window sharp signal                                                                        |
+| "steam move"                                                 | `mcp_propprofessor_steam_move` (or `mcp_propprofessor_get_alerts`)                          | format steam details                                                                 | Multi-book agreement                                                                             |
+| "best price for [team] [line]"                               | `mcp_propprofessor_find_best_price`                                                         | format price table                                                                   | Cross-book comparison                                                                            |
+| "line shop [game]"                                           | `mcp_propprofessor_find_best_price` for each market                                         | format side-by-side                                                                  | Markets: Moneyline, Spread, Total                                                                |
+| "player prop for [player] [market] [line]"                   | `mcp_propprofessor_player_context` first (injury/news check)                                | then `mcp_propprofessor_validate_play` (passes the player name as selection)         | NEVER bet without context check                                                                  |
+| "MLB game context" / "who's pitching" / "weather for [game]" | `mcp_propprofessor_mlb_game_context` directly with `gamePk`                                 | format context                                                                       | Auto-called by validate_play for MLB; use this directly only if user asks                        |
+| "log this bet"                                               | `mcp_propprofessor_log_pick`                                                                | confirm with pick ID                                                                 | Returns UUID for later resolve                                                                   |
+| "my record" / "how am I doing"                               | `mcp_propprofessor_get_pick_stats`                                                          | format win rate + P&L                                                                | Optional: `days` filter                                                                          |
+| "hide this bet from fantasy"                                 | `mcp_propprofessor_hide_bet`                                                                | confirm hidden                                                                       | Use betId from prior response                                                                    |
+| "show hidden bets"                                           | `mcp_propprofessor_get_hidden_bets`                                                         | list                                                                                 |                                                                                                  |
+| "fantasy optimizer" / "dfs picks" / "fantasy plays"          | `mcp_propprofessor_fantasy_optimizer`                                                       | filter by league/app/market, return ranked rows                                      | Requires Fantasy Optimizer subscription                                                          |
+| "is [book] sharp on this?"                                   | `mcp_propprofessor_screen_ranked` filtered to that book                                     | cross-reference with sharp books list                                                | Sharp books: Pinnacle, BetOnline, Circa, BookMaker, 4cx, OnyxOdds, Kalshi, Polymarket, NoVigApp  |
 
 ## Tier format (MANDATORY for any bet recommendation)
 
@@ -113,6 +113,41 @@ For bankroll-based stake allocation, call `mcp_propprofessor_staking_plan` with 
 - **Moneyline bias.** `recommended_bets` already scans Moneyline + Spread + Total. If Spread/Total return fewer plays, it's because the upstream API has fewer books posting those markets (see `MARKET-BOOK-AVAILABILITY.md`). The `marketsBreakdown` field makes this transparent — surface it.
 - **NoVigApp consensus gap.** `sharp_plays(targetBooks=["NoVigApp"])` may return 0 rows because NoVigApp's no-vig lines never match other books exactly. Add a fallback to `consensusEdge` if `consensusBookCount` is 0.
 - **Tiafoe-style "no bet" wrong answer.** The user has explicit warnings about agents that declare "no bet today" on slates that have 20+ plays. If `recommended_bets` returns 0, your next call is `sharp_plays(strict: false)`, not "no bet today."
+
+## Known data feed gaps (as of 2026-06-20 audit)
+
+### Soccer market name → data availability map
+
+The platform UI shows soccer markets under one naming scheme; the PropProfessor API uses a different one. Use this map when querying:
+
+| Platform label       | PropProfessor `market=` value        | Has data?        | Notes                                                                               |
+| -------------------- | ------------------------------------ | ---------------- | ----------------------------------------------------------------------------------- |
+| Draw No Bet          | `Draw No Bet`                        | ✅ 8 rows        | BetOnline only, no Pinnacle comp                                                    |
+| Total Goals          | `Total Goals` (aliases from `Total`) | ✅ **1206 rows** | Pinnacle prices this, sharp consensus works (17 plays)                              |
+| Match Handicap       | `Match Handicap`                     | ✅ **1206 rows** | Best signal-bearing soccer market besides Total Goals. 15 sharp_plays surfaced.     |
+| Total Corners        | `Total Corners`                      | ✅ 16 rows       | BetOnline only, no consensus                                                        |
+| Total Cards          | `Total Cards`                        | ✅ 16 rows       | BetOnline only, no consensus                                                        |
+| Team Total Goals     | `Team Total Goals`                   | ✅ 628 rows      | Kalshi prediction-market data (extreme odds like +4579), not traditional sportsbook |
+| Team Total Corners   | `Team Total Corners`                 | ❌ 0 rows        | Empty                                                                               |
+| Team Total Cards     | `Team Total Cards`                   | ❌ 0 rows        | Empty                                                                               |
+| Player Shots On Goal | `Player Shots On Goal`               | ❌ 0 rows        | Empty                                                                               |
+| Player Shots         | `Player Shots`                       | ❌ 0 rows        | Empty                                                                               |
+| Player Assists       | `Player Assists`                     | ❌ 0 rows        | Empty                                                                               |
+
+**Names that DO NOT match anything:** `Moneyline`, `Three-Way Moneyline`, `1X2`, `Match Result`, `Match Winner`, `Home/Away/Draw`, `Double Chance`, `Point Spread`, `Spread`. These all return 0 rows.
+
+### Other notes
+
+- **Match Handicap is the soccer equivalent of Point Spread.** If a user asks for "soccer spread" or "Asian handicap", use `Match Handicap`.
+- **Team Total Goals is Kalshi-only.** The numbers look weird because Kalshi is a prediction exchange with extreme prices. Not useful for traditional betting analysis.
+- **Player props (Shots, Shots On Goal, Assists) are empty for soccer.** Probably because Pinnacle doesn't index these markets for soccer.
+
+### Other known gaps
+
+- **NBA Moneyline empty during offseason.** Expected — no NBA games in late June. Re-test during season.
+- **UFC validate_play "no row matched selection"** is a separate rowId resolution bug — `screen_ranked` emits gameIds in `UFC:PREMATCH:<TeamA>:<TeamB>:<ts>:<Side>` format but `validate_play` / `get_play_details` can't resolve them when Pinnacle isn't pricing the event. Row lookup fails before any risk check runs.
+
+When the user asks about soccer, probe the market name first against the table above before assuming the data is empty. Most likely candidates: `Total Goals` (totals), `Match Handicap` (spreads), `Draw No Bet` (2-way).
 
 ## Related skills
 

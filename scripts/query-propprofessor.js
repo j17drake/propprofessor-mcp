@@ -593,7 +593,9 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean)
-      : [opts.market || 'Moneyline'];
+      : opts.market
+        ? [opts.market]
+        : ['Moneyline', 'Spread', 'Total'];
     const { createMcpHandlers } = require('./propprofessor-mcp-server');
     const handlers = createMcpHandlers({ client });
     const result = await handlers.sharp_plays({

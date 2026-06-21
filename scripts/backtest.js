@@ -27,6 +27,14 @@ const path = require('node:path');
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
 const { extractScreenRows } = require('../lib/propprofessor-screen-utils');
 const { getConfidenceTier } = require('../lib/propprofessor-risk-score');
+const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
+
+// Defense-in-depth league guard. The cron wrapper
+// (scripts/backtest-daily-snapshot.js) validates, but anyone calling
+// takeSnapshot() directly — e.g. via `pp-query backtest` or as a library
+// — would otherwise pollute backtest-data/ with garbage filenames.
+// Keep this in sync with DEFAULT_LEAGUES (single source of truth).
+const SUPPORTED_LEAGUES = new Set(DEFAULT_LEAGUES.map((l) => l.toUpperCase()));
 
 const DATA_DIR = path.join(__dirname, '..', 'backtest-data');
 
@@ -82,6 +90,9 @@ function parseArgs(argv) {
 // ---------------------------------------------------------------------------
 
 async function takeSnapshot({ league, market, tag }) {
+  if (!SUPPORTED_LEAGUES.has(String(league || '').toUpperCase())) {
+    throw new Error(`Unsupported league: "${league}". Supported: ${[...SUPPORTED_LEAGUES].sort().join(', ')}`);
+  }
   ensureDataDir();
   const client = createPropProfessorClient();
   tag = tag || todayTag();

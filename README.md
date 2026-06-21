@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-956%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-966%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 27 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 26 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -53,7 +53,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **27 tools** — organized into situational, analytical, and research tiers
+- **26 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 
@@ -80,7 +80,7 @@ flowchart LR
         T[Tier + risk score]
     end
 
-    subgraph OUTPUT["27 MCP Tools"]
+    subgraph OUTPUT["26 MCP Tools"];
         RB[recommended_bets]
         SP[sharp_plays]
         SC[sharp_consensus]
@@ -191,7 +191,7 @@ mcp_servers:
       PROPPROFESSOR_MCP_NDJSON: 'true'
 ```
 
-After setup, restart your MCP client. Your agent now has 27 sports betting intelligence tools.
+After setup, restart your MCP client. Your agent now has 26 sports betting intelligence tools.
 
 ### Agent System Prompt
 
@@ -230,6 +230,7 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `recommended_bets` | Top flagged movements with tier, risk, and plain English rationale               |
 | `player_context`   | Injury/availability check on a specific player                                   |
 | `validate_play`    | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS |
+| `mlb_game_context` | Starting pitchers, park factor, hourly weather, lineup lock for an MLB game      |
 | `find_best_price`  | Line-shop across all books for the best execution price                          |
 | `health_status`    | Auth freshness and endpoint connectivity                                         |
 
@@ -241,7 +242,6 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `sharp_consensus` | Multi-window (1h–48h) sharp movement — is the move sustained?                           |
 | `screen_ranked`   | Full ranked data for a (league, market) pair with consensus and movement metadata       |
 | `all_slates`      | Consolidated ranked list across multiple leagues in one call                            |
-| `screen`          | League-specific screen (NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer, NCAAB, NCAAF)    |
 | `league_presets`  | Sport-specific ranking weights and sharp-book reference sets                            |
 | `get_alerts`      | Line movement and steam move alerts since last check                                    |
 | `ev_candidates`   | Fast +EV discovery — validate on `/screen` afterward                                    |
@@ -353,7 +353,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 ## 🔧 For Maintainers
 
 ```bash
-npm test              # 956 tests, 0 failures
+npm test              # 966 tests, 0 failures
 npm run test:coverage # ~82% statements
 npm run lint          # clean
 npm run format:check  # clean (npm run format to fix)

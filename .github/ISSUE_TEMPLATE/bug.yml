@@ -1,0 +1,65 @@
+name: Bug report
+description: Report something that's broken or working incorrectly.
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill out the template below so we can reproduce and fix it quickly.
+
+  - type: input
+    id: version
+    attributes:
+      label: Affected version
+      description: Run `npm ls propprofessor-mcp` or check `git describe --tags` and paste the output here.
+      placeholder: '2.1.10'
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal commands or actions that trigger the bug.
+      placeholder: |
+        1. Run `pp-query screen --league NBA --market Moneyline`
+        2. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened. Paste the full error output, including stack traces, here.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, OS, auth setup (paid/free), anything else relevant.
+      placeholder: |
+        - Node: v20.x
+        - OS: macOS 14.4
+        - Subscription: paid
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: If you ran `pp-query doctor` or any debug command, paste the output.
+    validations:
+      required: false

@@ -29,6 +29,12 @@ jobs:
       - name: Check version consistency
         run: npm run check:version
 
+      - name: Check README claim drift
+        # Fails the build if README's "N tools" / "M tests passing" claim
+        # drifts from the actual codebase. Catches the silent-rot class
+        # of bugs (phantom tools, stale test counts) before they ship.
+        run: npm run check:claims:quick
+
       - name: Check for credential leaks
         # Fails if auth.json, token-cache.json, or .propprofessor/ are ever
         # committed. Belt-and-suspenders alongside .gitignore.
