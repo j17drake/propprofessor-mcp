@@ -1,7 +1,7 @@
 ---
 name: propprofessor-coach
-description: "Operator-facing PropProfessor coach. For any question about today's bets, sharp money, line shopping, player props, or bet tracking — load this skill FIRST to pick the right MCP tools and tier formatting. Pairs with the dev reference skill `propprofessor-mcp` for tool internals."
-version: 1.1.0
+description: "Operator-facing PropProfessor coach. Game context now runs for ALL sports (NBA rest days, Tennis surface, MLB weather). research[] includes contextType: 'player' | 'game' so agents know what they're looking at."
+version: 1.3.0
 author: James Drake (Kai)
 tags: [sports-betting, mcp, propprofessor, coach, sharp-money, line-shopping, audited-2026-06]
 ---
@@ -27,18 +27,27 @@ This skill auto-loads when a user's question contains any of:
 
 ## MANDATORY: Always validate before recommending
 
-**Before presenting ANY play to the user, run `mcp_propprofessor_validate_play` on the top candidates.** This is non-negotiable. Consensus + edge is not enough to recommend a bet — you need the bundled verdict that includes execution, player/news context, and (for MLB) game context (weather, park, pitcher, lineup).
+**Before presenting ANY play to the user, run `mcp_propprofessor_validate_play` on the top candidates.** This is non-negotiable. Consensus + edge is not enough to recommend a bet — you need the bundled verdict that includes execution, player/news context, and game context.
+
+Game context now runs for **ALL sports** (not just MLB):
+- **MLB** → weather, wind, park factor, starting pitchers, lineups (existing)
+- **NBA/WNBA** → rest days, back-to-back detection via NBA Stats API
+- **Tennis** → surface type, tournament level, matchup news count
+- **Other sports** (UFC, NHL, NFL, etc.) → clean note that no game-level context is available
 
 Workflow:
 
-1. Screen the slate (`recommended_bets` or `sharp_plays`).
+1. Screen the slate (`recommended_bets` or `quick_screen`).
 2. Pick the **top 2-3 candidates per league** by `screenScore` or `edge`.
 3. For EACH candidate, call `validate_play` with `{ league, gameId, selection, book }` — the `gameId` is the screen row's `gameId` (e.g. `MLB:PREMATCH:...:1781723400`), and `book` is the book the user wants to bet on (default: `NoVigApp` if unspecified).
-4. Use the verdict from `validate_play` (BET / CONSIDER / PASS) as the final word. A TIER 2 play that PASSes validate_play (e.g. high weather risk, or bad execution on the requested book) does NOT get recommended, even if the screen ranked it highly.
-5. If the user is going to bet on MLB, the validate_play call automatically pulls `mlb_game_context` (pitchers, weather, park factor, lineups) — no separate call needed.
-6. For non-MLB plays, you can skip the per-play validate_play if the user just wants a quick slate dump — but always validate before saying "I recommend you bet X."
+4. Use the verdict from `validate_play` (BET / CONSIDER / PASS) as the final word. A TIER 2 play that PASSes validate_play (e.g. high weather risk, bad execution, or rest-disadvantage) does NOT get recommended, even if the screen ranked it highly.
+5. The validate_play call automatically pulls game context (MLB: pitchers/weather/park; NBA: rest days; Tennis: surface/level) — no separate call needed.
+6. You can skip the per-play validate_play if the user just wants a quick slate dump — but always validate before saying "I recommend you bet X."
 
-The response should surface the validate_play reasoning, not just the screen's tier. For example: "Rays +1.5 — TIER 2, validate_play = CONSIDER, clean game context (McClanahan vs Ohtani, 4.5 mph wind, neutral park)."
+The response should surface the validate_play reasoning, not just the screen's tier. Examples:
+- MLB: "Mets Under 7.5 — TIER 2, game_context = high risk (15mph wind blowing out at CBP, Peterson 5.91 ERA)" → PASS
+- NBA: "Lakers -6.5 — TIER 3, game_context = low risk (Lakers on back-to-back, 1d rest)" → CONSIDER with note
+- Tennis: "Djokovic ML — TIER 2, game_context = clean (Wimbledon, Grass, Grand Slam)" → BET
 
 ## Tool routing table
 
@@ -81,12 +90,13 @@ When presenting plays, ALWAYS use this format. The user expects this layout — 
 - Plays where `validate_play` returned PASS should be demoted to TIER 4 (or omitted entirely if the user is in a hurry) — even if the screen ranked them TIER 1.
 - `Edge` from `recommended_bets[].edge` (decimal). Display as percentage: `* 100`, round to 1 decimal.
 - `Rationale` from the tool's `rationale` field — DO NOT invent your own.
+- Research results now include `contextType: 'player' | 'game'`. When contextType='game', the risk flags come from rest days / weather / surface rather than player injury news. Surface this in the rationale (e.g. "game_context: back-to-back").
 - If a tier has 0 plays, omit the section entirely. Don't show empty tables.
 - Always include `TIER` 4 only if `markets_queried` returned anything in that bucket (rare, mostly for transparency).
 
 ## Risk flag escalation
 
-`validate_play` already applies the risk-flag downgrades internally (player_context for non-MLB, mlb_game_context for MLB, plus execution check). If you're skipping validate_play for any reason, here's the manual equivalent:
+`validate_play` already applies the risk-flag downgrades internally (player_context + game_context for all sports, plus execution check). If you're skipping validate_play for any reason, here's the manual equivalent:
 
 Before recommending ANY player prop:
 
@@ -96,10 +106,22 @@ Before recommending ANY player prop:
 
 Before recommending ANY MLB play:
 
-1. Call `mcp_propprofessor_mlb_game_context` with the gamePk (or let `validate_play` do it).
+1. Call `mcp_propprofessor_validate_play` (which auto-pulls game context via the dispatcher). Or call `mcp_propprofessor_mlb_game_context` directly with the gamePk.
 2. If `riskFlag === "high"`, PASS the play entirely — weather at hitter-friendly parks can swing totals by 1.5+ runs.
 3. If `riskFlag === "medium"`, downgrade BET → CONSIDER and note the weather/park effect in the rationale.
 4. Always surface the starting pitcher names in the response (probable or confirmed).
+
+Before recommending ANY NBA/WNBA play:
+
+1. Call `mcp_propprofessor_validate_play` (auto-pulls rest days via the dispatcher).
+2. If `research.contextType === "game"` and `riskFlag === "low"`, note rest-day concerns in the rationale (e.g. "Lakers on back-to-back, 1d rest since last game").
+3. Back-to-back teams are more likely to rest players in the 4th quarter, affecting spreads and totals.
+
+Before recommending ANY Tennis play:
+
+1. Call `mcp_propprofessor_validate_play` (auto-pulls surface + tournament level).
+2. Surface-level mismatches (clay specialist on grass) are a legitimate factor — note them in the rationale.
+3. Tournament level affects motivation: Grand Slam best-of-5, ATP 250 best-of-3.
 
 ## Staking
 
