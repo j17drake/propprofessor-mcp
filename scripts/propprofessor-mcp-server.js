@@ -82,12 +82,16 @@ function createMcpServer({
       // Surface the active mode in the tools/list response so agents (and
       // humans inspecting the response) can see whether they're in lite or
       // full mode without having to grep env vars. Helps debugging when an
-      // expected tool is missing.
+      // expected tool is missing. The mode is derived from the actual
+      // served list length rather than the module-level TOOL_MODE constant
+      // so it stays self-consistent when callers inject custom
+      // toolDefinitions (e.g. in tests).
       const fullToolCount = Object.keys(TOOL_CATEGORIES).length;
+      const mode = toolDefinitions.length === LITE_MODE_TOOLS.size ? 'lite' : 'full';
       return createJsonRpcSuccess(id, {
         tools: toolDefinitions,
         _meta: {
-          mode: TOOL_MODE,
+          mode,
           toolCount: toolDefinitions.length,
           liteToolCount: LITE_MODE_TOOLS.size,
           fullToolCount

@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-993%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-998%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -401,7 +401,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 ## 🔧 For Maintainers
 
 ```bash
-npm test              # 993 tests, 0 failures
+npm test              # 998 tests, 0 failures
 npm run test:coverage # ~82% statements
 npm run lint          # clean
 npm run format:check  # clean (npm run format to fix)
