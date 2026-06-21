@@ -484,6 +484,377 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     return response;
   }
 
+  // ─── Play Detail & Validation Implementations ───────────────────────────
+
+  async function runGetPlayDetailsImpl(client, args = {}) {
+    const league = String(args.league || '').trim();
+    const rawGameIds = Array.isArray(args.game_ids) ? args.game_ids : [];
+    // Sanitize: trim, drop empties, dedupe. Stale/closed/malformed game IDs
+    // (e.g. non-numeric timestamps) used to crash the per-row enrichment
+    // path with "Cannot read properties of undefined (reading 'filter')".
+    // Clean them here so the downstream pipeline only sees well-formed IDs.
+    const gameIds = Array.from(new Set(rawGameIds.map((id) => String(id == null ? '' : id).trim()).filter(Boolean)));
+    if (!league || !gameIds.length) {
+      const error = new Error('league and game_ids are required.');
+      error.code = 'MISSING_PARAMS';
+      error.category = 'validation';
+      error.status = 400;
+      throw error;
+    }
+    const marketResolution = resolveMarkets(args, league);
+    const market = marketResolution.single;
+    const requestedBooks = normalizeBookList(args.books);
+    const preset = getLeagueRankingPreset(league, market);
+    const focusBook = requestedBooks[0] || preset.preferredBooks[0];
+
+    // Fetch full screen data (with history hydration — this is the detailed view)
+    let payload;
+    try {
+      payload = await client.queryScreenOddsBestComps({
+        market,
+        league,
+        games: gameIds,
+        participants: [],
+        books: requestedBooks,
+        is_live: false
+      });
+    } catch (err) {
+      return {
+        ok: true,
+        result: [],
+        resultMeta: {
+          queryGameIds: gameIds,
+          matchedRows: 0,
+          error: err?.message || String(err),
+          errorCode: 'SCREEN_QUERY_FAILED'
+        }
+      };
+    }
+    let response;
+    try {
+      // BUGFIX (regression pitfall #48): the previous code omitted the
+      // `await` here, so `response` was a Promise and the subsequent
+      // `response.result.filter(...)` crashed with
+      // "Cannot read properties of undefined (reading 'filter')".
+      response = await buildRankedScreenResponseShared({
+        client,
+        payloads: [payload],
+        args: { ...args, compact: false, skipHistory: false },
+        league,
+        focusBook,
+        rankRows: (hydratedRows, { debug } = {}) =>
+          rankLeagueScreenRows(hydratedRows, {
+            league,
+            market,
+            limit: gameIds.length * 4,
+            books: requestedBooks.length ? requestedBooks : undefined,
+            includeAll: true,
+            debug
+          })
+      });
+    } catch (err) {
+      return {
+        ok: true,
+        result: [],
+        resultMeta: {
+          queryGameIds: gameIds,
+          matchedRows: 0,
+          error: err?.message || String(err),
+          errorCode: 'RANK_PIPELINE_FAILED'
+        }
+      };
+    }
+
+    // Add market alias info to resultMeta if any aliases were used
+    if (marketResolution.aliasesUsed.length) {
+      response.resultMeta = {
+        ...response.resultMeta,
+        markets_alias_used: marketResolution.aliasesUsed
+      };
+    }
+
+    // Filter to only the requested game IDs. Guard against response.result
+    // being undefined (can happen when the upstream screen query returns no
+    // matching rows for the requested gameIds).
+    const gameIdSet = new Set(gameIds);
+    const safeResult = Array.isArray(response.result) ? response.result : [];
+    const filtered = safeResult.filter((row) => gameIdSet.has(row && row.gameId));
+    response.result = filtered;
+    response.resultMeta = {
+      ...response.resultMeta,
+      queryGameIds: gameIds,
+      matchedRows: filtered.length
+    };
+    return response;
+  }
+
+  async function runValidatePlayImpl(client, args = {}) {
+    const league = String(args.league || '').trim();
+    const gameId = String(args.gameId || '').trim();
+    const selection = String(args.selection || '').trim();
+    if (!league) {
+      return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'league is required' } };
+    }
+    if (!gameId) {
+      return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gameId is required' } };
+    }
+    if (!selection) {
+      return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'selection is required' } };
+    }
+    const market = String(args.market || 'Moneyline').trim() || 'Moneyline';
+    const books = normalizeBookList(args.books);
+    const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
+    const skipResearch = args.skipResearch === true;
+
+    // Steps 1 + 2 in parallel: re-fetch the screen for this game AND run
+    // player_context research concurrently. The two calls are independent —
+    // research only needs the selection name + league, not the detail row —
+    // so serializing them doubled wall-clock latency for no reason. We
+    // resolve detail first so we can pass `gameTime` to research without a
+    // second round-trip; in practice this is still 30-40% faster than the
+    // previous all-serial path on the typical validate_play invocation.
+    const detailPromise = (async () => {
+      try {
+        return {
+          ok: true,
+          value: await runGetPlayDetailsImpl(client, {
+            league,
+            market,
+            game_ids: [gameId],
+            books: books.length ? books : undefined,
+            lookbackHours
+          })
+        };
+      } catch (err) {
+        return { ok: false, error: err?.message || String(err) };
+      }
+    })();
+    const researchPromise = skipResearch
+      ? Promise.resolve(null)
+      : (async () => {
+          try {
+            return {
+              ok: true,
+              value: await handlers.player_context({
+                player: selection,
+                sport: league
+              })
+            };
+          } catch (err) {
+            return { ok: false, error: err?.message || String(err) };
+          }
+        })();
+
+    // MLB game-level context (pitcher, weather, park, lineup). Only runs
+    // for league=MLB. The screen gameId is the format
+    // "MLB:PREMATCH:<homeSlug>:<awaySlug>:<unixStart>" — note the
+    // <home>:<away> order, not the more intuitive away-first. The last
+    // segment is a Unix timestamp, NOT the MLB gamePk. We resolve the
+    // real gamePk via the schedule endpoint using the homeSlug + awaySlug
+    // + the start date derived from the Unix timestamp. The lookup is
+    // best-effort: if the schedule fetch fails or no match is found,
+    // gameContext stays null and the verdict is unaffected. Skipped on
+    // skipResearch to honor that opt-out.
+    const isMlb = league.toUpperCase() === 'MLB';
+    // The screen gameId encodes the matchup; parse it to seed the lookup.
+    const gameIdParts = isMlb && gameId ? gameId.split(':') : [];
+    // Convention: index 2 = HOME slug, index 3 = AWAY slug.
+    const seedHomeTeam = gameIdParts[2] ? gameIdParts[2].replace(/_/g, ' ') : '';
+    const seedAwayTeam = gameIdParts[3] ? gameIdParts[3].replace(/_/g, ' ') : '';
+    // Start date is the date of the Unix timestamp (last segment).
+    const seedStartDate =
+      gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4])
+        ? new Date(Number(gameIdParts[4]) * 1000).toISOString().slice(0, 10)
+        : '';
+    const gameContextPromise =
+      !isMlb || !seedAwayTeam || !seedHomeTeam || !seedStartDate || skipResearch
+        ? Promise.resolve(null)
+        : (async () => {
+            try {
+              const gamePk = await findMlbGamePk({
+                isoDate: seedStartDate,
+                awayTeam: seedAwayTeam,
+                homeTeam: seedHomeTeam
+              });
+              if (!gamePk) {
+                return { ok: false, error: 'no MLB gamePk found for matchup' };
+              }
+              return { ok: true, value: await getMlbGameContext({ gamePk }) };
+            } catch (err) {
+              return { ok: false, error: err?.message || String(err) };
+            }
+          })();
+
+    const [detailOutcome, researchOutcome, gameContextOutcome] = await Promise.all([
+      detailPromise,
+      researchPromise,
+      gameContextPromise
+    ]);
+    const detailResult = detailOutcome?.ok ? detailOutcome.value : null;
+    const detailError = detailOutcome?.ok ? null : detailOutcome.error;
+    const gameContext = gameContextOutcome?.ok ? gameContextOutcome.value : null;
+    const gameContextError = gameContextOutcome?.ok ? null : gameContextOutcome?.error || null;
+
+    // Extract the specific row that matches the selection.
+    const matchingRow = Array.isArray(detailResult?.result)
+      ? detailResult.result.find(
+          (r) =>
+            String(r.selection || r.participant || '').toLowerCase() === selection.toLowerCase() ||
+            String(r.homeTeam || '')
+              .toLowerCase()
+              .includes(selection.toLowerCase()) ||
+            String(r.awayTeam || '')
+              .toLowerCase()
+              .includes(selection.toLowerCase())
+        )
+      : null;
+
+    // If research was started before we had the row, re-run it with
+    // gameTime now that we know the start. Skip the round-trip when the
+    // gameTime is already present in the result.
+    let research = researchOutcome?.ok ? researchOutcome.value : null;
+    const researchError = researchOutcome?.ok ? null : researchOutcome?.error || null;
+    if (research && !research.gameTime && matchingRow?.start) {
+      research = { ...research, gameTime: matchingRow.start };
+    }
+
+    // Step 3: compute the verdict.
+    // We classify the play using the same signals the ranker uses,
+    // then layer on the risk-flag downgrade from research.
+    let verdict = 'PASS';
+    const reasons = [];
+    let tier = matchingRow?.confidenceTier || 'TIER 4';
+
+    if (matchingRow) {
+      // Base quality from the existing ranker output.
+      if (tier === 'TIER 1') {
+        verdict = 'BET';
+      } else if (tier === 'TIER 2' || tier === 'TIER 3') {
+        verdict = 'CONSIDER';
+      } else {
+        verdict = 'PASS';
+        reasons.push('TIER 4 (no signal)');
+      }
+
+      // Execution quality on the requested book.
+      const exec = String(matchingRow.executionQuality || '');
+      if (exec === 'bad') {
+        verdict = 'PASS';
+        reasons.push('execution quality is "bad" on the requested book');
+      } else if (exec === 'playable') {
+        reasons.push('execution quality is "playable" (within 10¢ of best)');
+      } else if (exec === 'best') {
+        reasons.push('execution quality is "best" (top of market)');
+      } else {
+        reasons.push(`execution quality is "${exec || 'unknown'}"`);
+      }
+
+      // Consensus/movement support.
+      const cbk = Number(matchingRow.consensusBookCount || 0);
+      if (cbk >= 3) reasons.push(`consensus: ${cbk} comp books agree`);
+      else if (cbk >= 1) reasons.push(`consensus: ${cbk} comp book (thin)`);
+      else reasons.push('no comp book consensus');
+    } else {
+      reasons.push(
+        detailError
+          ? `screen lookup failed: ${detailError}`
+          : `no row matched selection "${selection}" on gameId ${gameId}`
+      );
+    }
+
+    // Risk-flag override.
+    if (research && research.riskFlag === 'high') {
+      verdict = 'PASS';
+      reasons.push('player_context riskFlag = "high"');
+    } else if (research && research.riskFlag === 'medium') {
+      if (verdict === 'BET') verdict = 'CONSIDER';
+      reasons.push('player_context riskFlag = "medium" — proceed with caution');
+    } else if (research && research.riskFlag === 'low') {
+      reasons.push('player_context riskFlag = "low"');
+    }
+
+    // MLB game-context risk override (weather / park / lineup). Applied
+    // AFTER player_context so a high weather flag can still PASS a play
+    // that survived the player-news check. Same downgrades as
+    // player_context so the agent's reasoning doesn't have to branch.
+    if (gameContext && gameContext.riskFlag === 'high') {
+      verdict = 'PASS';
+      reasons.push(
+        `mlb_game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`
+      );
+    } else if (gameContext && gameContext.riskFlag === 'medium') {
+      if (verdict === 'BET') verdict = 'CONSIDER';
+      reasons.push(`mlb_game_context riskFlag = "medium" — ${gameContext.riskSummary || 'proceed with caution'}`);
+    } else if (gameContext && gameContext.riskFlag === 'low') {
+      reasons.push(`mlb_game_context riskFlag = "low" — ${gameContext.riskSummary || 'minor flag'}`);
+    }
+
+    return {
+      ok: true,
+      league,
+      market,
+      gameId,
+      selection,
+      executionBook: String(args.book || books[0] || ''),
+      verdict,
+      tier,
+      reasons,
+      play: matchingRow
+        ? {
+            gameId: matchingRow.gameId,
+            homeTeam: matchingRow.homeTeam,
+            awayTeam: matchingRow.awayTeam,
+            start: matchingRow.start,
+            odds: matchingRow.odds,
+            bestAvailableOdds: matchingRow.bestAvailableOdds,
+            executionQuality: matchingRow.executionQuality,
+            consensusEdge: matchingRow.consensusEdge,
+            consensusBookCount: matchingRow.consensusBookCount,
+            clvProxyPct: matchingRow.clvProxyPct,
+            openToCurrentClvPct: matchingRow.openToCurrentClvPct,
+            movementLabel: matchingRow.movementLabel,
+            kaiCall: matchingRow.kaiCall,
+            screenScore: matchingRow.screenScore
+          }
+        : null,
+      research: research
+        ? {
+            riskFlag: research.riskFlag,
+            riskSummary: research.summary || null,
+            topTweet:
+              Array.isArray(research.tweets) && research.tweets.length > 0
+                ? research.tweets[0]?.text?.slice(0, 200) || null
+                : null,
+            cached: Boolean(research.cached),
+            fetchedAt: research.fetchedAt
+          }
+        : skipResearch
+          ? { skipped: true }
+          : { error: researchError || 'research failed' },
+      gameContext: gameContext
+        ? {
+            gamePk: gameContext.gamePk,
+            venue: gameContext.venue || null,
+            pitchers: gameContext.pitchers || null,
+            park: gameContext.park || null,
+            weather: gameContext.weather || null,
+            lineups: gameContext.lineups || null,
+            riskFlag: gameContext.riskFlag,
+            riskSummary: gameContext.riskSummary || null,
+            signals: gameContext.signals || null,
+            cached: Boolean(gameContext.cached),
+            fetchedAt: gameContext.fetchedAt
+          }
+        : isMlb
+          ? skipResearch
+            ? { skipped: true }
+            : gameContextError
+              ? { error: gameContextError }
+              : null
+          : null
+    };
+  }
+
   function buildCacheKey(prefix, args, league) {
     return JSON.stringify({
       prefix,
@@ -1511,106 +1882,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return runUfcCard(args);
     },
 
+    // ─── Play Detail & Validation Handlers ──────────────────────────────────
+
     async get_play_details(args = {}) {
-      const league = String(args.league || '').trim();
-      const rawGameIds = Array.isArray(args.game_ids) ? args.game_ids : [];
-      // Sanitize: trim, drop empties, dedupe. Stale/closed/malformed game IDs
-      // (e.g. non-numeric timestamps) used to crash the per-row enrichment
-      // path with "Cannot read properties of undefined (reading 'filter')".
-      // Clean them here so the downstream pipeline only sees well-formed IDs.
-      const gameIds = Array.from(new Set(rawGameIds.map((id) => String(id == null ? '' : id).trim()).filter(Boolean)));
-      if (!league || !gameIds.length) {
-        const error = new Error('league and game_ids are required.');
-        error.code = 'MISSING_PARAMS';
-        error.category = 'validation';
-        error.status = 400;
-        throw error;
+      const canonicalKey = canonicalizeScreenArgs(args);
+      if (canonicalKey) {
+        return await canonicalScreenCache.memoize(async () => {
+          return await runGetPlayDetailsImpl(client, args);
+        }, canonicalKey)();
       }
-      const marketResolution = resolveMarkets(args, league);
-      const market = marketResolution.single;
-      const requestedBooks = normalizeBookList(args.books);
-      const preset = getLeagueRankingPreset(league, market);
-      const focusBook = requestedBooks[0] || preset.preferredBooks[0];
-
-      // Fetch full screen data (with history hydration — this is the detailed view)
-      let payload;
-      try {
-        payload = await client.queryScreenOddsBestComps({
-          market,
-          league,
-          games: gameIds,
-          participants: [],
-          books: requestedBooks,
-          is_live: false
-        });
-      } catch (err) {
-        return {
-          ok: true,
-          result: [],
-          resultMeta: {
-            queryGameIds: gameIds,
-            matchedRows: 0,
-            error: err?.message || String(err),
-            errorCode: 'SCREEN_QUERY_FAILED'
-          }
-        };
-      }
-      let response;
-      try {
-        // BUGFIX (regression pitfall #48): the previous code omitted the
-        // `await` here, so `response` was a Promise and the subsequent
-        // `response.result.filter(...)` crashed with
-        // "Cannot read properties of undefined (reading 'filter')".
-        response = await buildRankedScreenResponseShared({
-          client,
-          payloads: [payload],
-          args: { ...args, compact: false, skipHistory: false },
-          league,
-          focusBook,
-          rankRows: (hydratedRows, { debug } = {}) =>
-            rankLeagueScreenRows(hydratedRows, {
-              league,
-              market,
-              limit: gameIds.length * 4,
-              books: requestedBooks.length ? requestedBooks : undefined,
-              includeAll: true,
-              debug
-            })
-        });
-      } catch (err) {
-        return {
-          ok: true,
-          result: [],
-          resultMeta: {
-            queryGameIds: gameIds,
-            matchedRows: 0,
-            error: err?.message || String(err),
-            errorCode: 'RANK_PIPELINE_FAILED'
-          }
-        };
-      }
-
-      // Add market alias info to resultMeta if any aliases were used
-      if (marketResolution.aliasesUsed.length) {
-        response.resultMeta = {
-          ...response.resultMeta,
-          markets_alias_used: marketResolution.aliasesUsed
-        };
-      }
-
-      // Filter to only the requested game IDs. Guard against response.result
-      // being undefined (can happen when the upstream screen query returns no
-      // matching rows for the requested gameIds).
-      const gameIdSet = new Set(gameIds);
-      const safeResult = Array.isArray(response.result) ? response.result : [];
-      const filtered = safeResult.filter((row) => gameIdSet.has(row && row.gameId));
-      response.result = filtered;
-      response.resultMeta = {
-        ...response.resultMeta,
-        queryGameIds: gameIds,
-        matchedRows: filtered.length
-      };
-      return response;
+      return runGetPlayDetailsImpl(client, args);
     },
 
     /**
@@ -1642,270 +1923,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
      * to chain three separate tool calls.
      */
     async validate_play(args = {}) {
-      const league = String(args.league || '').trim();
-      const gameId = String(args.gameId || '').trim();
-      const selection = String(args.selection || '').trim();
-      if (!league) {
-        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'league is required' } };
+      const canonicalKey = canonicalizeScreenArgs(args);
+      if (canonicalKey) {
+        return await canonicalScreenCache.memoize(async () => {
+          return await runValidatePlayImpl(client, args);
+        }, canonicalKey)();
       }
-      if (!gameId) {
-        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gameId is required' } };
-      }
-      if (!selection) {
-        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'selection is required' } };
-      }
-      const market = String(args.market || 'Moneyline').trim() || 'Moneyline';
-      const books = normalizeBookList(args.books);
-      const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
-      const skipResearch = args.skipResearch === true;
-
-      // Steps 1 + 2 in parallel: re-fetch the screen for this game AND run
-      // player_context research concurrently. The two calls are independent —
-      // research only needs the selection name + league, not the detail row —
-      // so serializing them doubled wall-clock latency for no reason. We
-      // resolve detail first so we can pass `gameTime` to research without a
-      // second round-trip; in practice this is still 30-40% faster than the
-      // previous all-serial path on the typical validate_play invocation.
-      const detailPromise = (async () => {
-        try {
-          return {
-            ok: true,
-            value: await handlers.get_play_details({
-              league,
-              market,
-              game_ids: [gameId],
-              books: books.length ? books : undefined,
-              lookbackHours
-            })
-          };
-        } catch (err) {
-          return { ok: false, error: err?.message || String(err) };
-        }
-      })();
-      const researchPromise = skipResearch
-        ? Promise.resolve(null)
-        : (async () => {
-            try {
-              return {
-                ok: true,
-                value: await handlers.player_context({
-                  player: selection,
-                  sport: league
-                })
-              };
-            } catch (err) {
-              return { ok: false, error: err?.message || String(err) };
-            }
-          })();
-
-      // MLB game-level context (pitcher, weather, park, lineup). Only runs
-      // for league=MLB. The screen row's gameId is the format
-      // "MLB:PREMATCH:<homeSlug>:<awaySlug>:<unixStart>" — note the
-      // <home>:<away> order, not the more intuitive away-first. The last
-      // segment is a Unix timestamp, NOT the MLB gamePk. We resolve the
-      // real gamePk via the schedule endpoint using the homeSlug + awaySlug
-      // + the start date derived from the Unix timestamp. The lookup is
-      // best-effort: if the schedule fetch fails or no match is found,
-      // gameContext stays null and the verdict is unaffected. Skipped on
-      // skipResearch to honor that opt-out.
-      const isMlb = league.toUpperCase() === 'MLB';
-      // The screen gameId encodes the matchup; parse it to seed the lookup.
-      const gameIdParts = isMlb && gameId ? gameId.split(':') : [];
-      // Convention: index 2 = HOME slug, index 3 = AWAY slug.
-      const seedHomeTeam = gameIdParts[2] ? gameIdParts[2].replace(/_/g, ' ') : '';
-      const seedAwayTeam = gameIdParts[3] ? gameIdParts[3].replace(/_/g, ' ') : '';
-      // Start date is the date of the Unix timestamp (last segment).
-      const seedStartDate =
-        gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4])
-          ? new Date(Number(gameIdParts[4]) * 1000).toISOString().slice(0, 10)
-          : '';
-      const gameContextPromise =
-        !isMlb || !seedAwayTeam || !seedHomeTeam || !seedStartDate || skipResearch
-          ? Promise.resolve(null)
-          : (async () => {
-              try {
-                const gamePk = await findMlbGamePk({
-                  isoDate: seedStartDate,
-                  awayTeam: seedAwayTeam,
-                  homeTeam: seedHomeTeam
-                });
-                if (!gamePk) {
-                  return { ok: false, error: 'no MLB gamePk found for matchup' };
-                }
-                return { ok: true, value: await handlers.mlb_game_context({ gamePk }) };
-              } catch (err) {
-                return { ok: false, error: err?.message || String(err) };
-              }
-            })();
-
-      const [detailOutcome, researchOutcome, gameContextOutcome] = await Promise.all([
-        detailPromise,
-        researchPromise,
-        gameContextPromise
-      ]);
-      const detailResult = detailOutcome?.ok ? detailOutcome.value : null;
-      const detailError = detailOutcome?.ok ? null : detailOutcome.error;
-      const gameContext = gameContextOutcome?.ok ? gameContextOutcome.value : null;
-      const gameContextError = gameContextOutcome?.ok ? null : gameContextOutcome?.error || null;
-
-      // Extract the specific row that matches the selection.
-      const matchingRow = Array.isArray(detailResult?.result)
-        ? detailResult.result.find(
-            (r) =>
-              String(r.selection || r.participant || '').toLowerCase() === selection.toLowerCase() ||
-              String(r.homeTeam || '')
-                .toLowerCase()
-                .includes(selection.toLowerCase()) ||
-              String(r.awayTeam || '')
-                .toLowerCase()
-                .includes(selection.toLowerCase())
-          )
-        : null;
-
-      // If research was started before we had the row, re-run it with
-      // gameTime now that we know the start. Skip the round-trip when the
-      // gameTime is already present in the result.
-      let research = researchOutcome?.ok ? researchOutcome.value : null;
-      const researchError = researchOutcome?.ok ? null : researchOutcome?.error || null;
-      if (research && !research.gameTime && matchingRow?.start) {
-        research = { ...research, gameTime: matchingRow.start };
-      }
-
-      // Step 3: compute the verdict.
-      // We classify the play using the same signals the ranker uses,
-      // then layer on the risk-flag downgrade from research.
-      let verdict = 'PASS';
-      const reasons = [];
-      let tier = matchingRow?.confidenceTier || 'TIER 4';
-
-      if (matchingRow) {
-        // Base quality from the existing ranker output.
-        if (tier === 'TIER 1') {
-          verdict = 'BET';
-        } else if (tier === 'TIER 2' || tier === 'TIER 3') {
-          verdict = 'CONSIDER';
-        } else {
-          verdict = 'PASS';
-          reasons.push('TIER 4 (no signal)');
-        }
-
-        // Execution quality on the requested book.
-        const exec = String(matchingRow.executionQuality || '');
-        if (exec === 'bad') {
-          verdict = 'PASS';
-          reasons.push('execution quality is "bad" on the requested book');
-        } else if (exec === 'playable') {
-          reasons.push('execution quality is "playable" (within 10¢ of best)');
-        } else if (exec === 'best') {
-          reasons.push('execution quality is "best" (top of market)');
-        } else {
-          reasons.push(`execution quality is "${exec || 'unknown'}"`);
-        }
-
-        // Consensus/movement support.
-        const cbk = Number(matchingRow.consensusBookCount || 0);
-        if (cbk >= 3) reasons.push(`consensus: ${cbk} comp books agree`);
-        else if (cbk >= 1) reasons.push(`consensus: ${cbk} comp book (thin)`);
-        else reasons.push('no comp book consensus');
-      } else {
-        reasons.push(
-          detailError
-            ? `screen lookup failed: ${detailError}`
-            : `no row matched selection "${selection}" on gameId ${gameId}`
-        );
-      }
-
-      // Risk-flag override.
-      if (research && research.riskFlag === 'high') {
-        verdict = 'PASS';
-        reasons.push('player_context riskFlag = "high"');
-      } else if (research && research.riskFlag === 'medium') {
-        if (verdict === 'BET') verdict = 'CONSIDER';
-        reasons.push('player_context riskFlag = "medium" — proceed with caution');
-      } else if (research && research.riskFlag === 'low') {
-        reasons.push('player_context riskFlag = "low"');
-      }
-
-      // MLB game-context risk override (weather / park / lineup). Applied
-      // AFTER player_context so a high weather flag can still PASS a play
-      // that survived the player-news check. Same downgrades as
-      // player_context so the agent's reasoning doesn't have to branch.
-      if (gameContext && gameContext.riskFlag === 'high') {
-        verdict = 'PASS';
-        reasons.push(
-          `mlb_game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`
-        );
-      } else if (gameContext && gameContext.riskFlag === 'medium') {
-        if (verdict === 'BET') verdict = 'CONSIDER';
-        reasons.push(`mlb_game_context riskFlag = "medium" — ${gameContext.riskSummary || 'proceed with caution'}`);
-      } else if (gameContext && gameContext.riskFlag === 'low') {
-        reasons.push(`mlb_game_context riskFlag = "low" — ${gameContext.riskSummary || 'minor flag'}`);
-      }
-
-      return {
-        ok: true,
-        league,
-        market,
-        gameId,
-        selection,
-        executionBook: String(args.book || books[0] || ''),
-        verdict,
-        tier,
-        reasons,
-        play: matchingRow
-          ? {
-              gameId: matchingRow.gameId,
-              homeTeam: matchingRow.homeTeam,
-              awayTeam: matchingRow.awayTeam,
-              start: matchingRow.start,
-              odds: matchingRow.odds,
-              bestAvailableOdds: matchingRow.bestAvailableOdds,
-              executionQuality: matchingRow.executionQuality,
-              consensusEdge: matchingRow.consensusEdge,
-              consensusBookCount: matchingRow.consensusBookCount,
-              clvProxyPct: matchingRow.clvProxyPct,
-              openToCurrentClvPct: matchingRow.openToCurrentClvPct,
-              movementLabel: matchingRow.movementLabel,
-              kaiCall: matchingRow.kaiCall,
-              screenScore: matchingRow.screenScore
-            }
-          : null,
-        research: research
-          ? {
-              riskFlag: research.riskFlag,
-              riskSummary: research.summary || null,
-              topTweet:
-                Array.isArray(research.tweets) && research.tweets.length > 0
-                  ? research.tweets[0]?.text?.slice(0, 200) || null
-                  : null,
-              cached: Boolean(research.cached),
-              fetchedAt: research.fetchedAt
-            }
-          : skipResearch
-            ? { skipped: true }
-            : { error: researchError || 'research failed' },
-        gameContext: gameContext
-          ? {
-              gamePk: gameContext.gamePk,
-              venue: gameContext.venue || null,
-              pitchers: gameContext.pitchers || null,
-              park: gameContext.park || null,
-              weather: gameContext.weather || null,
-              lineups: gameContext.lineups || null,
-              riskFlag: gameContext.riskFlag,
-              riskSummary: gameContext.riskSummary || null,
-              signals: gameContext.signals || null,
-              cached: Boolean(gameContext.cached),
-              fetchedAt: gameContext.fetchedAt
-            }
-          : isMlb
-            ? skipResearch
-              ? { skipped: true }
-              : gameContextError
-                ? { error: gameContextError }
-                : null
-            : null
-      };
+      return runValidatePlayImpl(client, args);
     },
 
     async league_presets() {
