@@ -143,4 +143,88 @@ describe('runResearchOnTopRows', () => {
     });
     assert.equal(results[0].topTweet.length, 200);
   });
+
+  it('routes non-player selections to gameContextFn', async () => {
+    const playerCalls = [];
+    const gameCalls = [];
+    const playerContextFn = async ({ player }) => {
+      playerCalls.push(player);
+      return { riskFlag: 'low', tweets: [], news: [], cached: true };
+    };
+    const gameContextFn = async ({ selection }) => {
+      gameCalls.push(selection);
+      return { riskFlag: 'low', riskSummary: 'game context ok', cached: true };
+    };
+    const { results } = await runResearchOnTopRows({
+      rows: [{ selection: 'New York Mets', screenScore: 9, league: 'MLB' }],
+      limit: 1,
+      playerContextFn,
+      gameContextFn
+    });
+    assert.equal(gameCalls.length, 1);
+    assert.equal(gameCalls[0], 'New York Mets');
+    assert.equal(playerCalls.length, 0);
+    assert.equal(results.length, 1);
+  });
+
+  it('routes player selections to playerContextFn when both functions are provided', async () => {
+    const playerCalls = [];
+    const gameCalls = [];
+    const playerContextFn = async ({ player }) => {
+      playerCalls.push(player);
+      return { riskFlag: 'low', tweets: [], news: [], cached: true };
+    };
+    const gameContextFn = async ({ selection }) => {
+      gameCalls.push(selection);
+      return { riskFlag: 'low', riskSummary: 'game context ok', cached: true };
+    };
+    const { results } = await runResearchOnTopRows({
+      rows: [{ selection: 'LeBron James', screenScore: 9, league: 'NBA' }],
+      limit: 1,
+      playerContextFn,
+      gameContextFn
+    });
+    assert.equal(playerCalls.length, 1);
+    assert.equal(playerCalls[0], 'LeBron James');
+    assert.equal(gameCalls.length, 0);
+    assert.equal(results.length, 1);
+  });
+
+  it('attaches contextType: "game" for team selections', async () => {
+    const gameContextFn = async () => ({ riskFlag: 'low', riskSummary: 'all clear', cached: true });
+    const playerContextFn = async () => ({ riskFlag: 'low', tweets: [], news: [], cached: true });
+    const { results } = await runResearchOnTopRows({
+      rows: [{ selection: 'Los Angeles Lakers', screenScore: 8, league: 'NBA' }],
+      limit: 1,
+      playerContextFn,
+      gameContextFn
+    });
+    assert.equal(results[0].contextType, 'game');
+  });
+
+  it('attaches contextType: "player" for player selections', async () => {
+    const gameContextFn = async () => ({ riskFlag: 'low', riskSummary: 'all clear', cached: true });
+    const playerContextFn = async () => ({ riskFlag: 'low', tweets: [], news: [], cached: true });
+    const { results } = await runResearchOnTopRows({
+      rows: [{ selection: 'Stephen Curry', screenScore: 8, league: 'NBA' }],
+      limit: 1,
+      playerContextFn,
+      gameContextFn
+    });
+    assert.equal(results[0].contextType, 'player');
+  });
+
+  it('falls back to stub when gameContextFn is missing', async () => {
+    const playerContextFn = async () => ({ riskFlag: 'low', tweets: [], news: [], cached: true });
+    const { results } = await runResearchOnTopRows({
+      rows: [{ selection: 'New York Yankees', screenScore: 8, league: 'MLB' }],
+      limit: 1,
+      playerContextFn
+      // no gameContextFn
+    });
+    assert.equal(results.length, 1);
+    assert.equal(results[0].riskFlag, 'unknown');
+    assert.equal(results[0].riskSummary, 'no game context handler');
+    assert.equal(results[0].contextType, 'game');
+  });
 });
