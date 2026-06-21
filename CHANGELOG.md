@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.3.1
+
+**Bugfix: tier/kaiCall consistency, UFC row resolution, find_best_price name transparency, and validate_play cache.**
+
+### What changed
+
+- **Tier 4 + kaiCall=BET contradiction fixed.** `getConfidenceTier` now clamps tiers upward when kaiCall is BET (min TIER 2) or CONSIDER (min TIER 3). Previously a play with 1.48% edge, 5-book consensus, and best execution could show up as "BET" but "TIER 4 (avoid)" — the risk-score-based tier and the actionability signal were out of sync. Now kaiCall is authoritative: if the system says BET, the tier won't contradict it.
+
+- **UFC validate_play/get_play_details row resolution fixed.** The `runGetPlayDetailsImpl` handler passed `books: requestedBooks` to the upstream API, which was `[]` when no books were specified. This set `hasExplicitBooks=true` in `queryScreenOddsBestComps`, bypassing the `ALL_SCREEN_BOOKS` fallback for non-NA leagues (UFC, Tennis, Soccer). Since Pinnacle doesn't price those markets, every row was dropped before the focusBookMissingRows merge ever ran. Fix: `books: requestedBooks.length ? requestedBooks : undefined` so the API uses its own default set when no books are requested.
+
+- **found_best_price now returns `selectionRequested` and `selectionMatched`.** When the user searches for "Trungelliti" and the system matches "Li" (a fuzzy name-mapping issue in the upstream data), agents can now detect the mismatch instead of silently displaying the wrong player's odds. `selectionRequested` is the original query, `selectionMatched` is what actually resolved. If multiple selections matched (rare edge case for team props), `selectionMatched` is an array.
+
+- **validate_play no longer uses canonicalScreenCache.** The cache's 60s TTL was appropriate for screen_ranked re-fetches across markets but harmful for validate_play, which bundles research + MLB game context that goes stale quickly. Agents also call validate_play once per candidate, so there was no dedup benefit worth the staleness risk.
+
 ## 2.3.0
 
 **Startup perf: parallel pre-warming, write-coalescing, circuit breaker, and cross-request dedup.**

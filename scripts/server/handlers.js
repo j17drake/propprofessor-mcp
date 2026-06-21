@@ -520,7 +520,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         league,
         games: gameIds,
         participants: [],
-        books: requestedBooks,
+        // BUGFIX (2026-06-21): when no books are specified, omit the books
+        // param entirely so queryScreenOddsBestComps falls back to its own
+        // default set (ALL_SCREEN_BOOKS for non-NA leagues). Passing books: []
+        // sets hasExplicitBooks=true which bypasses the ALL_SCREEN_BOOKS
+        // fallback and returns 0 rows for UFC, Tennis, Soccer — leagues
+        // where Pinnacle doesn't price Moneyline markets.
+        books: requestedBooks.length ? requestedBooks : undefined,
         is_live: false
       });
     } catch (err) {
@@ -1944,15 +1950,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
      * execution check into a single call. Returns a single BET / CONSIDER /
      * PASS verdict with all supporting evidence so the agent doesn't have
      * to chain three separate tool calls.
+     *
+     * NOTE: does NOT use canonicalScreenCache. The cache's 60s TTL is
+     * appropriate for screen_ranked (where the same gameId is re-fetched
+     * within seconds across markets) but actively harmful for validate_play,
+     * which bundles research + MLB game context that goes stale quickly.
+     * Agents also call validate_play once per candidate, not N times, so
+     * there's no dedup benefit worth the staleness risk.
      */
     async validate_play(args = {}) {
-      const canonicalKey = canonicalizeScreenArgs(args);
-      if (canonicalKey) {
-        return await canonicalScreenCache.memoize(async () => {
-          return await runValidatePlayImpl(client, args);
-        }, canonicalKey)();
-      }
-      return runValidatePlayImpl(client, args);
+      return await runValidatePlayImpl(client, args);
     },
 
     async league_presets() {
