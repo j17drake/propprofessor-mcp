@@ -214,6 +214,37 @@ When presenting any play with riskScore ≥ 7:
 
 `recommended_bets` returns 0 plays on quiet days. This is **expected behavior, not a bug.** Tell the user: "No strong plays right now. The sharp books aren't showing clear signals today." Don't force recommendations by lowering standards.
 
+### Pick `verbosity` based on what you'll do with the response
+
+| Use case                                | Verbosity  | Why                                                                        |
+| --------------------------------------- | ---------- | -------------------------------------------------------------------------- |
+| Chat reply to user, plain English       | `minimal`  | Returns a **summary string** (not JSON). Cannot be parsed — just relay it. |
+| Decision logic (filter, re-rank, store) | `standard` | Structured rows with edge/tier/risk + brief rationale. Fields stripped.    |
+| Debug, audit, replay                    | `full`     | Every field, including line history and debug payloads. Largest response.  |
+
+> **Footgun**: agents that pick `minimal` to save tokens and then try to parse the response will silently get a plain-English sentence instead of JSON. Use `minimal` only when the output goes directly to the user.
+
+### Use canonical param names in new code
+
+The MCP exposes both clean canonical names and legacy aliases for backward compatibility. Prefer the canonical forms when writing new code:
+
+| Canonical (prefer) | Legacy alias                                    | Where                                               |
+| ------------------ | ----------------------------------------------- | --------------------------------------------------- |
+| `live`             | `is_live`                                       | 13 tools — backend still uses `is_live` on the wire |
+| `gameIds`          | `game_ids`                                      | `get_play_details` only                             |
+| `targetBooks`      | `book`, `books`, `targetBook`, `targetBooksCsv` | `sharp_plays` only — all 4 still accepted           |
+
+Old callers keep working unchanged.
+
+### Tool surface mode
+
+Check the `_meta.mode` field on `tools/list` if you're not sure which tools are available:
+
+- `full` (default): all 26 tools
+- `lite`: 10 essentials for casual/intermediate workflows
+
+If a tool you expect to call isn't in the catalog, surface the `_meta` block so the user can decide whether to restart the server in `full` mode (`PROPPROFESSOR_MCP_MODE=full`).
+
 ---
 
 ## 5. Common Questions
