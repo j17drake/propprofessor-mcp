@@ -33,7 +33,7 @@ Strips response to ~25 essential fields per row and skips the N+1 history API ca
 **Agent drilling into a specific play it already saw in a compact list**
 
 ```js
-get_play_details({ league: 'NBA', game_ids: ['abc123'] });
+get_play_details({ league: 'NBA', gameIds: ['abc123'] });
 ```
 
 Returns the full row (line history, consensus, movement debug) for the specific game. This is the canonical "compact list → drill into selected" workflow.

@@ -4,15 +4,16 @@ Environment variables and book configuration for the PropProfessor MCP.
 
 ## Environment Variables
 
-| Variable                     | Default                      | Description                                                       |
-| ---------------------------- | ---------------------------- | ----------------------------------------------------------------- |
-| `AUTH_FILE`                  | `~/.propprofessor/auth.json` | Path to the auth file (cookies + tokens)                          |
-| `PROPPROFESSOR_MCP_NDJSON`   | (required)                   | Set to `'true'` to enable NDJSON framing (required for stdio MCP) |
-| `PROPPROFESSOR_CACHE_TTL_MS` | `60000`                      | Response cache TTL in milliseconds                                |
-| `PROPPROFESSOR_CACHE_MAX`    | `50`                         | Max cache entries (LRU eviction)                                  |
-| `LOCAL_TIMEZONE`             | `America/Chicago`            | Display timezone for CLI output                                   |
-| `PROPPROFESSOR_DEBUG`        | (unset)                      | Set to any value to enable debug logging to stderr                |
-| `NITTER_BASE`                | `http://localhost:8080`      | Nitter instance for `player_context` tweet lookup                 |
+| Variable                     | Default                      | Description                                                                                                                                                                                                                                                       |
+| ---------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_FILE`                  | `~/.propprofessor/auth.json` | Path to the auth file (cookies + tokens)                                                                                                                                                                                                                          |
+| `PROPPROFESSOR_MCP_NDJSON`   | (required)                   | Set to `'true'` to enable NDJSON framing (required for stdio MCP)                                                                                                                                                                                                 |
+| `PROPPROFESSOR_CACHE_TTL_MS` | `60000`                      | Response cache TTL in milliseconds                                                                                                                                                                                                                                |
+| `PROPPROFESSOR_CACHE_MAX`    | `50`                         | Max cache entries (LRU eviction)                                                                                                                                                                                                                                  |
+| `LOCAL_TIMEZONE`             | `America/Chicago`            | Display timezone for CLI output                                                                                                                                                                                                                                   |
+| `PROPPROFESSOR_DEBUG`        | (unset)                      | Set to any value to enable debug logging to stderr                                                                                                                                                                                                                |
+| `PROPPROFESSOR_MCP_MODE`     | `full`                       | Tool surface mode. `full` exposes all 26 tools; `lite` exposes the 10 essentials for casual/intermediate agents (ask, recommended_bets, quick_screen, find_best_price, validate_play, get_play_details, player_context, log_pick, get_pick_history, resolve_pick) |
+| `NITTER_BASE`                | `http://localhost:8080`      | Nitter instance for `player_context` tweet lookup                                                                                                                                                                                                                 |
 
 ## Book configuration
 

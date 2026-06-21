@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "PropProfessor MCP API",
-    "version": "2.1.10",
+    "version": "2.2.0",
     "description": "Lean, fast odds analysis engine for AI agents. Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection.\n\nSee the README for setup instructions and tool guides by user type.",
     "contact": {
       "name": "James Drake",
@@ -44,7 +44,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "leagues": {
                     "type": "array",
@@ -63,7 +67,7 @@
                   },
                   "market": {
                     "type": "string",
-                    "description": "Market filter applied across all leagues, default Moneyline. Deprecated: use `markets` for multi-market scans."
+                    "description": "Market filter applied across all leagues, default Moneyline. Deprecated — prefer the canonical \"markets\" (plural array) param for multi-market scans. Still accepted for backward compatibility; the handler maps a single market to a one-element array internally."
                   },
                   "markets": {
                     "type": "array",
@@ -646,7 +650,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live +EV rows"
+                    "description": "Whether to query live +EV rows. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live +EV rows. Canonical name (preferred over \"is_live\")."
                   },
                   "showBreakOnly": {
                     "type": "boolean"
@@ -960,7 +968,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live plays."
+                    "description": "Whether to query live plays. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live plays. Canonical name (preferred over \"is_live\")."
                   },
                   "periodTypes": {
                     "type": "array",
@@ -1166,7 +1178,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "verbosity": {
                     "type": "string",
@@ -1665,7 +1681,7 @@
     },
     "/tools/get_pick_stats": {
       "post": {
-        "summary": "Get your personal betting performance stats: win rate, profit/loss, breakdowns by league and confidence tier. Helps you see what strategies are working.",
+        "summary": "Get your personal betting performance stats: win rate, profit/loss, breakdowns by league and confidence tier. Helps you see what strategies are working. Call for a SESSION OR WEEKLY RECAP — pass `days` to scope the window (default is all-time). For ROW-LEVEL history with status/league filters, use `get_pick_history` instead.",
         "operationId": "get_pick_stats",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -1825,7 +1841,7 @@
     },
     "/tools/get_play_details": {
       "post": {
-        "summary": "Get full details (including line history, consensus, movement debug) for specific plays by game ID. Generic market names are auto-resolved per league. Each row includes `consensusStrength` (strong/moderate/weak/none). Use after a compact/fields screen query to drill into selected plays. Returns full rows with all metadata.",
+        "summary": "Get full details (including line history, consensus, movement debug) for specific plays by game ID. Generic market names are auto-resolved per league. Each row includes `consensusStrength` (strong/moderate/weak/none). Use AFTER a `screen_ranked` or `recommended_bets` call when you need the full raw payload for one or more specific gameIds — e.g. when `compact=true` or `fields=[]` hid the data you need. For confirming a play before betting, prefer `validate_play` (it bundles player_context + execution check). Returns full rows with all metadata.",
         "operationId": "get_play_details",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -1844,7 +1860,14 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "Game IDs to fetch full details for. These are the gameId values from screen rows."
+                    "description": "Game IDs to fetch full details for. These are the gameId values from screen rows. Deprecated alias — prefer the canonical \"gameIds\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "gameIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Game IDs to fetch full details for. These are the gameId values from screen rows. Canonical name (preferred over \"game_ids\")."
                   },
                   "market": {
                     "type": "string",
@@ -1867,7 +1890,7 @@
                     "description": "Output detail level. Default: standard."
                   }
                 },
-                "required": ["league", "game_ids"],
+                "required": ["league", "gameIds"],
                 "additionalProperties": false
               }
             }
@@ -2194,7 +2217,7 @@
     },
     "/tools/health_status": {
       "post": {
-        "summary": "Check auth freshness and endpoint connectivity. Reports token persistence state: `persistedToDisk` (boolean), `refreshCount` (number of refreshes since startup), and `lastRefreshed` (ISO timestamp).",
+        "summary": "Check auth freshness and endpoint connectivity. Reports token persistence state: `persistedToDisk` (boolean), `refreshCount` (number of refreshes since startup), and `lastRefreshed` (ISO timestamp). Call FIRST THING on session boot to confirm the MCP server can reach the PropProfessor backend. If `persistedToDisk=false` or `lastRefreshed` is over 1 hour ago, expect auth failures on subsequent tool calls — surface `pp-query login` to the user. No arguments needed.",
         "operationId": "health_status",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -2364,7 +2387,7 @@
     },
     "/tools/league_presets": {
       "post": {
-        "summary": "Show the current sport-specific ranking presets.",
+        "summary": "Show the current sport-specific ranking presets — which books count as sharp per league, the default market bundles, and the preferred execution book. Call BEFORE `screen_ranked`, `recommended_bets`, or `validate_play` when you want to know which books/markets will be weighted highest, or when debugging unexpected ranking behavior. No arguments needed; result is informational only.",
         "operationId": "league_presets",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -3301,7 +3324,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "includeResearch": {
                     "type": "boolean",
@@ -3476,7 +3503,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "leagues": {
                     "type": "array",
@@ -3491,7 +3522,7 @@
                   },
                   "market": {
                     "type": "string",
-                    "description": "Market type, default \"Moneyline\". Deprecated: use `markets` for multi-market scans."
+                    "description": "Market type, default \"Moneyline\". Deprecated — prefer the canonical \"markets\" (plural array) param for multi-market scans. Still accepted for backward compatibility; the handler maps a single market to a one-element array internally."
                   },
                   "markets": {
                     "type": "array",
@@ -3696,7 +3727,7 @@
     },
     "/tools/resolve_pick": {
       "post": {
-        "summary": "Mark a logged pick as won, lost, or push after the game ends. Updates your personal betting record for accurate stats.",
+        "summary": "Mark a logged pick as won, lost, or push after the game ends. Updates your personal betting record for accurate stats. Call ONCE PER PICK after the underlying game finishes, before fetching updated stats via `get_pick_stats`. Required: the pick UUID from `log_pick` or `get_pick_history`, plus the result enum (won / lost / push).",
         "operationId": "resolve_pick",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -3862,7 +3893,7 @@
     },
     "/tools/screen_ranked": {
       "post": {
-        "summary": "Query /screen and return hydrated ranked rows with consensus, movement, and freshness metadata for any market. This is the primary tool for getting tiered, ranked plays. Generic market names like Total or Spread are auto-resolved per league — e.g. NHL Total becomes Total Goals, MLB Spread becomes Run Line. Each row includes `consensusStrength` (strong/moderate/weak/none). When aliases are resolved, `responseMeta.markets_alias_used` is set. Set compact=true to strip verbose payloads and return only essential fields per match — reduces response size by ~90%. NOTE: When you pass a single non-sharp book (e.g. NoVigApp), the tool auto-augments the query with the league's sharp book set (Pinnacle, BetOnline, Circa, etc.) so consensus and movement data populate. tier/kaiCall/edge/screenScore are signal-quality ratings, not win-probability predictions.",
+        "summary": "Query /screen and return hydrated ranked rows with consensus, movement, and freshness metadata for any market. This is the primary tool for getting tiered, ranked plays. Generic market names like Total or Spread are auto-resolved per league — e.g. NHL Total becomes Total Goals, MLB Spread becomes Run Line. Each row includes `consensusStrength` (strong/moderate/weak/none). When aliases are resolved, `responseMeta.markets_alias_used` is set. Set compact=true to strip verbose payloads and return only essential fields per match — reduces response size by ~90%. NOTE: When you pass a single non-sharp book (e.g. NoVigApp), the tool auto-augments the query with the league's sharp book set (Pinnacle, BetOnline, Circa, etc.) so consensus and movement data populate. RELATED: `recommended_bets` returns a TIER 1-4 filtered subset; `quick_screen` bundles screen_ranked + player_context in one call; `sharp_plays` enforces stricter movement-confirmation rules. tier/kaiCall/edge/screenScore are signal-quality ratings, not win-probability predictions.",
         "operationId": "screen_ranked",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -3930,7 +3961,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "compact": {
                     "type": "boolean",
@@ -4125,7 +4160,7 @@
     },
     "/tools/sharp_consensus": {
       "post": {
-        "summary": "Analyze line history across multiple time windows (1h, 2h, 6h, 12h, 24h, 48h) to detect sustained sharp book consensus movement. Returns plays ranked by how many windows show ALL sharp books moving supportive. tier/kaiCall/edge/screenScore are signal-quality ratings, not win-probability predictions.",
+        "summary": "Analyze line history across multiple time windows (1h, 2h, 6h, 12h, 24h, 48h) to detect sustained sharp book consensus movement. Returns plays ranked by how many windows show ALL sharp books moving supportive. Use when you want to understand WHY a play ranks, not just WHAT ranks — `recommended_bets` and `quick_screen` give you ranked plays faster; `sharp_consensus` gives you the multi-window movement evidence underneath the ranking. Returns all ranked rows by sustained agreement, including rows that did not survive the strict filter on sibling tools. tier/kaiCall/edge/screenScore are signal-quality ratings, not win-probability predictions.",
         "operationId": "sharp_consensus",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -4137,7 +4172,11 @@
                 "properties": {
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "league": {
                     "type": "string",
@@ -4332,7 +4371,7 @@
     },
     "/tools/sharp_plays": {
       "post": {
-        "summary": "Add-on scanner for the best target-book plays with supportive sharp movement. Queries /screen across leagues/markets, hydrates odds history, and only treats non-target sharp-book movement as support. Generic market names are auto-resolved per league (e.g. NHL Total → Total Goals, MLB Spread → Run Line). Each row includes `consensusStrength` (strong/moderate/weak/none). When aliases are resolved, `responseMeta.markets_alias_used` is set. Defaults to scanning Moneyline, Spread, and Total markets. Pass `markets` to override. tier/kaiCall/edge/screenScore are signal-quality ratings, not win-probability predictions.",
+        "summary": "Add-on scanner for the best target-book plays with supportive sharp movement. Queries /screen across leagues/markets, hydrates odds history, and only treats non-target sharp-book movement as support. Generic market names are auto-resolved per league (e.g. NHL Total → Total Goals, MLB Spread → Run Line). Each row includes `consensusStrength` (strong/moderate/weak/none). When aliases are resolved, `responseMeta.markets_alias_used` is set. Defaults to scanning Moneyline, Spread, and Total markets. Pass `markets` to override. RELATED: `quick_screen` is the one-call bundle (sharp_plays + player_context + risk flag); `recommended_bets` returns TIER 1-4 filtered plays without target-book constraints; `sharp_consensus` returns the multi-window movement evidence underneath the ranking. tier/kaiCall/edge/screenScore are signal-quality ratings, not win-probability predictions.",
         "operationId": "sharp_plays",
         "tags": ["PropProfessor MCP Tools"],
         "requestBody": {
@@ -4347,26 +4386,26 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "Target execution books to scan together, such as [\"Fliff\", \"NoVigApp\"]. Preferred over singular book."
+                    "description": "Target execution books to scan together, such as [\"Fliff\", \"NoVigApp\"]. CANONICAL name for the books param — prefer this over all aliases below."
                   },
                   "books": {
                     "type": "array",
                     "items": {
                       "type": "string"
                     },
-                    "description": "Alias for targetBooks. Use either books or targetBooks."
+                    "description": "Alias for targetBooks. Use either books or targetBooks — both work."
                   },
                   "targetBooksCsv": {
                     "type": "string",
-                    "description": "Dashboard URL convenience only — prefer targetBooks."
+                    "description": "Comma-separated books for dashboard URLs (e.g. \"Fliff,NoVigApp\"). Deprecated alias — prefer the canonical \"targetBooks\" array. Still accepted."
                   },
                   "book": {
                     "type": "string",
-                    "description": "Legacy single target execution book such as Fliff, NoVigApp, or Rebet. Prefer targetBooks."
+                    "description": "Legacy single target execution book such as Fliff, NoVigApp, or Rebet. Deprecated alias — prefer \"targetBooks\" array. Still accepted."
                   },
                   "targetBook": {
                     "type": "string",
-                    "description": "Legacy alias for book. Prefer targetBooks."
+                    "description": "Legacy alias for book. Deprecated — prefer \"targetBooks\" array. Still accepted."
                   },
                   "leagues": {
                     "type": "array",
@@ -4447,7 +4486,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "debug": {
                     "type": "boolean",
@@ -4624,7 +4667,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "leagues": {
                     "type": "array",
@@ -4639,7 +4686,7 @@
                   },
                   "market": {
                     "type": "string",
-                    "description": "Market type, default \"Moneyline\". Deprecated: use `markets` for multi-market scans."
+                    "description": "Market type, default \"Moneyline\". Deprecated — prefer the canonical \"markets\" (plural array) param for multi-market scans. Still accepted for backward compatibility; the handler maps a single market to a one-element array internally."
                   },
                   "markets": {
                     "type": "array",
@@ -4874,7 +4921,11 @@
                   },
                   "is_live": {
                     "type": "boolean",
-                    "description": "Whether to query live odds"
+                    "description": "Whether to query live odds. Deprecated alias — prefer the canonical \"live\" param (same value, cleaner name). Both names accepted."
+                  },
+                  "live": {
+                    "type": "boolean",
+                    "description": "Whether to query live odds. Canonical name (preferred over \"is_live\")."
                   },
                   "limit": {
                     "type": "number",
