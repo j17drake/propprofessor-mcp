@@ -10,7 +10,7 @@
  * for backward compatibility with existing imports.
  */
 
-const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
+const { buildToolDefinitions, LITE_MODE_TOOLS } = require('../lib/propprofessor-tool-definitions');
 const { createMcpHandlers, mapWithConcurrency: mapWithConcurrencyFromHandlers } = require('./server/handlers');
 const {
   categorizeError,
@@ -29,7 +29,21 @@ const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
 const PROTOCOL_VERSION = '2024-11-05';
 
-function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = buildToolDefinitions() } = {}) {
+// Tool surface mode: 'full' (default, 26 tools) or 'lite' (10 essentials).
+// Lite mode is opt-in via PROPPROFESSOR_MCP_MODE=lite — it cuts the tool
+// catalog an agent has to scan by ~60% and is the right choice for casual
+// and intermediate agents. Sharp users opt back into the full surface by
+// leaving the env var unset (or setting it to 'full').
+const VALID_MODES = new Set(['full', 'lite']);
+const TOOL_MODE = (() => {
+  const raw = (process.env.PROPPROFESSOR_MCP_MODE || '').toLowerCase().trim();
+  if (VALID_MODES.has(raw)) return raw;
+  // Default to full — preserves existing behavior for every MCP client
+  // already wired to this server. Lite mode is an opt-in choice.
+  return 'full';
+})();
+
+function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = buildToolDefinitions({ mode: TOOL_MODE }) } = {}) {
   const toolMap = new Map(toolDefinitions.map((tool) => [tool.name, tool]));
   let initialized = false;
 
@@ -62,7 +76,19 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
     }
 
     if (method === 'tools/list') {
-      return createJsonRpcSuccess(id, { tools: toolDefinitions });
+      // Surface the active mode in the tools/list response so agents (and
+      // humans inspecting the response) can see whether they're in lite or
+      // full mode without having to grep env vars. Helps debugging when an
+      // expected tool is missing.
+      return createJsonRpcSuccess(id, {
+        tools: toolDefinitions,
+        _meta: {
+          mode: TOOL_MODE,
+          toolCount: toolDefinitions.length,
+          liteToolCount: LITE_MODE_TOOLS.size,
+          fullToolCount: LITE_MODE_TOOLS.size + 16 // lite + the 16 hidden ones
+        }
+      });
     }
 
     if (method === 'tools/call') {
