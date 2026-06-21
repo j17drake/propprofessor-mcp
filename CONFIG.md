@@ -13,7 +13,13 @@ Environment variables and book configuration for the PropProfessor MCP.
 | `LOCAL_TIMEZONE`             | `America/Chicago`            | Display timezone for CLI output                                                                                                                                                                                                                                   |
 | `PROPPROFESSOR_DEBUG`        | (unset)                      | Set to any value to enable debug logging to stderr                                                                                                                                                                                                                |
 | `PROPPROFESSOR_MCP_MODE`     | `full`                       | Tool surface mode. `full` exposes all 26 tools; `lite` exposes the 10 essentials for casual/intermediate agents (ask, recommended_bets, quick_screen, find_best_price, validate_play, get_play_details, player_context, log_pick, get_pick_history, resolve_pick) |
-| `NITTER_BASE`                | `http://localhost:8080`      | Nitter instance for `player_context` tweet lookup                                                                                                                                                                                                                 |
+| `NITTER_BASE`                | `http://localhost:8080`      | Nitter instance for `player_context` tweet lookup |
+| `PROPPROFESSOR_MCP_STDIO_COALESCE_MS` | `0` | Batch stdout writes (ms). `0` = passthrough (no change). `1`+ buffers and flushes on a timer. Reduces write syscalls during bursty JSON-RPC responses. Requires server restart. |
+| `PROPPROFESSOR_MCP_PREWARM` | `1` | Pre-warm odds-history cache on session start. Set `0` to disable. League screens fire in parallel. |
+| `PROPPROFESSOR_MCP_PREWARM_LEAGUES` | `NBA,MLB,NFL,NHL,WNBA,NCAAB,NCAAF,Soccer,Tennis,UFC` | Comma-separated list of leagues to pre-warm. Ordered by betting activity. |
+| `PROPPROFESSOR_MCP_PREWARM_TIMEOUT_MS` | `10000` | Max ms before pre-warming aborts (best-effort, returns partial results). |
+| `PROPPROFESSOR_CIRCUIT_BREAKER_THRESHOLD` | `5` | Consecutive upstream failures before the circuit opens. |
+| `PROPPROFESSOR_CIRCUIT_BREAKER_TIMEOUT_MS` | `30000` | Ms until the circuit transitions open → half-open for a test request. |
 
 ## Book configuration
 

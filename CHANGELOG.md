@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.0
+
+**Startup perf: parallel pre-warming, write-coalescing, circuit breaker, and cross-request dedup.**
+
+### What changed
+
+- **Parallel league pre-warming.** Screen calls for all 10 leagues fire concurrently instead of sequentially. ~2s vs ~20s cold-start.
+- **Write-coalescing.** Optional stdout buffering (default OFF, opt-in via `PROPPROFESSOR_MCP_STDIO_COALESCE_MS`). When enabled, JSON-RPC messages are batched on a 1ms timer or 16KB buffer, reducing write syscalls during bursty responses.
+- **Circuit breaker.** Per-endpoint failure tracking. After 5 consecutive upstream errors, the breaker opens and fast-fails rather than retrying into a degrading backend. Auto-transitions to half-open after 30s. Configurable via `PROPPROFESSOR_CIRCUIT_BREAKER_THRESHOLD` and `PROPPROFESSOR_CIRCUIT_BREAKER_TIMEOUT_MS`.
+- **Cross-request cache key normalization.** Parallel MCP requests with identical parameters but different array ordering now share a single upstream call instead of duplicating.
+- **Docs.** 6 new env vars documented in CONFIG.md.
+
+### Migration notes
+
+Zero. Write coalescing is opt-in (default off). Everything else is automatic with no observable breaking change.
+
 ## 2.2.0
 
 **Agent-facing surface cleanup: canonical param names with full back-compat, lite mode, tool categories.**
