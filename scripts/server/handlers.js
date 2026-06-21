@@ -1437,33 +1437,46 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             if (!candidates.length) continue;
 
             if (includeResearch) {
+              const researchBatch = [];
               for (const row of candidates) {
                 const player = row.selection || row.participant || row.pick;
                 if (!player) continue;
-                try {
-                  const ctxResult = await handlers.player_context({
-                    player,
-                    sport: league,
-                    gameTime: row.start || row.eventStart || null
-                  });
-                  if (ctxResult) {
-                    researchResults.push({
-                      player,
-                      game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
-                      riskFlag: ctxResult.riskFlag || 'unknown',
-                      riskSummary: ctxResult.summary || null,
-                      topTweet:
-                        Array.isArray(ctxResult.tweets) && ctxResult.tweets.length > 0
-                          ? ctxResult.tweets[0]?.text?.slice(0, 120) || null
-                          : null
-                    });
-                  }
-                } catch (error) {
-                  process.stderr.write(
-                    `[propprofessor-mcp] Player context fetch failed for "${player}": ${error?.message || error}\n`
-                  );
-                  researchResults.push({ player, game: row.game, riskFlag: 'error', riskSummary: null });
-                }
+                const league = String(row.league || league || '').trim();
+                const game = row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`;
+                researchBatch.push({ player, league, game, row });
+              }
+
+              // Run research in parallel with concurrency-3, routing by selection type
+              const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
+              const researchOpts = {
+                rows: researchBatch.map(r => ({
+                  selection: r.player,
+                  league: r.league,
+                  game: r.game,
+                  start: r.row.start || r.row.eventStart || null,
+                  market: row.market || '',
+                })),
+                limit: researchBatch.length,
+                playerContextFn: handlers.player_context,
+                gameContextFn: (opts) => getGameContext({
+                  sport: opts.sport || opts.league,
+                  selection: opts.selection,
+                  game: opts.game,
+                  start: opts.start,
+                  market: opts.market,
+                }),
+                concurrency: 3,
+              };
+              const researchOut = await runResearchOnTopRows(researchOpts);
+              for (const r of researchOut.results) {
+                researchResults.push({
+                  player: r.player,
+                  game: r.game,
+                  riskFlag: r.riskFlag,
+                  riskSummary: r.riskSummary || null,
+                  contextType: r.contextType || 'player',
+                  ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {}),
+                });
               }
             }
 
