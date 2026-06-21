@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-966%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-993%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -275,10 +275,10 @@ Every tool accepts:
 
 Set `PROPPROFESSOR_MCP_MODE` at server boot to control how many tools the agent sees on `tools/list`:
 
-| Mode    | Default | Tools exposed | Best for                                          |
-| ------- | ------- | ------------- | ------------------------------------------------- |
-| `full`  | ✅ yes  | 26            | Sharp users — every discovery, screen, research tool |
-| `lite`  | no      | 10            | Casual / intermediate agents — covers the full workflow (discover → drill-down → validate → track) without overwhelming the tool catalog |
+| Mode   | Default | Tools exposed | Best for                                                                                                                                 |
+| ------ | ------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `full` | ✅ yes  | 26            | Sharp users — every discovery, screen, research tool                                                                                     |
+| `lite` | no      | 10            | Casual / intermediate agents — covers the full workflow (discover → drill-down → validate → track) without overwhelming the tool catalog |
 
 Lite mode exposes: `ask`, `recommended_bets`, `quick_screen`, `find_best_price`, `validate_play`, `get_play_details`, `player_context`, `log_pick`, `get_pick_history`, `resolve_pick`.
 
@@ -295,25 +295,25 @@ The `tools/list` response always includes a `_meta` block so agents can tell whi
 
 Every tool carries a `category` field that groups it by purpose — agents can use this to mentally cluster the surface rather than reading 26 individual descriptions:
 
-| Category      | Count | Purpose                                                | Tools                                                                                            |
-| ------------- | ----- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `discovery`   | 5     | Find plays (scout, multi-league, DFS, +EV)             | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `sharp_consensus`                     |
-| `screen`      | 6     | Score / rank plays for a target book                   | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `staking_plan`, `ufc_card`    |
-| `drill_down`  | 3     | Deep dive on a specific play                           | `find_best_price`, `get_play_details`, `validate_play`                                           |
-| `research`    | 3     | Context data (player news, game weather, alerts)       | `get_alerts`, `mlb_game_context`, `player_context`                                               |
-| `tracking`    | 4     | Personal bet log                                       | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                                 |
-| `admin`       | 2     | Bookkeeping (cache, hidden bets)                       | `clear_score_timeline`, `manage_hidden_bets`                                                     |
-| `meta`        | 3     | Server info / workflow guides                          | `get_started`, `health_status`, `league_presets`                                                 |
+| Category     | Count | Purpose                                          | Tools                                                                                          |
+| ------------ | ----- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `discovery`  | 5     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `sharp_consensus`                   |
+| `screen`     | 6     | Score / rank plays for a target book             | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `staking_plan`, `ufc_card` |
+| `drill_down` | 3     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `validate_play`                                         |
+| `research`   | 3     | Context data (player news, game weather, alerts) | `get_alerts`, `mlb_game_context`, `player_context`                                             |
+| `tracking`   | 4     | Personal bet log                                 | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                               |
+| `admin`      | 2     | Bookkeeping (cache, hidden bets)                 | `clear_score_timeline`, `manage_hidden_bets`                                                   |
+| `meta`       | 3     | Server info / workflow guides                    | `get_started`, `health_status`, `league_presets`                                               |
 
 ### Canonical vs Deprecated Param Names
 
 A handful of params accept both a clean canonical name and a legacy alias — every existing call site keeps working, and new code can use the cleaner names:
 
-| Canonical (prefer) | Deprecated alias | Where                                |
-| ------------------ | ---------------- | ------------------------------------ |
-| `live`             | `is_live`        | 13 tools — `is_live` is snake_case only on the MCP surface; the upstream backend still uses `is_live` on the wire |
-| `gameIds`          | `game_ids`       | `get_play_details` only              |
-| `targetBooks`      | `book`, `books`, `targetBook`, `targetBooksCsv` | `sharp_plays` only — service layer's `resolveTargetBooks()` accepts all 5 names |
+| Canonical (prefer) | Deprecated alias                                | Where                                                                                                             |
+| ------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `live`             | `is_live`                                       | 13 tools — `is_live` is snake_case only on the MCP surface; the upstream backend still uses `is_live` on the wire |
+| `gameIds`          | `game_ids`                                      | `get_play_details` only                                                                                           |
+| `targetBooks`      | `book`, `books`, `targetBook`, `targetBooksCsv` | `sharp_plays` only — service layer's `resolveTargetBooks()` accepts all 5 names                                   |
 
 Deprecated aliases are documented in each schema's `description` field and are normalized to the canonical key at dispatch time. No code change required for existing callers.
 
@@ -401,7 +401,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 ## 🔧 For Maintainers
 
 ```bash
-npm test              # 966 tests, 0 failures
+npm test              # 993 tests, 0 failures
 npm run test:coverage # ~82% statements
 npm run lint          # clean
 npm run format:check  # clean (npm run format to fix)

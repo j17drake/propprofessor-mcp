@@ -43,7 +43,10 @@ const TOOL_MODE = (() => {
   return 'full';
 })();
 
-function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = buildToolDefinitions({ mode: TOOL_MODE }) } = {}) {
+function createMcpServer({
+  handlers = createMcpHandlers(),
+  toolDefinitions = buildToolDefinitions({ mode: TOOL_MODE })
+} = {}) {
   const toolMap = new Map(toolDefinitions.map((tool) => [tool.name, tool]));
   let initialized = false;
 

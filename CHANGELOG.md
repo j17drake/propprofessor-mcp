@@ -1,5 +1,54 @@
 # Changelog
 
+## 2.2.0
+
+**Agent-facing surface cleanup: canonical param names with full back-compat, lite mode, tool categories.**
+
+This is the release that takes the agent-ergonomics feedback from the June 2026 audit and ships it. Every existing call site keeps working — the new canonical names are additive, and the deprecated aliases are documented in each schema's `description` and normalized at dispatch time.
+
+### What changed for users
+
+- **Canonical param names.** `live` is now the canonical name for what used to be `is_live` (13 tools). `gameIds` is canonical for `game_ids` (`get_play_details`). The 5-name `sharp_plays` books param (`targetBooks` / `books` / `targetBook` / `book` / `targetBooksCsv`) is now documented as a single canonical form (`targetBooks`) with 4 deprecated aliases. New code can use the clean names; old code keeps working.
+- **Tool surface modes via `PROPPROFESSOR_MCP_MODE` env var.** Default `full` exposes all 26 tools; opt-in `lite` exposes 10 tools covering the casual / intermediate workflow (router → discover → drill-down → validate → track). Lite mode cuts the `tools/list` response by ~60%, which materially helps agents on tight context budgets.
+- **Tool categories.** Every tool now carries a `category` field on its `tools/list` definition: `discovery` (5), `screen` (6), `drill_down` (3), `research` (3), `tracking` (4), `admin` (2), `meta` (3). Agents can cluster the surface instead of reading 26 individual descriptions.
+- **`tools/list` returns a `_meta` block.** `{ mode, toolCount, liteToolCount, fullToolCount }` makes it obvious when an expected tool is missing because the server is in lite mode — no more env-grep debugging.
+- **`verbosity=minimal` footgun is documented.** The minimal mode returns a plain-English summary STRING (not structured JSON), which trips agents that pick `minimal` to save tokens and then try to parse the response as data. The caveat is now in `VERBOSITY_PARAM.description` so it shows up wherever an agent is choosing a verbosity value.
+- **Description quality sweep.** Six under-scored tool descriptions (`sharp_consensus`, `get_play_details`, `league_presets`, `health_status`, `resolve_pick`, `get_pick_stats`) got explicit when-to-call and when-NOT-to-call guidance. `screen_ranked` and `sharp_plays` got `RELATED` cross-references pointing at their sibling tools.
+
+### Why this is the right shape
+
+The MCP catalog is what agents actually read — descriptions, parameter names, and the shape of `tools/list` are the only contract they have with the server. The previous surface worked but forced agents to:
+
+- Read all 26 descriptions to find the right tool (no grouping signal).
+- Guess whether `is_live` vs `live` was canonical.
+- Try parsing `verbosity=minimal` output as JSON and silently fail.
+- Discover via trial-and-error that the schema accepted `game_ids` but the handler wanted the same key under that exact name.
+
+This release makes every one of those discoverable from the schema alone.
+
+### What changed under the hood
+
+- `lib/propprofessor-tool-definitions.js` — new `__requiredAliases` schema hint, new `category` field on every tool, new `mode` option on `buildToolDefinitions()`. Exports `LITE_MODE_TOOLS` and `TOOL_CATEGORIES` for downstream consumers.
+- `lib/mcp-arg-validator.js` — `validateArgs()` honors `__requiredAliases` so the required-check accepts a deprecated alias when the canonical key is absent. New `normalizeArgs()` helper bidirectionally syncs canonical ↔ alias param names at dispatch time (without mutating caller args).
+- `scripts/propprofessor-mcp-server.js` — reads `PROPPROFESSOR_MCP_MODE` env var (default `full`), runs `normalizeArgs()` between `validateArgs()` and handler dispatch, surfaces the `_meta` block in `tools/list`.
+- `test/mcp-arg-validator.test.js` — +14 tests covering `normalizeArgs` and `__requiredAliases`.
+- `test/propprofessor-tool-definitions.test.js` — new file, 13 tests covering lite mode, category injection, alphabetical sort, and category-count lock-in.
+
+### Migration notes
+
+No code changes required for existing callers. To opt into the new behavior:
+
+```bash
+# Run server in lite mode (10 tools instead of 26)
+PROPPROFESSOR_MCP_MODE=lite pp-query serve
+
+# Use the new canonical param names in new code
+quick_screen({ books: ["Fliff"], live: true })        # canonical "live"
+get_play_details({ league: "NBA", gameIds: ["x"] })   # canonical "gameIds"
+```
+
+Old param names (`is_live`, `game_ids`) keep working unchanged.
+
 ## 2.1.10
 
 **System-wide performance pass: parallelize every serial hot path and add a cross-call odds-history cache.** v2.1.8's perf PR parallelized the `recommended_bets` league loop and the `validate_play` sub-calls. This release does the same for the rest of the fan-out paths that were still serial, plus adds an LRU-backed in-process cache for `/odds_history_new` lookups so a `screen_ranked` → `validate_play` workflow doesn't re-fetch the same data on the second call.

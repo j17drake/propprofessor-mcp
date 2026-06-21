@@ -2,7 +2,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { validateArgs } = require('../lib/mcp-arg-validator');
+const { validateArgs, normalizeArgs } = require('../lib/mcp-arg-validator');
 
 describe('mcp-arg-validator', () => {
   describe('happy paths', () => {
@@ -217,6 +217,111 @@ describe('mcp-arg-validator', () => {
       const r = validateArgs(schema, { filters: { minOdds: -120, maxOdds: '200' } });
       assert.equal(r.ok, false);
       assert.ok(r.errors.some((e) => /filters\.maxOdds.*expected (finite )?number/.test(e)));
+    });
+  });
+
+  describe('__requiredAliases (deprecated aliases satisfy required-check)', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        league: { type: 'string' },
+        gameIds: { type: 'array', items: { type: 'string' } },
+        game_ids: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['league', 'gameIds'],
+      __requiredAliases: { gameIds: ['game_ids'] },
+      additionalProperties: false
+    };
+
+    it('accepts canonical name in args', () => {
+      const r = validateArgs(schema, { league: 'NBA', gameIds: ['x'] });
+      assert.equal(r.ok, true);
+    });
+
+    it('accepts deprecated alias in args (back-compat)', () => {
+      const r = validateArgs(schema, { league: 'NBA', game_ids: ['x'] });
+      assert.equal(r.ok, true);
+    });
+
+    it('rejects when neither canonical nor alias is present', () => {
+      const r = validateArgs(schema, { league: 'NBA' });
+      assert.equal(r.ok, false);
+      assert.ok(r.errors.some((e) => /gameIds: required/.test(e)));
+    });
+
+    it('prefers canonical value when both are present (no overwrite)', () => {
+      // Canonical wins — alias is ignored if both are supplied.
+      const r = validateArgs(schema, { league: 'NBA', gameIds: ['canonical'], game_ids: ['alias'] });
+      assert.equal(r.ok, true);
+    });
+
+    it('does not mutate caller args (shallow copy on required-alias path)', () => {
+      const callerArgs = { league: 'NBA', game_ids: ['x'] };
+      const snapshot = JSON.parse(JSON.stringify(callerArgs));
+      validateArgs(schema, callerArgs);
+      assert.deepStrictEqual(callerArgs, snapshot);
+    });
+
+    it('schemas without __requiredAliases behave as before', () => {
+      const plainSchema = {
+        type: 'object',
+        properties: { league: { type: 'string' } },
+        required: ['league'],
+        additionalProperties: false
+      };
+      assert.equal(validateArgs(plainSchema, { league: 'NBA' }).ok, true);
+      assert.equal(validateArgs(plainSchema, {}).ok, false);
+    });
+  });
+
+  describe('normalizeArgs (canonical <-> alias sync at dispatch)', () => {
+    it('returns a NEW object, does not mutate input', () => {
+      const input = { is_live: true };
+      const out = normalizeArgs('any_tool', input);
+      assert.notStrictEqual(out, input);
+      assert.deepStrictEqual(input, { is_live: true });
+    });
+
+    it('passes through null/undefined args unchanged', () => {
+      assert.equal(normalizeArgs('any_tool', null), null);
+      assert.equal(normalizeArgs('any_tool', undefined), undefined);
+    });
+
+    it('live <-> is_live: copies live -> is_live when is_live is missing', () => {
+      const out = normalizeArgs('any_tool', { live: true });
+      assert.deepStrictEqual(out, { live: true, is_live: true });
+    });
+
+    it('live <-> is_live: copies is_live -> live when live is missing', () => {
+      const out = normalizeArgs('any_tool', { is_live: true });
+      assert.deepStrictEqual(out, { live: true, is_live: true });
+    });
+
+    it('live <-> is_live: when BOTH present, preserves caller values (no overwrite)', () => {
+      const out = normalizeArgs('any_tool', { live: true, is_live: false });
+      assert.deepStrictEqual(out, { live: true, is_live: false });
+    });
+
+    it('get_play_details: gameIds <-> game_ids sync', () => {
+      const out1 = normalizeArgs('get_play_details', { league: 'NBA', gameIds: ['a', 'b'] });
+      assert.deepStrictEqual(out1, { league: 'NBA', gameIds: ['a', 'b'], game_ids: ['a', 'b'] });
+
+      const out2 = normalizeArgs('get_play_details', { league: 'NBA', game_ids: ['a', 'b'] });
+      assert.deepStrictEqual(out2, { league: 'NBA', gameIds: ['a', 'b'], game_ids: ['a', 'b'] });
+    });
+
+    it('get_play_details: does not sync gameId (validate_play param) — wrong tool name', () => {
+      // validate_play uses singular `gameId`, not `gameIds`. normalizeArgs
+      // for the WRONG tool name should not touch gameId at all.
+      const out = normalizeArgs('validate_play', { gameId: 'abc' });
+      assert.deepStrictEqual(out, { gameId: 'abc' });
+    });
+
+    it('preserves unknown keys (does not strip them)', () => {
+      // Validator strips unknown keys via additionalProperties:false, but
+      // normalizeArgs runs separately and shouldn't lose data.
+      const out = normalizeArgs('any_tool', { is_live: true, weirdExtra: 'ok' });
+      assert.equal(out.weirdExtra, 'ok');
     });
   });
 });
