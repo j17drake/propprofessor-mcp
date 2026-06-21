@@ -21,7 +21,7 @@ const {
 } = require('../lib/propprofessor-mcp-stdio');
 const { redactSecrets } = require('../lib/propprofessor-redact');
 const { clearTierCache } = require('../lib/propprofessor-risk-score');
-const { validateArgs } = require('../lib/mcp-arg-validator');
+const { validateArgs, normalizeArgs } = require('../lib/mcp-arg-validator');
 
 const mapWithConcurrency = mapWithConcurrencyFromHandlers;
 
@@ -89,8 +89,14 @@ function createMcpServer({ handlers = createMcpHandlers(), toolDefinitions = bui
           isError: true
         });
       }
+      // Sync canonical and deprecated-alias param names bidirectionally so
+      // callers can use the new clean names (e.g. "live", "gameIds") while
+      // existing handler code keeps reading the legacy names (e.g. "is_live",
+      // "game_ids"). Schema's known-property check has already passed, so
+      // both forms are guaranteed to be valid here.
+      const normalizedArgs = normalizeArgs(toolName, params?.arguments || {});
       try {
-        const result = await handler(params?.arguments || {});
+        const result = await handler(normalizedArgs);
         return createJsonRpcSuccess(id, {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           structuredContent: result
