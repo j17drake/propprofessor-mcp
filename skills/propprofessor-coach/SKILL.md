@@ -147,7 +147,7 @@ The platform UI shows soccer markets under one naming scheme; the PropProfessor 
 ### Other known gaps
 
 - **NBA Moneyline empty during offseason.** Expected — no NBA games in late June. Re-test during season.
-- **UFC validate_play "no row matched selection"** is a separate rowId resolution bug — `screen_ranked` emits gameIds in `UFC:PREMATCH:<TeamA>:<TeamB>:<ts>:<Side>` format but `validate_play` / `get_play_details` can't resolve them when Pinnacle isn't pricing the event. Row lookup fails before any risk check runs.
+- **UFC validate_play "no row matched selection"** — fixed 2026-06-21. Two bugs: (1) `runGetPlayDetailsImpl` defaulted focusBook to Pinnacle (Pinnacle has no UFC odds), (2) ranker partitioned all Pinnacle-less rows into `focusBookMissingRows` even when no book was user-requested. Both fixed in commit `8ccda45`.
 
 When the user asks about soccer, probe the market name first against the table above before assuming the data is empty. Most likely candidates: `Total Goals` (totals), `Match Handicap` (spreads), `Draw No Bet` (2-way).
 
