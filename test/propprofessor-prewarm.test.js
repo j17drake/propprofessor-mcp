@@ -162,7 +162,6 @@ describe('propprofessor-prewarm', () => {
         runtimeConfig: config,
         logger: null
       });
-
       // Immediately after calling, prewarm should NOT have completed yet
       // (setImmediate defers execution)
       // Note: This test verifies the function returns a promise, not that it blocks
@@ -173,6 +172,52 @@ describe('propprofessor-prewarm', () => {
 
       assert.equal(prewarmStarted, true);
       assert.equal(prewarmCompleted, true);
+    });
+
+    it('processes multiple leagues in parallel - MLB screen fires while NBA screen is delayed', async () => {
+      const { prewarmOddsHistoryCache } = require('../lib/propprofessor-prewarm');
+
+      const callOrder = [];
+      const nbaDelayMs = 200; // NBA will be artificially delayed
+
+      const mockClient = {
+        queryScreenOddsBestComps: async ({ league }) => {
+          callOrder.push(`screen-start-${league}`);
+          
+          if (league === 'NBA') {
+            // Simulate a slow NBA API call
+            await new Promise((r) => setTimeout(r, nbaDelayMs));
+          } else if (league === 'MLB') {
+            // MLB should complete quickly
+            await new Promise((r) => setTimeout(r, 10));
+          }
+          
+          callOrder.push(`screen-end-${league}`);
+          return { game_data: [] };
+        },
+        queryOddsHistory: async () => ({})
+      };
+
+      const config = { enabled: true, leagues: ['NBA', 'MLB'], timeoutMs: 10000 };
+      await prewarmOddsHistoryCache({
+        client: mockClient,
+        runtimeConfig: config,
+        logger: null
+      });
+
+      // Verify that MLB screen started before NBA screen ended
+      // This proves parallel execution
+      const mlbStartIdx = callOrder.indexOf('screen-start-MLB');
+      const nbaEndIdx = callOrder.indexOf('screen-end-NBA');
+      
+      assert.notEqual(mlbStartIdx, -1, 'MLB screen should have started');
+      assert.notEqual(nbaEndIdx, -1, 'NBA screen should have ended');
+      
+      // MLB screen should start before NBA screen ends (proving parallel execution)
+      assert.ok(
+        mlbStartIdx < nbaEndIdx,
+        'MLB screen should start before NBA screen ends - proving parallel execution'
+      );
     });
   });
 });
