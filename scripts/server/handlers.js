@@ -52,25 +52,27 @@ const {
   ALL_SCREEN_BOOKS,
   uniqueBooks
 } = require('../../lib/propprofessor-sharp-books');
-const { resolveHistoryForEntity } = require('../../lib/propprofessor-history');
-const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
-const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
-const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
-const {
-  analyzeMultiWindow,
-  summarizeResults,
-  DEFAULT_WINDOWS,
-  DEFAULT_SHARP_BOOKS
-} = require('../../lib/propprofessor-sharp-consensus');
-const {
-  getConfidenceTierStable,
-  clearScoreTimeline,
-  buildRationale,
-  suggestStakes
-} = require('../../lib/propprofessor-risk-score');
-const { getPlayerContext } = require('../../lib/propprofessor-player-context');
-const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
-const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
+ const { resolveHistoryForEntity } = require('../../lib/propprofessor-history');
+ const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
+ const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
+ const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
+ const {
+   analyzeMultiWindow,
+   summarizeResults,
+   DEFAULT_WINDOWS,
+   DEFAULT_SHARP_BOOKS
+ } = require('../../lib/propprofessor-sharp-consensus');
+ const {
+   getConfidenceTierStable,
+   clearScoreTimeline,
+   buildRationale,
+   suggestStakes
+ } = require('../../lib/propprofessor-risk-score');
+ const { getPlayerContext } = require('../../lib/propprofessor-player-context');
+ const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
+ const { getGameContext } = require('../../lib/propprofessor-game-context');
+ const { isPlayerSelection } = require('../../lib/propprofessor-selection-type');
+ const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
 const {
   formatRecommendedBetsMinimal,
   formatRecommendedBetsStandard,
@@ -454,12 +456,21 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const research = await runResearchOnTopRows({
         rows: response.result,
         limit: researchLimit,
-        playerContextFn: handlers.player_context
+        playerContextFn: handlers.player_context,
+        gameContextFn: (opts) => getGameContext({
+          sport: opts.sport || opts.league,
+          selection: opts.selection,
+          game: opts.game,
+          start: opts.start,
+          market: opts.market
+        })
       });
       response.research = research.results;
       response.resultMeta = {
         ...response.resultMeta,
         researchRunCount: research.results.length,
+        researchPlayerContextCount: research.results.filter((r) => r.contextType === 'player').length,
+        researchGameContextCount: research.results.filter((r) => r.contextType === 'game').length,
         researchRiskHighCount: research.results.filter((r) => r.riskFlag === 'high').length,
         researchCachedCount: research.results.filter((r) => r.cached).length
       };
@@ -696,23 +707,40 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         ? new Date(Number(gameIdParts[4]) * 1000).toISOString().slice(0, 10)
         : '';
     const gameContextPromise =
-      !isMlb || !seedAwayTeam || !seedHomeTeam || !seedStartDate || skipResearch
+      skipResearch
         ? Promise.resolve(null)
-        : (async () => {
-            try {
-              const gamePk = await findMlbGamePk({
-                isoDate: seedStartDate,
-                awayTeam: seedAwayTeam,
-                homeTeam: seedHomeTeam
-              });
-              if (!gamePk) {
-                return { ok: false, error: 'no MLB gamePk found for matchup' };
+        : isMlb
+          ? (async () => {
+              try {
+                if (!seedAwayTeam || !seedHomeTeam || !seedStartDate) {
+                  return { ok: false, error: 'missing MLB matchup data for game context' };
+                }
+                const gamePk = await findMlbGamePk({
+                  isoDate: seedStartDate,
+                  awayTeam: seedAwayTeam,
+                  homeTeam: seedHomeTeam
+                });
+                if (!gamePk) {
+                  return { ok: false, error: 'no MLB gamePk found for matchup' };
+                }
+                return { ok: true, value: await getMlbGameContext({ gamePk }) };
+              } catch (err) {
+                return { ok: false, error: err?.message || String(err) };
               }
-              return { ok: true, value: await getMlbGameContext({ gamePk }) };
-            } catch (err) {
-              return { ok: false, error: err?.message || String(err) };
-            }
-          })();
+            })()
+          : (async () => {
+              try {
+                // Non-MLB: run sport-agnostic game context via dispatcher
+                const ctx = await getGameContext({
+                  sport: league,
+                  selection,
+                  game: gameId // screen game ID includes matchup info
+                });
+                return { ok: true, value: ctx };
+              } catch (err) {
+                return { ok: false, error: err?.message || String(err) };
+              }
+            })();
 
     const [detailOutcome, researchOutcome, gameContextOutcome] = await Promise.all([
       detailPromise,
@@ -802,20 +830,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       reasons.push('player_context riskFlag = "low"');
     }
 
-    // MLB game-context risk override (weather / park / lineup). Applied
+    // Game-context risk override (weather / park / rest / surface). Applied
     // AFTER player_context so a high weather flag can still PASS a play
     // that survived the player-news check. Same downgrades as
     // player_context so the agent's reasoning doesn't have to branch.
     if (gameContext && gameContext.riskFlag === 'high') {
       verdict = 'PASS';
       reasons.push(
-        `mlb_game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`
+        `game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`
       );
     } else if (gameContext && gameContext.riskFlag === 'medium') {
       if (verdict === 'BET') verdict = 'CONSIDER';
-      reasons.push(`mlb_game_context riskFlag = "medium" — ${gameContext.riskSummary || 'proceed with caution'}`);
+      reasons.push(`game_context riskFlag = "medium" — ${gameContext.riskSummary || 'proceed with caution'}`);
     } else if (gameContext && gameContext.riskFlag === 'low') {
-      reasons.push(`mlb_game_context riskFlag = "low" — ${gameContext.riskSummary || 'minor flag'}`);
+      reasons.push(`game_context riskFlag = "low" — ${gameContext.riskSummary || 'minor flag'}`);
+    } else if (gameContext && gameContext.riskFlag === 'unknown') {
+      // Surface/level couldn't be determined — note it but don't downgrade
+      if (gameContext.riskSummary) {
+        reasons.push(`game_context: ${gameContext.riskSummary}`);
+      }
     }
 
     return {
@@ -863,16 +896,31 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       gameContext: gameContext
         ? {
             gamePk: gameContext.gamePk,
-            venue: gameContext.venue || null,
-            pitchers: gameContext.pitchers || null,
-            park: gameContext.park || null,
-            weather: gameContext.weather || null,
-            lineups: gameContext.lineups || null,
+            sport: gameContext.sport || null,
             riskFlag: gameContext.riskFlag,
             riskSummary: gameContext.riskSummary || null,
             signals: gameContext.signals || null,
             cached: Boolean(gameContext.cached),
-            fetchedAt: gameContext.fetchedAt
+            fetchedAt: gameContext.fetchedAt,
+            // MLB-specific
+            ...(isMlb ? {
+              venue: gameContext.venue || null,
+              pitchers: gameContext.pitchers || null,
+              park: gameContext.park || null,
+              weather: gameContext.weather || null,
+              lineups: gameContext.lineups || null,
+            } : {}),
+            // Basketball-specific
+            ...(gameContext.awayTeam ? {
+              awayTeam: gameContext.awayTeam,
+              homeTeam: gameContext.homeTeam,
+            } : {}),
+            // Tennis-specific
+            ...(gameContext.surface ? {
+              surface: gameContext.surface,
+              level: gameContext.level,
+              matchupNewsCount: gameContext.matchupNewsCount,
+            } : {}),
           }
         : isMlb
           ? skipResearch
