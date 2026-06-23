@@ -29,9 +29,9 @@ describe('propprofessor-tool-definitions', () => {
   });
 
   describe('lite mode', () => {
-    it('returns only the 10 lite tools when mode is "lite"', () => {
+    it('returns only the 11 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 10);
+      assert.equal(tools.length, 11);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {
