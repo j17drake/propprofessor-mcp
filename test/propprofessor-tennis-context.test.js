@@ -363,3 +363,288 @@ describe('getTennisContext', () => {
     assert.equal(result.cached, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Matchup-to-tournament resolution (added 2026-06-22)
+// ---------------------------------------------------------------------------
+//
+// The live validate_play pipeline passes `tournament: "Dart vs Sonmez"`
+// (a matchup) instead of an actual tourney name. These tests confirm the
+// new resolver turns the matchup into a real tournament + surface + level
+// when the schedule data has a match for that week and player circuit.
+
+describe('looksLikeMatchup', () => {
+  beforeEach(() => clearModuleCache());
+
+  it('returns true for "Dart vs Sonmez"', () => {
+    const { looksLikeMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(looksLikeMatchup('Dart vs Sonmez'), true);
+  });
+
+  it('returns true for "Bergs vs Munar"', () => {
+    const { looksLikeMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(looksLikeMatchup('Bergs vs Munar'), true);
+  });
+
+  it('returns true for "Lakers @ Celtics"', () => {
+    const { looksLikeMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(looksLikeMatchup('Lakers @ Celtics'), true);
+  });
+
+  it('returns false for a real tournament name like "Wimbledon"', () => {
+    const { looksLikeMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(looksLikeMatchup('Wimbledon'), false);
+  });
+
+  it('returns false for "Roland Garros"', () => {
+    const { looksLikeMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(looksLikeMatchup('Roland Garros'), false);
+  });
+
+  it('returns false for null / empty', () => {
+    const { looksLikeMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(looksLikeMatchup(null), false);
+    assert.equal(looksLikeMatchup(''), false);
+    assert.equal(looksLikeMatchup(undefined), false);
+  });
+});
+
+describe('parseMatchup', () => {
+  beforeEach(() => clearModuleCache());
+
+  it('splits " vs " into two players', () => {
+    const { parseMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = parseMatchup('Dart vs Sonmez');
+    assert.equal(r.player1, 'Dart');
+    assert.equal(r.player2, 'Sonmez');
+  });
+
+  it('splits " @ " and " at " too', () => {
+    const { parseMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.deepEqual(parseMatchup('Lakers @ Celtics'), { player1: 'Lakers', player2: 'Celtics' });
+    assert.deepEqual(parseMatchup('Lakers at Celtics'), { player1: 'Lakers', player2: 'Celtics' });
+  });
+
+  it('returns empty player2 for unparseable input', () => {
+    const { parseMatchup } = require('../lib/propprofessor-tennis-context');
+    assert.equal(parseMatchup('').player1, '');
+    assert.equal(parseMatchup('Solo').player2, '');
+  });
+});
+
+describe('resolveTournamentFromMatchup', () => {
+  beforeEach(() => clearModuleCache());
+
+  it('resolves Dart vs Sonmez (2026-06-22) to Eastbourne (WTA grass)', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Dart vs Sonmez', '2026-06-22T10:00:00.000Z');
+    assert.ok(r, 'expected a resolved tourney');
+    assert.equal(r.tour, 'wta');
+    assert.equal(r.slug, 'eastbourne');
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'WTA 250');
+    assert.equal(r.city, 'Eastbourne');
+    assert.equal(r.weekStart, '2026-06-22');
+  });
+
+  it('resolves Kasatkina vs Kessler (2026-06-22) to Bad Homburg (WTA 500 grass)', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Kasatkina vs Kessler', '2026-06-22T12:00:00.000Z');
+    assert.ok(r, 'expected a resolved tourney');
+    assert.equal(r.slug, 'bad-homburg');
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'WTA 500');
+  });
+
+  it('resolves Munar matches (2026-06-22) to Mallorca (ATP 250 grass)', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Bergs vs Munar', '2026-06-22T15:00:00.000Z');
+    assert.ok(r, 'expected a resolved tourney');
+    assert.equal(r.slug, 'mallorca');
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'ATP 250');
+  });
+
+  it('resolves Popyrin matches (2026-06-22) to Halle (ATP 500 grass)', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Choinski vs Popyrin', '2026-06-22T13:30:00.000Z');
+    assert.ok(r, 'expected a resolved tourney');
+    assert.equal(r.slug, 'halle');
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'ATP 500');
+  });
+
+  it('resolves to a Wimbledon match for early July', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Dart vs Someone', '2026-06-29T10:00:00.000Z');
+    assert.ok(r, 'expected a resolved tourney');
+    assert.equal(r.slug, 'wimbledon');
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'Grand Slam');
+  });
+
+  it('returns null for a date outside the schedule', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Dart vs Sonmez', '2027-01-15T10:00:00.000Z');
+    assert.equal(r, null);
+  });
+
+  it('returns null when no player circuit hint matches', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    const r = resolveTournamentFromMatchup('Unknownplayer1 vs Unknownplayer2', '2026-06-22T10:00:00.000Z');
+    assert.equal(r, null);
+  });
+});
+
+describe('getTennisContext — matchup resolution integration', () => {
+  beforeEach(() => clearModuleCache());
+
+  it('returns Grass + WTA 250 for "Dart vs Sonmez" with start=2026-06-22', async () => {
+    mockCurlSuccess(EMPTY_RSS);
+    const { getTennisContext } = require('../lib/propprofessor-tennis-context');
+    const result = await getTennisContext({
+      player1: 'Dart',
+      player2: 'Sonmez',
+      tournament: 'Dart vs Sonmez', // matchup, not a real tourney name
+      start: '2026-06-22T10:00:00.000Z'
+    });
+    assert.equal(result.surface, 'Grass');
+    assert.equal(result.level, 'WTA 250');
+    assert.equal(result.riskFlag, 'clean');
+    assert.equal(result.riskSummary, null);
+    assert.equal(result.signals.resolvedFromMatchup, true);
+    assert.equal(result.tournament, 'Lexus Eastbourne Open');
+    assert.equal(result.city, 'Eastbourne');
+    assert.equal(result.tour, 'wta');
+  });
+
+  it('returns Grass + ATP 500 for "Choinski vs Popyrin" with start=2026-06-22', async () => {
+    mockCurlSuccess(EMPTY_RSS);
+    const { getTennisContext } = require('../lib/propprofessor-tennis-context');
+    const result = await getTennisContext({
+      player1: 'Choinski',
+      player2: 'Popyrin',
+      tournament: 'Choinski vs Popyrin',
+      start: '2026-06-22T13:30:00.000Z'
+    });
+    assert.equal(result.surface, 'Grass');
+    assert.equal(result.level, 'ATP 500');
+    assert.equal(result.tournament, 'Halle Open');
+  });
+
+  it('falls back to unknown when no resolver match (no player circuit hint)', async () => {
+    mockCurlSuccess(EMPTY_RSS);
+    const { getTennisContext } = require('../lib/propprofessor-tennis-context');
+    const result = await getTennisContext({
+      player1: 'Unknownplayer1',
+      player2: 'Unknownplayer2',
+      tournament: 'Unknownplayer1 vs Unknownplayer2',
+      start: '2026-06-22T10:00:00.000Z'
+    });
+    assert.equal(result.surface, 'unknown');
+    assert.equal(result.riskFlag, 'unknown');
+    assert.equal(result.signals.resolvedFromMatchup, false);
+    assert.equal(result.tournament, null);
+  });
+
+  it('falls back to unknown when start is missing (no resolution attempt)', async () => {
+    mockCurlSuccess(EMPTY_RSS);
+    const { getTennisContext } = require('../lib/propprofessor-tennis-context');
+    const result = await getTennisContext({
+      player1: 'Dart',
+      player2: 'Sonmez',
+      tournament: 'Dart vs Sonmez'
+      // no start
+    });
+    assert.equal(result.surface, 'unknown');
+    assert.equal(result.riskFlag, 'unknown');
+  });
+
+  it('does not attempt resolution when tournament is a real tourney name', async () => {
+    mockCurlSuccess(EMPTY_RSS);
+    const { getTennisContext } = require('../lib/propprofessor-tennis-context');
+    const result = await getTennisContext({
+      player1: 'Alcaraz',
+      player2: 'Sinner',
+      tournament: 'Wimbledon',
+      start: '2026-06-22T10:00:00.000Z'
+    });
+    // Wimbledon is a real tourney name → pattern matchers work directly
+    assert.equal(result.surface, 'Grass');
+    assert.equal(result.level, 'Grand Slam');
+    assert.equal(result.signals.resolvedFromMatchup, false);
+    // tournament field is only set when resolved FROM a matchup
+    assert.equal(result.tournament, null);
+  });
+});
+
+describe('PLAYER_CIRCUIT coverage (regression)', () => {
+  // Each entry: a matchup + start that's live in 2026 grass swing.
+  // The resolver MUST return non-null for these — covers today's slate.
+  const KNOWN_MATCHUPS = [
+    { matchup: 'Samsonova vs Svitolina', start: '2026-06-23T15:30:00.000Z', expectedSlug: 'bad-homburg' },
+    { matchup: 'Djere vs Zheng',         start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne'] },
+    { matchup: 'Bondar vs Udvardy',      start: '2026-06-23T12:30:00.000Z', expectedSlugAny: ['eastbourne', 'nottingham'] },
+    { matchup: 'Sabalenka vs Rybakina',  start: '2026-06-22T12:00:00.000Z', expectedSlugAny: ['bad-homburg', 'berlin'] },
+    { matchup: 'Alcaraz vs Sinner',      start: '2026-06-22T12:00:00.000Z', expectedSlugAny: ['queens', 'halle'] },
+    { matchup: 'Buse vs Tsitsipas',      start: '2026-06-22T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne', 'mallorca'] },
+    { matchup: 'Bronzetti vs Inglis',    start: '2026-06-23T09:00:00.000Z', expectedSlug: 'bad-homburg' },
+    { matchup: 'Monnet vs Prozorova',    start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['bad-homburg', 'eastbourne'] },
+    { matchup: 'Gojo vs Smith',          start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne'] }
+  ];
+  for (const tc of KNOWN_MATCHUPS) {
+    it(`resolves ${tc.matchup} @ ${tc.start} (regression)`, () => {
+      const ctx = require('../lib/propprofessor-tennis-context');
+      const r = ctx.resolveTournamentFromMatchup(tc.matchup, tc.start);
+      assert.ok(r, `expected non-null resolution for ${tc.matchup}, got null`);
+      if (tc.expectedSlug) assert.equal(r.slug, tc.expectedSlug, `wrong slug for ${tc.matchup}`);
+      if (tc.expectedSlugAny) assert.ok(
+        tc.expectedSlugAny.includes(r.slug),
+        `${tc.matchup} → ${r.slug} not in ${JSON.stringify(tc.expectedSlugAny)}`
+      );
+    });
+  }
+});
+
+describe('weekly-schedule-2026 helpers', () => {
+  beforeEach(() => clearModuleCache());
+
+  it('getWeekForDate returns the schedule entry for the Monday of that week', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    // 2026-06-22 is a Monday itself
+    const w1 = sched.getWeekForDate('2026-06-22');
+    assert.ok(w1);
+    assert.equal(w1.start, '2026-06-22');
+    // 2026-06-25 (Thursday) → same week
+    const w2 = sched.getWeekForDate('2026-06-25');
+    assert.equal(w2.start, '2026-06-22');
+    // 2026-06-28 (Sunday) → same week
+    const w3 = sched.getWeekForDate('2026-06-28');
+    assert.equal(w3.start, '2026-06-22');
+    // 2026-06-29 (Monday) → new week
+    const w4 = sched.getWeekForDate('2026-06-29');
+    assert.equal(w4.start, '2026-06-29');
+  });
+
+  it('getWeekForDate returns null for a date outside the schedule', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    assert.equal(sched.getWeekForDate('2027-01-15'), null);
+    assert.equal(sched.getWeekForDate('not a date'), null);
+  });
+
+  it('listTourneysForWeek returns ATP + WTA + Challenger for week of 2026-06-22', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    const tourneys = sched.listTourneysForWeek('2026-06-22T15:00:00.000Z');
+    const slugs = tourneys.map((t) => t.slug);
+    assert.ok(slugs.includes('halle'), 'expected halle');
+    assert.ok(slugs.includes('mallorca'), 'expected mallorca');
+    assert.ok(slugs.includes('bad-homburg'), 'expected bad-homburg');
+    assert.ok(slugs.includes('eastbourne'), 'expected eastbourne');
+    assert.ok(slugs.includes('ilkley'), 'expected ilkley');
+  });
+
+  it('listTourneysForWeek returns [] for a date outside the schedule', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    assert.deepEqual(sched.listTourneysForWeek('2027-01-15T00:00:00.000Z'), []);
+  });
+});
