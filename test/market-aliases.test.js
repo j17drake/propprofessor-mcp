@@ -122,8 +122,8 @@ assertEqual(
 );
 assertEqual(
   resolveMarketName('Spread', 'SOCCER'),
-  { resolved: 'Point Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
-  '"Spread" + SOCCER -> "Point Spread"'
+  { resolved: 'Match Handicap', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + SOCCER -> "Match Handicap"'
 );
 
 // Tennis keeps "Spread" because normalizeTennisMarketQuery() expands it to

@@ -33,6 +33,21 @@ const {
   canonicalizeScreenArgs,
   createCanonicalScreenCache
 } = require('../../lib/propprofessor-shared-utils');
+
+/**
+ * Get default markets for a given league and book.
+ * Soccer uses different market names than US sports.
+ * @param {string} league - League name (e.g. 'Soccer', 'NBA')
+ * @param {string[]} [targetBooks] - Target book names (currently unused, reserved for future per-book overrides)
+ * @returns {string[]} Default market names
+ */
+function getDefaultMarketsForLeague(league, _targetBooks) {
+  const leagueUpper = String(league || '').trim().toUpperCase();
+  if (leagueUpper === 'SOCCER') {
+    return ['Draw No Bet', 'Match Handicap', 'Total Goals'];
+  }
+  return ['Moneyline', 'Spread', 'Total'];
+}
 const { getOddsHistoryCache, getOddsHistoryCacheTtlMs } = require('../../lib/mcp-runtime-config');
 const { buildUfcShortlist } = require('../../lib/propprofessor-sharp-plays');
 const { findBestPrice } = require('../../lib/propprofessor-best-price');
@@ -115,17 +130,14 @@ function resolveMarkets(args, league, defaultMarket = 'Moneyline') {
   const leagueKey = league ? String(league).trim().toUpperCase() : '';
   const result = { single: defaultMarket, array: [], aliasesUsed: [] };
 
-  // Resolve single market
+  // Resolve single market — only apply aliases when the user doesn't explicitly provide one
   const singleRaw = args.market;
   if (singleRaw !== undefined && singleRaw !== null) {
-    const resolved = resolveMarketName(singleRaw, leagueKey);
-    result.single = resolved.resolved;
-    if (resolved.wasAliased) {
-      result.aliasesUsed.push(`${singleRaw} → ${resolved.resolved}`);
-    }
+    // User explicitly provided a market — pass through unchanged (no alias resolution)
+    result.single = singleRaw;
   }
 
-  // Resolve markets array
+  // Resolve markets array — apply aliases for each element
   if (Array.isArray(args.markets) && args.markets.length) {
     result.array = args.markets.map((m) => {
       const resolved = resolveMarketName(m, leagueKey);
@@ -1436,7 +1448,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ? args.markets
           : args.market
             ? [args.market]
-            : ['Moneyline', 'Spread', 'Total'];
+            : null;  // null = use per-league defaults below
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
       const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 50;
       const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
@@ -1447,11 +1459,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       const resolvedMarketsByLeague = {};
       for (const league of leagues) {
-        const marketResolution = resolveMarkets({ markets }, league);
-        resolvedMarketsByLeague[league] = marketResolution.array.length
-          ? marketResolution.array
-          : [marketResolution.single];
-        allAliasesUsed.push(...marketResolution.aliasesUsed);
+        if (markets === null) {
+          // Use per-league defaults
+          resolvedMarketsByLeague[league] = getDefaultMarketsForLeague(league, targetBooks);
+        } else {
+          const marketResolution = resolveMarkets({ markets }, league);
+          resolvedMarketsByLeague[league] = marketResolution.array.length
+            ? marketResolution.array
+            : [marketResolution.single];
+          allAliasesUsed.push(...marketResolution.aliasesUsed);
+        }
       }
 
       const allCandidates = [];
@@ -1580,21 +1597,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Resolve markets using aliases for each league
       const allAliasesUsed = [];
       const resolvedMarketsByLeague = {};
-      const defaultMarkets = ['Moneyline', 'Spread', 'Total'];
       for (const league of leagues) {
-        const marketResolution = resolveMarkets(
-          { markets: args.markets, market: args.market },
-          league,
-          defaultMarkets[0]
-        );
-        resolvedMarketsByLeague[league] = marketResolution.array.length
-          ? marketResolution.array
-          : [marketResolution.single];
-        allAliasesUsed.push(...marketResolution.aliasesUsed);
+        if (args.markets === undefined && args.market === undefined) {
+          // Use per-league defaults
+          resolvedMarketsByLeague[league] = getDefaultMarketsForLeague(league);
+        } else {
+          const marketResolution = resolveMarkets(
+            { markets: args.markets, market: args.market },
+            league,
+            'Moneyline'  // fallback for resolveMarkets
+          );
+          resolvedMarketsByLeague[league] = marketResolution.array.length
+            ? marketResolution.array
+            : [marketResolution.single];
+          allAliasesUsed.push(...marketResolution.aliasesUsed);
+        }
       }
       // Use the first league's resolved markets as the default "markets" for response
       const firstLeague = leagues[0];
-      const markets = resolvedMarketsByLeague[firstLeague] || defaultMarkets;
+      const markets = resolvedMarketsByLeague[firstLeague] || ['Moneyline', 'Spread', 'Total'];
       const targetTiers =
         Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;

@@ -107,9 +107,9 @@ describe('resolveMarketName — SOCCER', () => {
     assert.equal(r.wasAliased, true);
   });
 
-  it('Spread → Point Spread (SOCCER canonical — was "Spread" pre-2026-06-12 fix)', () => {
+  it('Spread → Match Handicap (SOCCER canonical — was "Spread" pre-2026-06-12 fix)', () => {
     const r = resolveMarketName('Spread', 'SOCCER');
-    assert.equal(r.resolved, 'Point Spread');
+    assert.equal(r.resolved, 'Match Handicap');
     assert.equal(r.wasAliased, true);
   });
 });
