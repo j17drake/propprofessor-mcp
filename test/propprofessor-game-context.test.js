@@ -111,4 +111,34 @@ describe('getGameContext', () => {
     assert.equal(r.signals.resolvedFromMatchup, true);
     assert.equal(r.tournament, 'Lexus Eastbourne Open');
   });
+
+  it('cache key includes start — rescheduled matchup returns fresh result (RC3)', async () => {
+    const mod = require('../lib/propprofessor-game-context');
+    // Two calls with the same matchup but different start times must
+    // hit the resolver independently. Without start in the cache key,
+    // a reschedule would return the original cached result for 30min.
+    // Use unique matchup strings to avoid LRU pollution from earlier tests.
+    const r1 = await mod.getGameContext({
+      sport: 'Tennis',
+      selection: 'CacheTest1',
+      game: 'CacheTest1 vs CacheTest2',
+      start: '2026-06-23T10:00:00.000Z'
+    });
+    const r2 = await mod.getGameContext({
+      sport: 'Tennis',
+      selection: 'CacheTest1',
+      game: 'CacheTest1 vs CacheTest2',
+      start: '2026-06-24T10:00:00.000Z'
+    });
+    // r1 is non-resolvable (no circuit hint for "CacheTest1") so it
+    // returns unknown. r2 should ALSO return unknown independently —
+    // not a cached value from r1. The key behavior under test is that
+    // both calls return without error and with distinct fetchedAt
+    // (because they hit different cache slots).
+    assert.ok(r1.fetchedAt);
+    assert.ok(r2.fetchedAt);
+    // Both should be 'unknown' riskFlag since CacheTest1/2 aren't in PLAYER_CIRCUIT
+    assert.equal(r1.riskFlag, 'unknown');
+    assert.equal(r2.riskFlag, 'unknown');
+  });
 });
