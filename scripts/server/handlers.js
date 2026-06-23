@@ -2339,6 +2339,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    async get_market_registry(args = {}) {
+      const { getMarketsForSport } = require('../../lib/propprofessor-market-registry');
+      const sport = String(args.sport || '').trim();
+      const book = args.book ? String(args.book).trim() : null;
+      if (!sport) {
+        return { ok: false, error: { code: 'MISSING_PARAMS', message: 'sport is required' } };
+      }
+      const markets = getMarketsForSport(sport, book);
+      return {
+        ok: true,
+        sport,
+        book: book || 'default',
+        markets,
+        note: sport.toUpperCase() === 'SOCCER'
+          ? 'Soccer uses Draw No Bet (not Moneyline), Match Handicap (not Spread), and Total Goals'
+          : undefined,
+      };
+    },
+
     async get_started(args = {}) {
       const userType = args.user_type || 'intermediate';
 

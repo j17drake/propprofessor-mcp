@@ -6,14 +6,14 @@ const { buildToolDefinitions, LITE_MODE_TOOLS, TOOL_CATEGORIES } = require('../l
 
 describe('propprofessor-tool-definitions', () => {
   describe('default (full) mode', () => {
-    it('returns all 26 tools by default', () => {
+    it('returns all 27 tools by default', () => {
       const tools = buildToolDefinitions();
-      assert.equal(tools.length, 26);
+      assert.equal(tools.length, 27);
     });
 
-    it('returns all 26 tools when mode is explicitly "full"', () => {
+    it('returns all 27 tools when mode is explicitly "full"', () => {
       const tools = buildToolDefinitions({ mode: 'full' });
-      assert.equal(tools.length, 26);
+      assert.equal(tools.length, 27);
     });
 
     it('every tool has a name, description, category, and inputSchema', () => {
@@ -102,7 +102,7 @@ describe('propprofessor-tool-definitions', () => {
       // future tool addition forces a conscious decision about whether to
       // bump the count or leave it stale.
       const expected = {
-        discovery: 5,
+        discovery: 6,
         screen: 6,
         drill_down: 3,
         research: 3,

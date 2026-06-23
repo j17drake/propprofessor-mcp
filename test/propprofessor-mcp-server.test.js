@@ -266,6 +266,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'fantasy_optimizer',
         'find_best_price',
         'get_alerts',
+        'get_market_registry',
         'get_pick_history',
         'get_pick_stats',
         'get_play_details',

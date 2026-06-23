@@ -23,9 +23,9 @@ describe('MCP server — tools/list _meta block', () => {
     });
     assert.ok(response.result._meta, '_meta block should be present');
     assert.equal(response.result._meta.mode, 'full');
-    assert.equal(response.result._meta.toolCount, 26);
+    assert.equal(response.result._meta.toolCount, 27);
     assert.equal(response.result._meta.liteToolCount, 10);
-    assert.equal(response.result._meta.fullToolCount, 26);
+    assert.equal(response.result._meta.fullToolCount, 27);
   });
 
   it('_meta.mode reflects the ACTUAL tool list length when toolDefinitions are injected', async () => {
@@ -54,7 +54,7 @@ describe('MCP server — tools/list _meta block', () => {
     assert.equal(response.result._meta.mode, 'lite');
     assert.equal(response.result._meta.toolCount, 10);
     // fullToolCount is the catalog total (26), not the served count (10)
-    assert.equal(response.result._meta.fullToolCount, 26);
+    assert.equal(response.result._meta.fullToolCount, 27);
     assert.equal(response.result.tools.length, 10);
   });
 
