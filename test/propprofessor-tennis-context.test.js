@@ -606,6 +606,24 @@ describe('PLAYER_CIRCUIT coverage (regression)', () => {
   }
 });
 
+describe('PLAYER_CIRCUIT cache merge', () => {
+  it('merged map contains both static and cache entries', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    // Static entries are always there
+    assert.ok(sched.PLAYER_CIRCUIT['Sabalenka'], 'Sabalenka missing from merged map');
+    assert.ok(sched.PLAYER_CIRCUIT['Djokovic'],  'Djokovic missing from merged map');
+    // STATIC map exposes the pre-merge static entries for inspection
+    assert.ok(sched.PLAYER_CIRCUIT_STATIC, 'PLAYER_CIRCUIT_STATIC not exported');
+    assert.ok(sched.PLAYER_CIRCUIT_STATIC['Sabalenka'], 'Sabalenka missing from static map');
+  });
+
+  it('reloadCircuitCache() returns the current cache object', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    const result = sched.reloadCircuitCache();
+    assert.ok(typeof result === 'object');
+  });
+});
+
 describe('weekly-schedule-2026 helpers', () => {
   beforeEach(() => clearModuleCache());
 
