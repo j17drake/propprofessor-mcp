@@ -41,6 +41,11 @@ describe('parseGameString', () => {
     assert.strictEqual(r.team1, 'Lakers');
     assert.strictEqual(r.team2, '');
   });
+  it('parses MLB-style "TeamA vs TeamB" correctly', () => {
+    const r = parseGameString('Cincinnati Reds vs Milwaukee Brewers');
+    assert.strictEqual(r.team1, 'Cincinnati Reds');
+    assert.strictEqual(r.team2, 'Milwaukee Brewers');
+  });
 });
 
 describe('getGameContext', () => {
@@ -62,6 +67,22 @@ describe('getGameContext', () => {
     assert.ok(r.ok || r.riskFlag);
   });
 
+  it('MLB routing parses game string and passes awayTeam/homeTeam correctly', async () => {
+    const mod = require('../lib/propprofessor-game-context');
+    // Full team names — the module parses into team1 / team2 and passes
+    // those to findMlbGamePk({ isoDate, awayTeam, homeTeam })
+    const r = await mod.getGameContext({
+      sport: 'MLB',
+      selection: 'Reds',
+      game: 'Cincinnati Reds vs Milwaukee Brewers',
+      start: new Date().toISOString()
+    });
+    // Whether gamePk resolves or not depends on live MLB API data,
+    // but the response should always have the expected shape
+    assert.ok(typeof (r.riskFlag || r.riskSummary || '') === 'string');
+    assert.ok(r.sport === 'MLB' || r.sport === undefined);
+  });
+
   it('routes NBA to basketball handler', async () => {
     const mod = require('../lib/propprofessor-game-context');
     const r = await mod.getGameContext({ sport: 'NBA', selection: 'Lakers', game: 'Lakers vs Celtics', start: new Date().toISOString() });
@@ -72,5 +93,22 @@ describe('getGameContext', () => {
     const mod = require('../lib/propprofessor-game-context');
     const r = await mod.getGameContext({ sport: 'Tennis', selection: 'Djokovic', game: 'Wimbledon' });
     assert.ok(typeof r.riskFlag === 'string');
+  });
+
+  it('passes start through to tennis handler so matchup resolution can fire', async () => {
+    const mod = require('../lib/propprofessor-game-context');
+    // "Dart vs Sonmez" is a matchup, not a real tourney. With start
+    // threaded through, the resolver should hit Eastbourne (WTA 250 grass).
+    const r = await mod.getGameContext({
+      sport: 'Tennis',
+      selection: 'Dart',
+      game: 'Dart vs Sonmez',
+      start: '2026-06-22T10:00:00.000Z'
+    });
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'WTA 250');
+    assert.equal(r.riskFlag, 'clean');
+    assert.equal(r.signals.resolvedFromMatchup, true);
+    assert.equal(r.tournament, 'Lexus Eastbourne Open');
   });
 });

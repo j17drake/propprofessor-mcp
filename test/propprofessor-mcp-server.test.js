@@ -1264,6 +1264,43 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls[0].market, 'Moneyline');
     assert.equal(result.ok, true);
   });
+
+  it('recommended_bets includes gameId in each play row', async () => {
+    const { client } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.recommended_bets({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 3,
+      compact: true
+    });
+
+    assert.ok(result.ok);
+    for (const league of result.leagues) {
+      for (const play of league.plays) {
+        assert.ok(play.gameId, `gameId missing in recommended_bets for ${play.selection}`);
+      }
+    }
+  });
+
+  it('quick_screen includes gameId in each candidate row', async () => {
+    const { client } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+
+    const result = await handlers.quick_screen({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 3
+    });
+
+    assert.ok(result.ok);
+    for (const leagueResult of result.results) {
+      for (const candidate of leagueResult.candidates || []) {
+        assert.ok(candidate.gameId, `gameId missing in quick_screen for ${candidate.selection}`);
+      }
+    }
+  });
 });
 
 describe('validated candidate concurrency helpers', () => {

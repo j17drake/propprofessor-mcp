@@ -513,8 +513,20 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       throw error;
     }
     const marketResolution = resolveMarkets(args, league);
-    const market = marketResolution.single;
+    let market = marketResolution.single;
     const requestedBooks = normalizeBookList(args.books);
+    // BUGFIX (2026-06-22): Tennis market normalization in get_play_details.
+    // The Tennis screen handler normalizes generic markets ("Spread", "Total")
+    // into specific backend market names (Game Handicap, Set Handicap, Total
+    // Games, etc.) via normalizeTennisMarketQuery. But get_play_details
+    // bypassed this and passed the raw "Spread"/"Total" string directly to
+    // queryScreenOddsBestComps — which has no rows for those names, causing
+    // validate_play to always FAIL with "no row matched selection" on Tennis
+    // spread/total plays. Apply the same normalization here.
+    if (league === 'Tennis') {
+      const tennisMarkets = normalizeTennisMarketQuery(market);
+      market = tennisMarkets[0] || market;
+    }
     // BUGFIX: don't default focusBook to the preset's preferred book
     // (Pinnacle for most leagues). Pinnacle doesn't post UFC/Tennis/Soccer
     // moneylines, so focusPlays in extractScreenRows would drop every row
@@ -729,18 +741,31 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               }
             })()
           : (async () => {
-              try {
-                // Non-MLB: run sport-agnostic game context via dispatcher
-                const ctx = await getGameContext({
-                  sport: league,
-                  selection,
-                  game: gameId // screen game ID includes matchup info
-                });
-                return { ok: true, value: ctx };
-              } catch (err) {
-                return { ok: false, error: err?.message || String(err) };
+            try {
+              // Non-MLB: run sport-agnostic game context via dispatcher.
+              // For Tennis, parse the gameId to extract the unix start
+              // (Tennis:PREMATCH:p1:p2:unixStart) so the resolver can
+              // map a matchup string ("Dart vs Sonmez") to a real
+              // tourney via the 2026 weekly schedule.
+              let derivedStart = null;
+              if (league.toLowerCase() === 'tennis' && gameId) {
+                const parts = gameId.split(':');
+                const ts = parts[parts.length - 1];
+                if (ts && /^\d{10}$/.test(ts)) {
+                  derivedStart = new Date(Number(ts) * 1000).toISOString();
+                }
               }
-            })();
+              const ctx = await getGameContext({
+                sport: league,
+                selection,
+                game: gameId, // screen game ID includes matchup info
+                start: derivedStart
+              });
+              return { ok: true, value: ctx };
+            } catch (err) {
+              return { ok: false, error: err?.message || String(err) };
+            }
+          })();
 
     const [detailOutcome, researchOutcome, gameContextOutcome] = await Promise.all([
       detailPromise,
@@ -753,17 +778,29 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const gameContextError = gameContextOutcome?.ok ? null : gameContextOutcome?.error || null;
 
     // Extract the specific row that matches the selection.
+    // The screen's `selection` field for spread/total plays concatenates the
+    // line (e.g. "Harris -1.5", "Over 22.5", "Under 2.5 sets"), but
+    // get_play_details stores them as `participant: "Harris"` with the line
+    // in a separate `line` field. To match both shapes:
+    //   1. Try exact match (moneyline case).
+    //   2. Strip trailing line digits and re-try (spread case).
+    //   3. Strip "Over "/"Under " prefix and re-try (total case).
+    //   4. Fall back to home/away includes.
+    const selLower = selection.toLowerCase().trim();
+    const stripLine = (s) => s.replace(/\s*[+-]?\d+(?:\.\d+)?\s*(sets|games)?\s*$/i, '').trim();
+    const stripOverUnder = (s) => s.replace(/^(over|under)\s+/i, '').trim();
+    const selStrippedLine = stripLine(selLower);
+    const selStrippedOverUnder = stripOverUnder(selLower);
+    const selStrippedLineOU = stripOverUnder(selStrippedLine);
     const matchingRow = Array.isArray(detailResult?.result)
-      ? detailResult.result.find(
-          (r) =>
-            String(r.selection || r.participant || '').toLowerCase() === selection.toLowerCase() ||
-            String(r.homeTeam || '')
-              .toLowerCase()
-              .includes(selection.toLowerCase()) ||
-            String(r.awayTeam || '')
-              .toLowerCase()
-              .includes(selection.toLowerCase())
-        )
+      ? detailResult.result.find((r) => {
+          const stored = String(r.selection || r.participant || '').toLowerCase().trim();
+          if (stored === selLower) return true;
+          if (stored && (stored === selStrippedLine || stored === selStrippedOverUnder || stored === selStrippedLineOU)) return true;
+          if (String(r.homeTeam || '').toLowerCase().includes(selLower)) return true;
+          if (String(r.awayTeam || '').toLowerCase().includes(selLower)) return true;
+          return false;
+        })
       : null;
 
     // If research was started before we had the row, re-run it with
@@ -1056,7 +1093,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const payload = await queryFn({
         market,
         league: 'Tennis',
-        books: requestedBooks.length ? requestedBooks : ALL_SCREEN_BOOKS,
+        // Always query with ALL_SCREEN_BOOKS for tennis — the backend only
+        // returns multi-book data (consensus, history) for secondary sports
+        // when the complete book list is passed. The requestedBooks filter
+        // is applied below via requirePreferredBook.
+        books: ALL_SCREEN_BOOKS,
         is_live: Boolean(args.is_live)
       });
       payloads.push(payload);
@@ -1454,7 +1495,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   league: r.league,
                   game: r.game,
                   start: r.row.start || r.row.eventStart || null,
-                  market: row.market || '',
+                  market: r.row.market || '',
                 })),
                 limit: researchBatch.length,
                 playerContextFn: handlers.player_context,
@@ -1484,6 +1525,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               league,
               market,
               candidates: candidates.slice(0, limit).map((row) => ({
+                gameId: row.gameId || null,
                 game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                 selection: row.selection || row.participant || row.pick || null,
                 start: row.start || null,
@@ -1662,6 +1704,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   const leagueBooks = Array.isArray(args.books) && args.books.length ? args.books : [];
                   const focusBook = leagueBooks[0] || row.book || row.oddsSource || null;
                   return {
+                    gameId: row.gameId || null,
                     game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                     selection: row.selection || row.participant || null,
                     market: row._market || row.market || null,

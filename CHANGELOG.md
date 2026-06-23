@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.3.2
+
+**Bugfix: tennis game context resolves matchup strings to real tournaments.**
+
+### What changed
+
+- **Matchup → tournament resolution in `getTennisContext`.** The `validate_play` and `quick_screen` pipelines call the tennis context module with a `tournament` field that is actually a matchup string (e.g. `"Dart vs Sonmez"`) — the real tourney name is never present. Previously the surface/level pattern matchers would fail to find a tour-level keyword and return `surface: unknown, level: null` for every tennis play. Now, when the input looks like a matchup and a start timestamp is available, the resolver looks up the active tourney from a 2026 weekly schedule table and uses the schedule's authoritative surface/level fields.
+- **2026 ATP + WTA weekly schedule added.** Covers June through mid-August: Halle, Mallorca, Queen's, Eastbourne, Bad Homburg, Wimbledon, Hamburg, Gstaad, Washington, Cincinnati, and named grass Challengers (Surbiton, Ilkley, Nottingham). Extends via `lib/tennis-schedule-data/weekly-schedule-2026.js` — add a week entry when new tour-level events go live.
+- **Player-circuit hints.** Top-100 player names (Dart, Kasatkina, Keys, Popyrin, Munar, etc.) are mapped to their preferred grass-swing tourneys so a top-50 matchup resolves to the correct tour-level event instead of "Challenger".
+- **New `tournament`, `city`, `tour`, `signals.resolvedFromMatchup` fields** in the `getTennisContext` result when a matchup was successfully resolved.
+- **`validate_play` now derives the start timestamp from the gameId** (format `Tennis:PREMATCH:p1:p2:unixStart`) and threads it into the game context call. Tennis was the only sport in the validate pipeline that didn't get a `start` field — the other sports have it from the screen row.
+
+### Migration notes
+
+Zero. For matchup strings where resolution succeeds (tour-level events in the schedule), `surface` and `level` are now populated and `riskFlag` is `clean` instead of `unknown`. For matchups outside the schedule window or where the players aren't in the circuit map, the existing `unknown` behavior is preserved. Real tournament names (e.g. "Wimbledon") are unaffected — the pattern matchers still handle them directly.
+
+### Tests
+
+25 new tests in `test/propprofessor-tennis-context.test.js` covering matchup detection, parseMatchup, the resolver against live gameIds from the June 22 grass swing, the integration path, and the schedule-data helpers. Full suite: 1225/1225 pass.
+
 ## 2.3.1
 
 **Bugfix: tier/kaiCall consistency, UFC row resolution, find_best_price name transparency, and validate_play cache.**

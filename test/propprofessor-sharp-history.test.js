@@ -126,4 +126,48 @@ describe('propprofessor sharp history helpers', () => {
     assert.equal(summary.movementQuality, 'low');
     assert.equal(summary.lineHistoryUsable, true);
   });
+
+  it('flags V-shaped recovery where endpoints positive but midline adverse', () => {
+    const nowMs = Date.UTC(2026, 4, 7, 12, 0, 0);
+    const windows = buildMovementWindows(
+      [
+        { book: 'Pinnacle', odds: -222, time: nowMs - 25 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -210, time: nowMs - 20 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -205, time: nowMs - 18 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -202, time: nowMs - 15 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -192, time: nowMs - 14 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -186, time: nowMs - 13 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -190, time: nowMs - 12 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -200, time: nowMs - 6 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -215, time: nowMs - 3 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -229, time: nowMs - 1 * 60 * 60 * 1000 },
+      ],
+      { nowMs, recentWindowHours: 6 }
+    );
+
+    assert.ok(windows.fullWindow.clvPct > 0, `Expected positive CLV, got ${windows.fullWindow.clvPct}`);
+    assert.ok(windows.fullWindow.minClvPct < -2, `Expected minClvPct < -2, got ${windows.fullWindow.minClvPct}`);
+    assert.ok(
+      windows.fullWindow.minClvPct < windows.fullWindow.clvPct,
+      `minClvPct (${windows.fullWindow.minClvPct}) should be < clvPct (${windows.fullWindow.clvPct})`
+    );
+  });
+
+  it('passes minClvPct through summarizeSharpMovement', () => {
+    const nowMs = Date.UTC(2026, 4, 7, 12, 0, 0);
+    const summary = summarizeSharpMovement({
+      lineHistory: [
+        { book: 'Pinnacle', odds: -222, time: nowMs - 25 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -186, time: nowMs - 13 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -229, time: nowMs - 1 * 60 * 60 * 1000 },
+      ],
+      preferredBook: 'NoVigApp',
+      sharpBooks: ['Pinnacle', 'Circa'],
+      options: { nowMs, recentWindowHours: 6 }
+    });
+
+    assert.ok(typeof summary.minClvPct === 'number', `Expected minClvPct to be a number, got ${summary.minClvPct}`);
+    assert.ok(typeof summary.peakAdverseClvPct === 'number', `Expected peakAdverseClvPct to be a number, got ${summary.peakAdverseClvPct}`);
+    assert.ok(summary.minClvPct < summary.clvProxyPct, `minClvPct (${summary.minClvPct}) should be < clvProxyPct (${summary.clvProxyPct})`);
+  });
 });
