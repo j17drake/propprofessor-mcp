@@ -94,7 +94,9 @@ const {
   formatSharpPlaysMinimal,
   formatSharpPlaysStandard,
   formatScreenRankedMinimal,
-  formatScreenRankedStandard
+  formatScreenRankedStandard,
+  formatGetPlayDetailsMinimal,
+  formatGetPlayDetailsStandard
 } = require('../../lib/propprofessor-formatter');
 const {
   getPickHistory,
@@ -649,6 +651,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       queryGameIds: gameIds,
       matchedRows: merged.length
     };
+    // Apply verbosity formatting (adds summary mode for agents that just
+    // need a quick overview of game details without 700KB+ of line history)
+    const verbosity = String(args.verbosity || 'full').toLowerCase();
+    if (verbosity === 'minimal') return formatGetPlayDetailsMinimal(response);
+    if (verbosity === 'standard') return formatGetPlayDetailsStandard(response);
     return response;
   }
 
