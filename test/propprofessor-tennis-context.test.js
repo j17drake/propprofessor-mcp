@@ -624,6 +624,38 @@ describe('PLAYER_CIRCUIT cache merge', () => {
   });
 });
 
+describe('Tour alignment (regression)', () => {
+  // Eastbourne hosts both ATP 250 and WTA 250 in the same week. A
+  // matchup with both players' circuit hints tagged "atp" must resolve
+  // to the ATP version, not the WTA version (or vice versa).
+  it('Djere vs Zheng (both ATP) → ATP Eastbourne, not WTA', () => {
+    const ctx = require('../lib/propprofessor-tennis-context');
+    const r = ctx.resolveTournamentFromMatchup('Djere vs Zheng', '2026-06-23T09:00:00.000Z');
+    assert.ok(r);
+    assert.equal(r.tour, 'atp', `Djere vs Zheng should resolve to ATP, got ${r.tour}`);
+    assert.equal(r.slug, 'eastbourne');
+    assert.equal(r.level, 'ATP 250');
+  });
+
+  it('Samsonova vs Svitolina (both WTA) → WTA Bad Homburg', () => {
+    const ctx = require('../lib/propprofessor-tennis-context');
+    const r = ctx.resolveTournamentFromMatchup('Samsonova vs Svitolina', '2026-06-23T15:30:00.000Z');
+    assert.ok(r);
+    assert.equal(r.tour, 'wta', `Samsonova vs Svitolina should resolve to WTA, got ${r.tour}`);
+    assert.equal(r.slug, 'bad-homburg');
+    assert.equal(r.level, 'WTA 500');
+  });
+
+  it('listTourneysForWeek returns both ATP and WTA versions of Eastbourne', () => {
+    const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
+    const t = sched.listTourneysForWeek('2026-06-23T09:00:00.000Z');
+    const eastbourne = t.filter((x) => x.slug === 'eastbourne');
+    assert.equal(eastbourne.length, 2, `expected 2 Eastbourne entries (ATP + WTA), got ${eastbourne.length}`);
+    assert.ok(eastbourne.find((x) => x.tour === 'atp'), 'no ATP Eastbourne entry');
+    assert.ok(eastbourne.find((x) => x.tour === 'wta'), 'no WTA Eastbourne entry');
+  });
+});
+
 describe('weekly-schedule-2026 helpers', () => {
   beforeEach(() => clearModuleCache());
 
