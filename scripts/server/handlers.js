@@ -811,6 +811,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           if (stored && (stored === selStrippedLine || stored === selStrippedOverUnder || stored === selStrippedLineOU)) return true;
           if (String(r.homeTeam || '').toLowerCase().includes(selLower)) return true;
           if (String(r.awayTeam || '').toLowerCase().includes(selLower)) return true;
+          // Check nested selections for soccer totals/handicaps
+          if (r.selections && typeof r.selections === 'object') {
+            for (const key of Object.keys(r.selections)) {
+              const sel = r.selections[key];
+              if (sel && typeof sel === 'object') {
+                const s1 = String(sel.selection1 || '').toLowerCase().trim();
+                const s2 = String(sel.selection2 || '').toLowerCase().trim();
+                if (s1 === selLower || s2 === selLower) return true;
+                if (s1 === selStrippedLine || s2 === selStrippedLine) return true;
+                if (s1 === selStrippedOverUnder || s2 === selStrippedOverUnder) return true;
+              }
+            }
+          }
           return false;
         })
       : null;
