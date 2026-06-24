@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.4.0
+
+**Major validate_play reliability overhaul: canonical play identity, honest degradation, and freshness metadata.**
+
+### What changed
+
+- **validate_play no longer returns fake PASS on lookup failure.** When the screen row can't be rehydrated, the verdict is now CONSIDER with `lookupStatus: "lookup_failed"` and `reasonType: "lookup_failure"`. The old behavior treated lookup misses as negative betting signals — now it's honest about being a stale snapshot.
+- **Canonical play identity (`playId`) on every ranked row.** Screen, quick_screen, recommended_bets, and sharp_plays now emit `playId` and `selectionKey` on every candidate row. Agents can pass `playId` back to `validate_play` for exact row matching.
+- **`validate_play` accepts optional `playId` param.** When provided, row matching skips string comparison entirely and looks up by canonical key.
+- **Row matching priority restructured.** Exact playId > normalized selectionKey > line-stripped > nested selections > home/away fallback.
+- **Screen freshness metadata in validate_play.** New `screenFreshness` top-level field and `freshnessSource` on the play object.
+- **Typed MLB game-context errors.** `gameContext` returns `errorType`, `errorDetail`, and `attemptedLookup` when gamePk resolver fails.
+- **MLB findMlbGamePk hardening.** Team-name matching normalizes case and whitespace.
+- **New validate_play fields:** `lookupStatus`, `reasonType`, `screenFreshness`, `playId`, `selectionKey`, `freshnessSource`.
+
+### Migration notes
+
+Additive — existing consumers reading `verdict`, `reasons`, `verdictSummary` are unaffected. `actionableSummary` now says "Couldn't be rehydrated..." instead of "PASS — one or more hard checks failed" on stale snapshots.
+
+### Tests
+
+- 1258/1258 passing
+- New regression tests for: lookup failure degradation, canonical identity, screen freshness, playId resolution, MLB typed errors
+
+---
+
 ## 2.3.2
 
 **Bugfix: tennis game context resolves matchup strings to real tournaments.**

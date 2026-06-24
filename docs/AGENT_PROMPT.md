@@ -354,9 +354,11 @@ Movement: 🟢=all signals aligned, 🟡=some uncertainty, 🔴=do not bet
 
 ## 8. Edge Cases
 
-### validate_play returns "no row matched selection" (SELECTION_NOT_FOUND)
+### validate_play returns "no row matched selection" (lookup_failed)
 
-The market moved between your screen call and validate. Do NOT retry via `find_best_price` — the matcher is stricter and also returns no_match. The play has evaporated — move on to the next candidate.
+`validate_play` now returns `CONSIDER` with `lookupStatus: "lookup_failed"` when the screen row can't be rehydrated. This is a stale-snapshot issue, NOT a negative betting signal. The play may still be good — it just couldn't be verified against the current screen. If `playId` is available from a prior `quick_screen` call, pass it in for exact matching instead of relying on selection string comparison.
+
+The old behavior returned `PASS`, which falsely implied the play was bad. The new `CONSIDER` verdict with `lookupStatus: "lookup_failed"` lets agents distinguish "couldn't check" from "checked and it's bad".
 
 ### Soccer returns 0 candidates on quick_screen
 

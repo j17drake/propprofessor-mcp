@@ -95,6 +95,8 @@ function toCandidateRows(rankedRows) {
     book: row.book || row.sportsbook || '',
     odds: row.odds ?? row.currentOdds ?? null,
     game_id: row.gameId || null,
+    play_id: row.playId || null,
+    selection_key: row.selectionKey || null,
     start_time: row.start || null,
     selection_id: row.selectionId || null,
     play_type: row.playType || row.betType || null,

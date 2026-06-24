@@ -1661,6 +1661,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               league,
               market,
               candidates: candidates.slice(0, limit).map((row) => ({
+                playId: row.playId || null,
+                selectionKey: row.selectionKey || null,
                 gameId: row.gameId || null,
                 game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
                 selection: row.selection || row.participant || row.pick || null,
@@ -1678,7 +1680,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 kaiCall: row.kaiCall ?? 'PASS',
                 confidenceTier: row.confidenceTier ?? 'TIER 4',
                 rationale: row.rationale || null,
-                screenScore: row.screenScore ?? 0
+                screenScore: row.screenScore ?? 0,
+                freshnessSource: row.freshnessSource ?? null
               }))
             });
           } catch (error) {
@@ -2599,7 +2602,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         honest_scope:
           'TIER 1-4, kaiCall (BET/CONSIDER/PASS), edge, and screenScore are quality ratings on what sharp books are doing — NOT predictions about which side will win. TIER 1 means sharp books agree; it does not mean the side will win. Use to inform handicapping, not to outsource decisions.',
         edge_cases: [
-          'validate_play_no_match: If validate_play returns SELECTION_NOT_FOUND "no row matched selection", the market moved between your screen call and validate. Do NOT retry via find_best_price. The play has evaporated — move on.',
+          'validate_play_no_match: If validate_play returns lookupStatus="lookup_failed" with verdict CONSIDER, the screen row could not be rehydrated — this is a stale snapshot, not a negative signal. Pass playId from the prior quick_screen call for exact matching. Do NOT treat this as PASS.',
           'soccer_markets: quick_screen with leagues=["Soccer"] uses Draw No Bet / Match Handicap / Total Goals by default. If you get 0 results, the book may genuinely not have soccer that day. Probe find_best_price with market="Draw No Bet" on a known fixture.',
           'tennis_start_time: validate_play may return stale start timestamps for tennis. Check verdictSummary.movementDisposition and gameContext — if surface/level resolve to a real tournament, the match is live regardless of the API start time.',
           'movement_disposition: validate_play.verdictSummary.movementDisposition is the single field to check: supportive_clean = BET, supportive_bouncy = CONSIDER, adverse_recent/adverse_full = PASS. Do not cross-reference movementGrade + movementLabel separately.',

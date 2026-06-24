@@ -51,6 +51,8 @@ async function main() {
   });
 
   const sample = (Array.isArray(result.result) ? result.result : []).slice(0, limit).map((row) => ({
+    playId: row.playId || null,
+    selectionKey: row.selectionKey || null,
     participant: row.participant || row.selection || row.pick || null,
     book: row.book || null,
     odds: row.odds ?? row.currentOdds ?? null,
