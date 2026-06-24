@@ -74,8 +74,9 @@ A qualitative assessment of the line movement quality:
 
 **Tools to call:**
 
-1. `quick_screen` with `verbosity: "minimal"` — plain English picks with sharp consensus, book price, and injury research in one call
-2. `player_context` — check injury risk on the plays you're showing
+1. `quick_screen` with `verbosity: "minimal"` — plain English picks with sharp consensus, book price, and injury research in one call. Each candidate already has `movementDisposition` (supportive_clean = BET, supportive_bouncy = CONSIDER, adverse = PASS) and `displayTier` (BET/CONSIDER/PASS).
+2. `smart_bet` with `selection` and `book` — complete evaluation (play details, verdict, best price, staking) in one call when you already know the player/team.
+3. `player_context` — check injury risk on the plays you're showing
 
 **Verbosity:** Minimal. One sentence per play. No jargon.
 
@@ -241,8 +242,8 @@ Old callers keep working unchanged.
 
 Check the `_meta.mode` field on `tools/list` if you're not sure which tools are available:
 
-- `full` (default): all 26 tools
-- `lite`: 10 essentials for casual/intermediate workflows
+- `full` (default): all 28 tools
+- `lite`: 13 essentials for casual/intermediate workflows
 
 If a tool you expect to call isn't in the catalog, surface the `_meta` block so the user can decide whether to restart the server in `full` mode (`PROPPROFESSOR_MCP_MODE=full`).
 
@@ -257,6 +258,16 @@ Call `quick_screen` with the user's preferred verbosity. Present TIER 1 plays fi
 ```
 → quick_screen(verbosity: "minimal", leagues: ["NBA", "MLB", "NHL"])
 ```
+
+### "Should I bet [player] on [book]?"
+
+Call `smart_bet` with the player/team and book. Returns play metadata, verdict (movementDisposition + riskFlags + tier), best price across all books, and staking recommendation — all in one call.
+
+```
+→ smart_bet(selection: "Tatum", book: "Fliff", league: "NBA")
+```
+
+If you already have a specific play from `quick_screen`, use `validate_play` with the `gameId` and `playId` for a lighter check.
 
 ### "Is [player] safe to bet on?"
 
@@ -346,8 +357,9 @@ Risk: 1-3=low, 4-6=moderate, 7-10=high (warn user)
 Edge: <1%=skip, 1-3%=playable, >3%=strong
 Movement: 🟢=all signals aligned, 🟡=some uncertainty, 🔴=do not bet
 |Staking: T1=2%, T2=1%, T3=0.25% max, T4=0%
-|Auth: pp-query login → verify with health_status
+|Tool surface: 28 tools (full) / 13 essentials (lite)
 |Starting point: quick_screen (one-call: consensus + price + research)
+|Complete eval: smart_bet(selection, book) — play + verdict + price + staking
 ```
 
 ---
