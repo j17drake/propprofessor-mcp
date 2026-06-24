@@ -69,6 +69,7 @@ const {
 } = require('../../lib/propprofessor-sharp-books');
  const { resolveHistoryForEntity } = require('../../lib/propprofessor-history');
  const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
+ const { computeMovementDisposition } = require('../../lib/propprofessor-movement-disposition');
  const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
  const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
  const {
@@ -920,6 +921,56 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
     }
 
+    // --- Synthesize verdict summary for agents ---
+    // Combines movement disposition, verdict, risk flags, and execution quality
+    // into a single "should I bet this" answer. This encodes the bet-card drill
+    // so no agent-side skill doc is needed.
+    const _disposition = matchingRow
+      ? computeMovementDisposition(matchingRow)
+      : 'insufficient';
+
+    const _statusMessages = {
+      supportive_clean: 'all signals aligned — green movement, supportive direction, clean path',
+      supportive_bouncy: 'direction is right but path was rocky — yellow grade or V-shaped recovery',
+      adverse_recent: 'recent movement turned adverse — the direction went against the play recently',
+      adverse_full: 'full-window direction is adverse — do not bet',
+      insufficient: 'not enough data to evaluate movement quality',
+    };
+
+    const _riskFlags = [];
+    if (research && research.riskFlag && research.riskFlag !== 'low' && research.riskFlag !== 'clean') {
+      _riskFlags.push(`player_context: ${research.riskFlag}`);
+    }
+    if (gameContext && gameContext.riskFlag && gameContext.riskFlag !== 'low' && gameContext.riskFlag !== 'clean') {
+      _riskFlags.push(`game_context: ${gameContext.riskFlag}`);
+    }
+    if (_disposition === 'adverse_recent' || _disposition === 'adverse_full') {
+      _riskFlags.push('movement adverse');
+    }
+
+    let _actionableSummary;
+    if (_riskFlags.length === 0 && verdict === 'BET') {
+      _actionableSummary = 'No red flags. Clean play across all checks.';
+    } else if (verdict === 'BET' && _riskFlags.length > 0) {
+      _actionableSummary = `BET with caution — flags: ${_riskFlags.join(', ')}`;
+    } else if (verdict === 'CONSIDER') {
+      _actionableSummary = `Thin play${_riskFlags.length > 0 ? ' — ' + _riskFlags.join(', ') : ''}. Reduce stake or skip.`;
+    } else {
+      _actionableSummary = 'PASS — one or more hard checks failed.';
+    }
+
+    const verdictSummary = {
+      displayTier: verdict === 'BET' ? 'BET' : verdict === 'CONSIDER' ? 'CONSIDER' : 'PASS',
+      movementDisposition: _disposition,
+      movementStatus: _statusMessages[_disposition] || 'unknown',
+      executionQuality: matchingRow?.executionQuality || null,
+      consensusSupport: matchingRow?.consensusBookCount > 0
+        ? `${matchingRow.consensusBookCount} books`
+        : 'no consensus',
+      riskFlags: _riskFlags,
+      actionableSummary: _actionableSummary,
+    };
+
     return {
       ok: true,
       league,
@@ -930,6 +981,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       verdict,
       tier,
       reasons,
+      verdictSummary,
       play: matchingRow
         ? {
             gameId: matchingRow.gameId,
