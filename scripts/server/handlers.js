@@ -1719,7 +1719,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 confidenceTier: row.confidenceTier ?? 'TIER 4',
                 rationale: row.rationale || null,
                 screenScore: row.screenScore ?? 0,
-                freshnessSource: row.freshnessSource ?? null
+                freshnessSource: row.freshnessSource ?? null,
+                movementDisposition: row.movementDisposition || 'insufficient',
+                displayTier: row.kaiCall === 'BET' ? 'BET'
+                  : row.kaiCall === 'CONSIDER' ? 'CONSIDER'
+                  : 'PASS',
+                hoursUntilStart: row.start
+                  ? Math.round((new Date(row.start).getTime() - Date.now()) / 3600000 * 10) / 10
+                  : null
               }))
             });
           } catch (error) {
@@ -1736,6 +1743,21 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
+      const activeSlate = allCandidates
+        .filter(r => r.candidates && r.candidates.length > 0)
+        .map(r => ({
+          league: r.league,
+          market: r.market,
+          count: r.candidates.length,
+          error: r.error || null
+        }));
+
+      const warnings = allCandidates.some(r =>
+        r.candidates?.some(c => c.hoursUntilStart !== null && c.hoursUntilStart < 0)
+      )
+        ? ['Some games have already started. Live odds may be stale.']
+        : [];
+
       const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
       return {
         ok: true,
@@ -1744,8 +1766,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         leagues,
         markets,
         totalCandidates: allCandidates.reduce((sum, l) => sum + (l.candidates?.length || 0), 0),
+        activeSlate,
         results: allCandidates,
         research: researchResults,
+        warnings,
         workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
@@ -2449,6 +2473,34 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         throw error;
       }
       const parsed = parseNaturalLanguagePropQuery(query);
+
+      // Check if this is a validation query ("should I bet X?") with a player
+      const isValidationQuery = /\b(should i bet|is .* safe|validate|check .* play)\b/i.test(query);
+
+      if (isValidationQuery && parsed.player) {
+        return {
+          ok: true,
+          raw: parsed.raw,
+          parsed: {
+            league: parsed.league,
+            book: parsed.book,
+            market: parsed.market,
+            side: parsed.side,
+            line: parsed.line,
+            player: parsed.player
+          },
+          suggestedTool: {
+            tool: 'validate_play',
+            args: {
+              ...(parsed.league ? { league: parsed.league } : {}),
+              selection: parsed.player,
+              ...(parsed.book ? { book: parsed.book } : {})
+            }
+          },
+          workflow: 'This looks like a validation query. Call quick_screen first to get the gameId, then call validate_play with the gameId and selection. Or if you already have a gameId from a prior call, use it directly.'
+        };
+      }
+
       return {
         ok: true,
         raw: parsed.raw,
