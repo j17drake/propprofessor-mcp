@@ -300,7 +300,11 @@ describe('validate_play handler', () => {
       // 4 rows = 2 sides (Chandler, Ruffy) × 2 books (BetOnline, FanDuel)
       assert.ok(result.resultMeta.matchedRows > 0, 'should have matched at least one row');
       assert.ok(
-        result.result.some((r) => String(r.selection || '').toLowerCase().includes('chandler')),
+        result.result.some((r) =>
+          String(r.selection || '')
+            .toLowerCase()
+            .includes('chandler')
+        ),
         'should include Chandler in results'
       );
     });
@@ -319,7 +323,10 @@ describe('validate_play handler', () => {
       });
       // The row should be found even though Pinnacle has no odds.
       assert.equal(result.ok, true);
-      assert.ok(result.play !== null, 'play should not be null when row is found. reasons: ' + JSON.stringify(result.reasons));
+      assert.ok(
+        result.play !== null,
+        'play should not be null when row is found. reasons: ' + JSON.stringify(result.reasons)
+      );
       assert.equal(result.gameId, 'UFC:PREMATCH:Chandler:Ruffy:1781484000');
       assert.ok(result.tier, 'should have a tier assignment');
     });

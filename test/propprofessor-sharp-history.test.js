@@ -140,7 +140,7 @@ describe('propprofessor sharp history helpers', () => {
         { book: 'Pinnacle', odds: -190, time: nowMs - 12 * 60 * 60 * 1000 },
         { book: 'Pinnacle', odds: -200, time: nowMs - 6 * 60 * 60 * 1000 },
         { book: 'Pinnacle', odds: -215, time: nowMs - 3 * 60 * 60 * 1000 },
-        { book: 'Pinnacle', odds: -229, time: nowMs - 1 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -229, time: nowMs - 1 * 60 * 60 * 1000 }
       ],
       { nowMs, recentWindowHours: 6 }
     );
@@ -159,7 +159,7 @@ describe('propprofessor sharp history helpers', () => {
       lineHistory: [
         { book: 'Pinnacle', odds: -222, time: nowMs - 25 * 60 * 60 * 1000 },
         { book: 'Pinnacle', odds: -186, time: nowMs - 13 * 60 * 60 * 1000 },
-        { book: 'Pinnacle', odds: -229, time: nowMs - 1 * 60 * 60 * 1000 },
+        { book: 'Pinnacle', odds: -229, time: nowMs - 1 * 60 * 60 * 1000 }
       ],
       preferredBook: 'NoVigApp',
       sharpBooks: ['Pinnacle', 'Circa'],
@@ -167,7 +167,13 @@ describe('propprofessor sharp history helpers', () => {
     });
 
     assert.ok(typeof summary.minClvPct === 'number', `Expected minClvPct to be a number, got ${summary.minClvPct}`);
-    assert.ok(typeof summary.peakAdverseClvPct === 'number', `Expected peakAdverseClvPct to be a number, got ${summary.peakAdverseClvPct}`);
-    assert.ok(summary.minClvPct < summary.clvProxyPct, `minClvPct (${summary.minClvPct}) should be < clvProxyPct (${summary.clvProxyPct})`);
+    assert.ok(
+      typeof summary.peakAdverseClvPct === 'number',
+      `Expected peakAdverseClvPct to be a number, got ${summary.peakAdverseClvPct}`
+    );
+    assert.ok(
+      summary.minClvPct < summary.clvProxyPct,
+      `minClvPct (${summary.minClvPct}) should be < clvProxyPct (${summary.clvProxyPct})`
+    );
   });
 });

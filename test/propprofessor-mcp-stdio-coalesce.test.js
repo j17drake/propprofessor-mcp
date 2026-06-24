@@ -70,10 +70,7 @@ describe('createCoalescingWriter', () => {
         assert.ok(writes.length >= 1, 'Should have flushed at least once');
         // The first flush should contain at least 101 bytes
         const firstWrite = writes[0];
-        assert.ok(
-          firstWrite.length >= 100,
-          `First write should be >= 100 bytes, got ${firstWrite.length}`
-        );
+        assert.ok(firstWrite.length >= 100, `First write should be >= 100 bytes, got ${firstWrite.length}`);
         resolve();
       });
     });

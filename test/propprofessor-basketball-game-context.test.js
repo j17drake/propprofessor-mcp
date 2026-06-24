@@ -22,11 +22,7 @@ function scoreboardResponse(gameDate, games) {
   });
 }
 
-function makeGame({
-  gameId = '0022300001',
-  homeTeamName = 'Lakers',
-  awayTeamName = 'Celtics'
-} = {}) {
+function makeGame({ gameId = '0022300001', homeTeamName = 'Lakers', awayTeamName = 'Celtics' } = {}) {
   return {
     gameId,
     gameStatus: 1,
@@ -76,7 +72,10 @@ describe('propprofessor-basketball-game-context', () => {
     // No curl mocks needed — unknown sport path doesn't reach fetchJsonNba
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: '123', sport: 'NCAAB', awayTeam: 'Duke', homeTeam: 'UNC'
+      gamePk: '123',
+      sport: 'NCAAB',
+      awayTeam: 'Duke',
+      homeTeam: 'UNC'
     });
     assert.strictEqual(result.riskFlag, 'unknown');
     assert.ok(result.riskSummary.includes('not NBA or WNBA'));
@@ -85,7 +84,10 @@ describe('propprofessor-basketball-game-context', () => {
   it('returns riskFlag: unknown for NFL', async () => {
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: '99', sport: 'NFL', awayTeam: 'Chiefs', homeTeam: '49ers'
+      gamePk: '99',
+      sport: 'NFL',
+      awayTeam: 'Chiefs',
+      homeTeam: '49ers'
     });
     assert.strictEqual(result.riskFlag, 'unknown');
   });
@@ -108,7 +110,10 @@ describe('propprofessor-basketball-game-context', () => {
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: 'g1', sport: 'NBA', awayTeam: 'Celtics', homeTeam: 'Lakers',
+      gamePk: 'g1',
+      sport: 'NBA',
+      awayTeam: 'Celtics',
+      homeTeam: 'Lakers',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -125,24 +130,35 @@ describe('propprofessor-basketball-game-context', () => {
     // Return scheduled Jun 20 games on the Jun 20 curl, empty for all others
     cp.execFile = (_cmd, args, _opts, cb) => {
       const fn = typeof cb === 'function' ? cb : typeof _opts === 'function' ? _opts : null;
-      const joined = (Array.isArray(args) ? args.join(' ') : String(args));
+      const joined = Array.isArray(args) ? args.join(' ') : String(args);
       if (joined.includes('GameDate=2026-06-20')) {
         // LAL played Jun 20
-        fn(null, scoreboardResponse('2026-06-20', [
-          makeGame({ gameId: 'prev', homeTeamName: 'Lakers', awayTeamName: 'Jazz' })
-        ]), '');
+        fn(
+          null,
+          scoreboardResponse('2026-06-20', [
+            makeGame({ gameId: 'prev', homeTeamName: 'Lakers', awayTeamName: 'Jazz' })
+          ]),
+          ''
+        );
       } else if (joined.includes('GameDate=2026-06-18')) {
         // BOS played Jun 18
-        fn(null, scoreboardResponse('2026-06-18', [
-          makeGame({ gameId: 'prev2', homeTeamName: 'Celtics', awayTeamName: 'Knicks' })
-        ]), '');
+        fn(
+          null,
+          scoreboardResponse('2026-06-18', [
+            makeGame({ gameId: 'prev2', homeTeamName: 'Celtics', awayTeamName: 'Knicks' })
+          ]),
+          ''
+        );
       } else {
         fn(null, scoreboardResponse('2026-06-21', []), '');
       }
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: 'g2', sport: 'NBA', awayTeam: 'Celtics', homeTeam: 'Lakers',
+      gamePk: 'g2',
+      sport: 'NBA',
+      awayTeam: 'Celtics',
+      homeTeam: 'Lakers',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -160,19 +176,26 @@ describe('propprofessor-basketball-game-context', () => {
   it('detects both-teams on back-to-back', async () => {
     cp.execFile = (_cmd, args, _opts, cb) => {
       const fn = typeof cb === 'function' ? cb : typeof _opts === 'function' ? _opts : null;
-      const joined = (Array.isArray(args) ? args.join(' ') : String(args));
+      const joined = Array.isArray(args) ? args.join(' ') : String(args);
       if (joined.includes('GameDate=2026-06-20')) {
-        fn(null, scoreboardResponse('2026-06-20', [
-          makeGame({ gameId: 'a', homeTeamName: 'Lakers', awayTeamName: 'Jazz' }),
-          makeGame({ gameId: 'b', homeTeamName: 'Celtics', awayTeamName: 'Bulls' })
-        ]), '');
+        fn(
+          null,
+          scoreboardResponse('2026-06-20', [
+            makeGame({ gameId: 'a', homeTeamName: 'Lakers', awayTeamName: 'Jazz' }),
+            makeGame({ gameId: 'b', homeTeamName: 'Celtics', awayTeamName: 'Bulls' })
+          ]),
+          ''
+        );
       } else {
         fn(null, scoreboardResponse('2026-06-21', []), '');
       }
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: 'g3', sport: 'NBA', awayTeam: 'Celtics', homeTeam: 'Lakers',
+      gamePk: 'g3',
+      sport: 'NBA',
+      awayTeam: 'Celtics',
+      homeTeam: 'Lakers',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -194,7 +217,10 @@ describe('propprofessor-basketball-game-context', () => {
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: 'wnba1', sport: 'WNBA', awayTeam: 'Lynx', homeTeam: 'Liberty',
+      gamePk: 'wnba1',
+      sport: 'WNBA',
+      awayTeam: 'Lynx',
+      homeTeam: 'Liberty',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.sport, 'WNBA');
@@ -207,7 +233,10 @@ describe('propprofessor-basketball-game-context', () => {
   it('returns VALIDATION_ERROR when gameDate missing for NBA', async () => {
     const mod = require(MODULE_PATH);
     const result = await mod.getBasketballGameContext({
-      gamePk: 'x', sport: 'NBA', awayTeam: 'A', homeTeam: 'B'
+      gamePk: 'x',
+      sport: 'NBA',
+      awayTeam: 'A',
+      homeTeam: 'B'
     });
     assert.strictEqual(result.ok, false);
     assert.strictEqual(result.error.code, 'VALIDATION_ERROR');
@@ -216,12 +245,18 @@ describe('propprofessor-basketball-game-context', () => {
   it('returns VALIDATION_ERROR when team names missing for NBA', async () => {
     const mod = require(MODULE_PATH);
     const r1 = await mod.getBasketballGameContext({
-      gamePk: 'x', sport: 'NBA', homeTeam: 'B', gameDate: '2026-06-21'
+      gamePk: 'x',
+      sport: 'NBA',
+      homeTeam: 'B',
+      gameDate: '2026-06-21'
     });
     assert.strictEqual(r1.error?.code, 'VALIDATION_ERROR');
 
     const r2 = await mod.getBasketballGameContext({
-      gamePk: 'x', sport: 'NBA', awayTeam: 'A', gameDate: '2026-06-21'
+      gamePk: 'x',
+      sport: 'NBA',
+      awayTeam: 'A',
+      gameDate: '2026-06-21'
     });
     assert.strictEqual(r2.error?.code, 'VALIDATION_ERROR');
   });
@@ -237,12 +272,18 @@ describe('propprofessor-basketball-game-context', () => {
     };
     const mod = require(MODULE_PATH);
     const r1 = await mod.getBasketballGameContext({
-      gamePk: 'cached1', sport: 'NBA', awayTeam: 'Celtics', homeTeam: 'Lakers',
+      gamePk: 'cached1',
+      sport: 'NBA',
+      awayTeam: 'Celtics',
+      homeTeam: 'Lakers',
       gameDate: '2026-06-21'
     });
     const firstCallCount = callCount;
     const r2 = await mod.getBasketballGameContext({
-      gamePk: 'cached1', sport: 'NBA', awayTeam: 'Celtics', homeTeam: 'Lakers',
+      gamePk: 'cached1',
+      sport: 'NBA',
+      awayTeam: 'Celtics',
+      homeTeam: 'Lakers',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(r1.ok, true);
@@ -263,9 +304,7 @@ describe('propprofessor-basketball-game-context', () => {
 
   it('parseScoreboardGames parses a valid response', () => {
     const { parseScoreboardGames } = require(MODULE_PATH);
-    const raw = JSON.parse(scoreboardResponse('2026-06-21', [
-      makeGame({ gameId: 'g1' })
-    ]));
+    const raw = JSON.parse(scoreboardResponse('2026-06-21', [makeGame({ gameId: 'g1' })]));
     const games = parseScoreboardGames(raw);
     assert.strictEqual(games.length, 1);
     assert.strictEqual(games[0].gameId, 'g1');
@@ -302,9 +341,7 @@ describe('propprofessor-basketball-game-context', () => {
 
   it('findLastPlayedGame returns null when no prior game exists', () => {
     const { findLastPlayedGame } = require(MODULE_PATH);
-    const games = [
-      { gameDate: '2026-06-21', homeTeam: { name: 'Celtics' }, awayTeam: { name: 'Lakers' } }
-    ];
+    const games = [{ gameDate: '2026-06-21', homeTeam: { name: 'Celtics' }, awayTeam: { name: 'Lakers' } }];
     assert.strictEqual(findLastPlayedGame(games, 'Celtics', '2026-06-21'), null);
   });
 

@@ -37,14 +37,14 @@ const execFile = promisify(cp.execFile);
 const SCHEDULE_PATH = path.join(__dirname, '..', 'lib', 'tennis-schedule-data', 'weekly-schedule-2026.js');
 const CACHE_PATH = path.join(__dirname, '..', 'lib', 'tennis-schedule-data', 'circuit-cache.json');
 const SLUG_TO_FLASHSCORE = {
-  'halle':      { tour: 'atp', flashscorePath: '/tennis/atp-singles/halle/' },
-  'mallorca':   { tour: 'atp', flashscorePath: '/tennis/atp-singles/mallorca/' },
-  'queens':     { tour: 'atp', flashscorePath: '/tennis/atp-singles/london/' },
-  'bad-homburg':{ tour: 'wta', flashscorePath: '/tennis/wta-singles/bad-homburg/' },
-  'eastbourne': { tour: 'wta', flashscorePath: '/tennis/wta-singles/eastbourne/' },
-  'berlin':     { tour: 'wta', flashscorePath: '/tennis/wta-singles/berlin/' },
-  'nottingham': { tour: 'wta', flashscorePath: '/tennis/wta-singles/nottingham/' },
-  'wimbledon':  { tour: 'atp', flashscorePath: '/tennis/atp-singles/wimbledon/' }
+  halle: { tour: 'atp', flashscorePath: '/tennis/atp-singles/halle/' },
+  mallorca: { tour: 'atp', flashscorePath: '/tennis/atp-singles/mallorca/' },
+  queens: { tour: 'atp', flashscorePath: '/tennis/atp-singles/london/' },
+  'bad-homburg': { tour: 'wta', flashscorePath: '/tennis/wta-singles/bad-homburg/' },
+  eastbourne: { tour: 'wta', flashscorePath: '/tennis/wta-singles/eastbourne/' },
+  berlin: { tour: 'wta', flashscorePath: '/tennis/wta-singles/berlin/' },
+  nottingham: { tour: 'wta', flashscorePath: '/tennis/wta-singles/nottingham/' },
+  wimbledon: { tour: 'atp', flashscorePath: '/tennis/atp-singles/wimbledon/' }
 };
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -56,12 +56,11 @@ const CURL_TIMEOUT = 15;
  */
 async function fetchUrl(url) {
   try {
-    const { stdout } = await execFile('curl', [
-      '-sL',
-      '--max-time', String(CURL_TIMEOUT),
-      '-A', 'Mozilla/5.0 (PropProfessor Tennis MCP refresh)',
-      url
-    ], { timeout: CURL_TIMEOUT * 1000 });
+    const { stdout } = await execFile(
+      'curl',
+      ['-sL', '--max-time', String(CURL_TIMEOUT), '-A', 'Mozilla/5.0 (PropProfessor Tennis MCP refresh)', url],
+      { timeout: CURL_TIMEOUT * 1000 }
+    );
     return stdout;
   } catch (e) {
     return null;
@@ -145,7 +144,7 @@ async function pullTourneyDraw(slug, tour) {
   const html = await fetchUrl(url);
   if (!html) return [];
   const fullNames = parseFlashscoreDraw(html);
-  return fullNames.map(name => ({ lastName: lastName(name), slug, tour }));
+  return fullNames.map((name) => ({ lastName: lastName(name), slug, tour }));
 }
 
 async function main() {
@@ -164,7 +163,7 @@ async function main() {
 
   // Pull draws in parallel
   const results = await Promise.all(
-    targets.map(async t => {
+    targets.map(async (t) => {
       const entries = await pullTourneyDraw(t.slug, t.tour);
       return { ...t, entries };
     })
@@ -199,7 +198,7 @@ async function main() {
   console.log(`[refresh] wrote ${total} player entries to ${CACHE_PATH}`);
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error('[refresh] failed:', e.message);
   process.exit(1);
 });

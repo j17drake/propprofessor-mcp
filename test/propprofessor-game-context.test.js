@@ -56,7 +56,11 @@ describe('getGameContext', () => {
 
   it('returns clean for unsupported sports', async () => {
     const mod = require('../lib/propprofessor-game-context');
-    const r = await mod.getGameContext({ sport: 'UFC', selection: 'Islam Makhachev', game: 'Islam Makhachev vs Dustin Poirier' });
+    const r = await mod.getGameContext({
+      sport: 'UFC',
+      selection: 'Islam Makhachev',
+      game: 'Islam Makhachev vs Dustin Poirier'
+    });
     assert.ok(r.riskFlag);
     assert.ok(r.riskSummary);
   });
@@ -85,7 +89,12 @@ describe('getGameContext', () => {
 
   it('routes NBA to basketball handler', async () => {
     const mod = require('../lib/propprofessor-game-context');
-    const r = await mod.getGameContext({ sport: 'NBA', selection: 'Lakers', game: 'Lakers vs Celtics', start: new Date().toISOString() });
+    const r = await mod.getGameContext({
+      sport: 'NBA',
+      selection: 'Lakers',
+      game: 'Lakers vs Celtics',
+      start: new Date().toISOString()
+    });
     assert.ok(typeof r.riskFlag === 'string');
   });
 

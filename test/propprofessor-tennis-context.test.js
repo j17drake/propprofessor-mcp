@@ -583,14 +583,22 @@ describe('PLAYER_CIRCUIT coverage (regression)', () => {
   // The resolver MUST return non-null for these — covers today's slate.
   const KNOWN_MATCHUPS = [
     { matchup: 'Samsonova vs Svitolina', start: '2026-06-23T15:30:00.000Z', expectedSlug: 'bad-homburg' },
-    { matchup: 'Djere vs Zheng',         start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne'] },
-    { matchup: 'Bondar vs Udvardy',      start: '2026-06-23T12:30:00.000Z', expectedSlugAny: ['eastbourne', 'nottingham'] },
-    { matchup: 'Sabalenka vs Rybakina',  start: '2026-06-22T12:00:00.000Z', expectedSlugAny: ['bad-homburg', 'berlin'] },
-    { matchup: 'Alcaraz vs Sinner',      start: '2026-06-22T12:00:00.000Z', expectedSlugAny: ['queens', 'halle'] },
-    { matchup: 'Buse vs Tsitsipas',      start: '2026-06-22T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne', 'mallorca'] },
-    { matchup: 'Bronzetti vs Inglis',    start: '2026-06-23T09:00:00.000Z', expectedSlug: 'bad-homburg' },
-    { matchup: 'Monnet vs Prozorova',    start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['bad-homburg', 'eastbourne'] },
-    { matchup: 'Gojo vs Smith',          start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne'] }
+    { matchup: 'Djere vs Zheng', start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne'] },
+    { matchup: 'Bondar vs Udvardy', start: '2026-06-23T12:30:00.000Z', expectedSlugAny: ['eastbourne', 'nottingham'] },
+    { matchup: 'Sabalenka vs Rybakina', start: '2026-06-22T12:00:00.000Z', expectedSlugAny: ['bad-homburg', 'berlin'] },
+    { matchup: 'Alcaraz vs Sinner', start: '2026-06-22T12:00:00.000Z', expectedSlugAny: ['queens', 'halle'] },
+    {
+      matchup: 'Buse vs Tsitsipas',
+      start: '2026-06-22T09:00:00.000Z',
+      expectedSlugAny: ['halle', 'eastbourne', 'mallorca']
+    },
+    { matchup: 'Bronzetti vs Inglis', start: '2026-06-23T09:00:00.000Z', expectedSlug: 'bad-homburg' },
+    {
+      matchup: 'Monnet vs Prozorova',
+      start: '2026-06-23T09:00:00.000Z',
+      expectedSlugAny: ['bad-homburg', 'eastbourne']
+    },
+    { matchup: 'Gojo vs Smith', start: '2026-06-23T09:00:00.000Z', expectedSlugAny: ['halle', 'eastbourne'] }
   ];
   for (const tc of KNOWN_MATCHUPS) {
     it(`resolves ${tc.matchup} @ ${tc.start} (regression)`, () => {
@@ -598,10 +606,11 @@ describe('PLAYER_CIRCUIT coverage (regression)', () => {
       const r = ctx.resolveTournamentFromMatchup(tc.matchup, tc.start);
       assert.ok(r, `expected non-null resolution for ${tc.matchup}, got null`);
       if (tc.expectedSlug) assert.equal(r.slug, tc.expectedSlug, `wrong slug for ${tc.matchup}`);
-      if (tc.expectedSlugAny) assert.ok(
-        tc.expectedSlugAny.includes(r.slug),
-        `${tc.matchup} → ${r.slug} not in ${JSON.stringify(tc.expectedSlugAny)}`
-      );
+      if (tc.expectedSlugAny)
+        assert.ok(
+          tc.expectedSlugAny.includes(r.slug),
+          `${tc.matchup} → ${r.slug} not in ${JSON.stringify(tc.expectedSlugAny)}`
+        );
     });
   }
 });
@@ -611,7 +620,7 @@ describe('PLAYER_CIRCUIT cache merge', () => {
     const sched = require('../lib/tennis-schedule-data/weekly-schedule-2026');
     // Static entries are always there
     assert.ok(sched.PLAYER_CIRCUIT['Sabalenka'], 'Sabalenka missing from merged map');
-    assert.ok(sched.PLAYER_CIRCUIT['Djokovic'],  'Djokovic missing from merged map');
+    assert.ok(sched.PLAYER_CIRCUIT['Djokovic'], 'Djokovic missing from merged map');
     // STATIC map exposes the pre-merge static entries for inspection
     assert.ok(sched.PLAYER_CIRCUIT_STATIC, 'PLAYER_CIRCUIT_STATIC not exported');
     assert.ok(sched.PLAYER_CIRCUIT_STATIC['Sabalenka'], 'Sabalenka missing from static map');
@@ -651,8 +660,14 @@ describe('Tour alignment (regression)', () => {
     const t = sched.listTourneysForWeek('2026-06-23T09:00:00.000Z');
     const eastbourne = t.filter((x) => x.slug === 'eastbourne');
     assert.equal(eastbourne.length, 2, `expected 2 Eastbourne entries (ATP + WTA), got ${eastbourne.length}`);
-    assert.ok(eastbourne.find((x) => x.tour === 'atp'), 'no ATP Eastbourne entry');
-    assert.ok(eastbourne.find((x) => x.tour === 'wta'), 'no WTA Eastbourne entry');
+    assert.ok(
+      eastbourne.find((x) => x.tour === 'atp'),
+      'no ATP Eastbourne entry'
+    );
+    assert.ok(
+      eastbourne.find((x) => x.tour === 'wta'),
+      'no WTA Eastbourne entry'
+    );
   });
 });
 

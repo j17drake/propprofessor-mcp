@@ -42,7 +42,9 @@ const {
  * @returns {string[]} Default market names
  */
 function getDefaultMarketsForLeague(league, _targetBooks) {
-  const leagueUpper = String(league || '').trim().toUpperCase();
+  const leagueUpper = String(league || '')
+    .trim()
+    .toUpperCase();
   if (leagueUpper === 'SOCCER') {
     return ['Draw No Bet', 'Match Handicap', 'Total Goals'];
   }
@@ -69,28 +71,28 @@ const {
   ALL_SCREEN_BOOKS,
   uniqueBooks
 } = require('../../lib/propprofessor-sharp-books');
- const { resolveHistoryForEntity } = require('../../lib/propprofessor-history');
- const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
- const { computeMovementDisposition } = require('../../lib/propprofessor-movement-disposition');
- const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
- const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
- const {
-   analyzeMultiWindow,
-   summarizeResults,
-   DEFAULT_WINDOWS,
-   DEFAULT_SHARP_BOOKS
- } = require('../../lib/propprofessor-sharp-consensus');
- const {
-   getConfidenceTierStable,
-   clearScoreTimeline,
-   buildRationale,
-   suggestStakes
- } = require('../../lib/propprofessor-risk-score');
- const { getPlayerContext } = require('../../lib/propprofessor-player-context');
- const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
- const { getGameContext } = require('../../lib/propprofessor-game-context');
- const { isPlayerSelection } = require('../../lib/propprofessor-selection-type');
- const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
+const { resolveHistoryForEntity } = require('../../lib/propprofessor-history');
+const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
+const { computeMovementDisposition } = require('../../lib/propprofessor-movement-disposition');
+const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
+const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
+const {
+  analyzeMultiWindow,
+  summarizeResults,
+  DEFAULT_WINDOWS,
+  DEFAULT_SHARP_BOOKS
+} = require('../../lib/propprofessor-sharp-consensus');
+const {
+  getConfidenceTierStable,
+  clearScoreTimeline,
+  buildRationale,
+  suggestStakes
+} = require('../../lib/propprofessor-risk-score');
+const { getPlayerContext } = require('../../lib/propprofessor-player-context');
+const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
+const { getGameContext } = require('../../lib/propprofessor-game-context');
+const { isPlayerSelection } = require('../../lib/propprofessor-selection-type');
+const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
 const {
   formatRecommendedBetsMinimal,
   formatRecommendedBetsStandard,
@@ -474,13 +476,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         rows: response.result,
         limit: researchLimit,
         playerContextFn: handlers.player_context,
-        gameContextFn: (opts) => getGameContext({
-          sport: opts.sport || opts.league,
-          selection: opts.selection,
-          game: opts.game,
-          start: opts.start,
-          market: opts.market
-        })
+        gameContextFn: (opts) =>
+          getGameContext({
+            sport: opts.sport || opts.league,
+            selection: opts.selection,
+            game: opts.game,
+            start: opts.start,
+            market: opts.market
+          })
       });
       response.research = research.results;
       response.resultMeta = {
@@ -635,9 +638,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // moneylines — all rows land in `focusBookMissingRows` instead of `result`.
     // Merge those back in so that get_play_details and validate_play actually
     // return a row for the requested gameId.
-    const fallbackRows = Array.isArray(response.focusBookMissingRows)
-      ? response.focusBookMissingRows
-      : [];
+    const fallbackRows = Array.isArray(response.focusBookMissingRows) ? response.focusBookMissingRows : [];
     const merged = [...filtered];
     for (const fbRow of fallbackRows) {
       if (gameIdSet.has(fbRow && fbRow.gameId)) {
@@ -741,38 +742,37 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4])
         ? new Date(Number(gameIdParts[4]) * 1000).toISOString().slice(0, 10)
         : '';
-    const gameContextPromise =
-      skipResearch
-        ? Promise.resolve(null)
-        : isMlb
-          ? (async () => {
-              try {
-                if (!seedAwayTeam || !seedHomeTeam || !seedStartDate) {
-                  return { ok: false, error: 'missing MLB matchup data for game context' };
-                }
-                const attemptedLookup = {
-                  isoDate: seedStartDate,
-                  awayTeam: seedAwayTeam,
-                  homeTeam: seedHomeTeam,
-                  unixStart: gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4]) ? Number(gameIdParts[4]) : undefined
-                };
-                const gamePk = await findMlbGamePk(attemptedLookup);
-                if (!gamePk) {
-                  return {
-                    ok: false,
-                    error: {
-                      errorType: 'schedule_not_found',
-                      errorDetail: 'no MLB gamePk found for matchup',
-                      attemptedLookup
-                    }
-                  };
-                }
-                return { ok: true, value: await getMlbGameContext({ gamePk }) };
-              } catch (err) {
-                return { ok: false, error: err?.message || String(err) };
+    const gameContextPromise = skipResearch
+      ? Promise.resolve(null)
+      : isMlb
+        ? (async () => {
+            try {
+              if (!seedAwayTeam || !seedHomeTeam || !seedStartDate) {
+                return { ok: false, error: 'missing MLB matchup data for game context' };
               }
-            })()
-          : (async () => {
+              const attemptedLookup = {
+                isoDate: seedStartDate,
+                awayTeam: seedAwayTeam,
+                homeTeam: seedHomeTeam,
+                unixStart: gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4]) ? Number(gameIdParts[4]) : undefined
+              };
+              const gamePk = await findMlbGamePk(attemptedLookup);
+              if (!gamePk) {
+                return {
+                  ok: false,
+                  error: {
+                    errorType: 'schedule_not_found',
+                    errorDetail: 'no MLB gamePk found for matchup',
+                    attemptedLookup
+                  }
+                };
+              }
+              return { ok: true, value: await getMlbGameContext({ gamePk }) };
+            } catch (err) {
+              return { ok: false, error: err?.message || String(err) };
+            }
+          })()
+        : (async () => {
             try {
               // Non-MLB: run sport-agnostic game context via dispatcher.
               // For Tennis, parse the gameId to extract the unix start
@@ -832,7 +832,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const exactRow = detailRows.find((r) => {
         const rowPlayId = String(r.playId || buildCanonicalPlayId(r)).trim();
         if (requestedPlayId && rowPlayId === requestedPlayId) return true;
-        const stored = String(r.selection || r.participant || '').toLowerCase().trim();
+        const stored = String(r.selection || r.participant || '')
+          .toLowerCase()
+          .trim();
         const storedSelectionKey = normalizeSelectionKey(r.selection || r.participant || r.pick || '');
         return (
           stored === selLower ||
@@ -849,8 +851,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         for (const key of Object.keys(r.selections)) {
           const sel = r.selections[key];
           if (sel && typeof sel === 'object') {
-            const s1 = String(sel.selection1 || '').toLowerCase().trim();
-            const s2 = String(sel.selection2 || '').toLowerCase().trim();
+            const s1 = String(sel.selection1 || '')
+              .toLowerCase()
+              .trim();
+            const s2 = String(sel.selection2 || '')
+              .toLowerCase()
+              .trim();
             if (s1 === selLower || s2 === selLower) return true;
             if (s1 === selStrippedLine || s2 === selStrippedLine) return true;
             if (s1 === selStrippedOverUnder || s2 === selStrippedOverUnder) return true;
@@ -860,12 +866,24 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
       if (nestedRow) return nestedRow;
 
-      return detailRows.find((r) => {
-        if (String(r.selection || r.participant || '').trim()) return false;
-        if (String(r.homeTeam || '').toLowerCase().includes(selLower)) return true;
-        if (String(r.awayTeam || '').toLowerCase().includes(selLower)) return true;
-        return false;
-      }) || null;
+      return (
+        detailRows.find((r) => {
+          if (String(r.selection || r.participant || '').trim()) return false;
+          if (
+            String(r.homeTeam || '')
+              .toLowerCase()
+              .includes(selLower)
+          )
+            return true;
+          if (
+            String(r.awayTeam || '')
+              .toLowerCase()
+              .includes(selLower)
+          )
+            return true;
+          return false;
+        }) || null
+      );
     })();
 
     // If research was started before we had the row, re-run it with
@@ -961,9 +979,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // player_context so the agent's reasoning doesn't have to branch.
     if (gameContext && gameContext.riskFlag === 'high') {
       verdict = 'PASS';
-      reasons.push(
-        `game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`
-      );
+      reasons.push(`game_context riskFlag = "high"${gameContext.riskSummary ? ` — ${gameContext.riskSummary}` : ''}`);
     } else if (gameContext && gameContext.riskFlag === 'medium') {
       if (verdict === 'BET') verdict = 'CONSIDER';
       reasons.push(`game_context riskFlag = "medium" — ${gameContext.riskSummary || 'proceed with caution'}`);
@@ -980,16 +996,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // Combines movement disposition, verdict, risk flags, and execution quality
     // into a single "should I bet this" answer. This encodes the bet-card drill
     // so no agent-side skill doc is needed.
-    const _disposition = matchingRow
-      ? computeMovementDisposition(matchingRow)
-      : 'insufficient';
+    const _disposition = matchingRow ? computeMovementDisposition(matchingRow) : 'insufficient';
 
     const _statusMessages = {
       supportive_clean: 'all signals aligned — green movement, supportive direction, clean path',
       supportive_bouncy: 'direction is right but path was rocky — yellow grade or V-shaped recovery',
       adverse_recent: 'recent movement turned adverse — the direction went against the play recently',
       adverse_full: 'full-window direction is adverse — do not bet',
-      insufficient: 'not enough data to evaluate movement quality',
+      insufficient: 'not enough data to evaluate movement quality'
     };
 
     const _riskFlags = [];
@@ -1009,7 +1023,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     } else if (verdict === 'BET' && _riskFlags.length > 0) {
       _actionableSummary = `BET with caution — flags: ${_riskFlags.join(', ')}`;
     } else if (lookupStatus === 'lookup_failed') {
-      _actionableSummary = "Couldn't be rehydrated from the current screen snapshot. Treat as stale / unverified, not an automatic fade.";
+      _actionableSummary =
+        "Couldn't be rehydrated from the current screen snapshot. Treat as stale / unverified, not an automatic fade.";
     } else if (verdict === 'CONSIDER') {
       _actionableSummary = `Thin play${_riskFlags.length > 0 ? ' — ' + _riskFlags.join(', ') : ''}. Reduce stake or skip.`;
     } else {
@@ -1021,11 +1036,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       movementDisposition: _disposition,
       movementStatus: _statusMessages[_disposition] || 'unknown',
       executionQuality: matchingRow?.executionQuality || null,
-      consensusSupport: matchingRow?.consensusBookCount > 0
-        ? `${matchingRow.consensusBookCount} books`
-        : 'no consensus',
+      consensusSupport:
+        matchingRow?.consensusBookCount > 0 ? `${matchingRow.consensusBookCount} books` : 'no consensus',
       riskFlags: _riskFlags,
-      actionableSummary: _actionableSummary,
+      actionableSummary: _actionableSummary
     };
 
     return {
@@ -1047,7 +1061,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       play: matchingRow
         ? {
             playId: matchingRow.playId || buildCanonicalPlayId(matchingRow),
-            selectionKey: matchingRow.selectionKey || normalizeSelectionKey(matchingRow.selection || matchingRow.participant || ''),
+            selectionKey:
+              matchingRow.selectionKey || normalizeSelectionKey(matchingRow.selection || matchingRow.participant || ''),
             gameId: matchingRow.gameId,
             homeTeam: matchingRow.homeTeam,
             awayTeam: matchingRow.awayTeam,
@@ -1089,24 +1104,30 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             cached: Boolean(gameContext.cached),
             fetchedAt: gameContext.fetchedAt,
             // MLB-specific
-            ...(isMlb ? {
-              venue: gameContext.venue || null,
-              pitchers: gameContext.pitchers || null,
-              park: gameContext.park || null,
-              weather: gameContext.weather || null,
-              lineups: gameContext.lineups || null,
-            } : {}),
+            ...(isMlb
+              ? {
+                  venue: gameContext.venue || null,
+                  pitchers: gameContext.pitchers || null,
+                  park: gameContext.park || null,
+                  weather: gameContext.weather || null,
+                  lineups: gameContext.lineups || null
+                }
+              : {}),
             // Basketball-specific
-            ...(gameContext.awayTeam ? {
-              awayTeam: gameContext.awayTeam,
-              homeTeam: gameContext.homeTeam,
-            } : {}),
+            ...(gameContext.awayTeam
+              ? {
+                  awayTeam: gameContext.awayTeam,
+                  homeTeam: gameContext.homeTeam
+                }
+              : {}),
             // Tennis-specific
-            ...(gameContext.surface ? {
-              surface: gameContext.surface,
-              level: gameContext.level,
-              matchupNewsCount: gameContext.matchupNewsCount,
-            } : {}),
+            ...(gameContext.surface
+              ? {
+                  surface: gameContext.surface,
+                  level: gameContext.level,
+                  matchupNewsCount: gameContext.matchupNewsCount
+                }
+              : {})
           }
         : isMlb
           ? skipResearch
@@ -1117,7 +1138,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 : gameContextError
               : null
           : null
-
     };
   }
 
@@ -1584,11 +1604,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             ? [args.league]
             : Array.from(DEFAULT_LEAGUES);
       const markets =
-        Array.isArray(args.markets) && args.markets.length
-          ? args.markets
-          : args.market
-            ? [args.market]
-            : null;  // null = use per-league defaults below
+        Array.isArray(args.markets) && args.markets.length ? args.markets : args.market ? [args.market] : null; // null = use per-league defaults below
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
       const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 50;
       const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
@@ -1647,23 +1663,24 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               // Run research in parallel with concurrency-3, routing by selection type
               const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
               const researchOpts = {
-                rows: researchBatch.map(r => ({
+                rows: researchBatch.map((r) => ({
                   selection: r.player,
                   league: r.league,
                   game: r.game,
                   start: r.row.start || r.row.eventStart || null,
-                  market: r.row.market || '',
+                  market: r.row.market || ''
                 })),
                 limit: researchBatch.length,
                 playerContextFn: handlers.player_context,
-                gameContextFn: (opts) => getGameContext({
-                  sport: opts.sport || opts.league,
-                  selection: opts.selection,
-                  game: opts.game,
-                  start: opts.start,
-                  market: opts.market,
-                }),
-                concurrency: 3,
+                gameContextFn: (opts) =>
+                  getGameContext({
+                    sport: opts.sport || opts.league,
+                    selection: opts.selection,
+                    game: opts.game,
+                    start: opts.start,
+                    market: opts.market
+                  }),
+                concurrency: 3
               };
               const researchOut = await runResearchOnTopRows(researchOpts);
               for (const r of researchOut.results) {
@@ -1673,7 +1690,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   riskFlag: r.riskFlag,
                   riskSummary: r.riskSummary || null,
                   contextType: r.contextType || 'player',
-                  ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {}),
+                  ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {})
                 });
               }
             }
@@ -1748,7 +1765,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           const marketResolution = resolveMarkets(
             { markets: args.markets, market: args.market },
             league,
-            'Moneyline'  // fallback for resolveMarkets
+            'Moneyline' // fallback for resolveMarkets
           );
           resolvedMarketsByLeague[league] = marketResolution.array.length
             ? marketResolution.array
@@ -2482,9 +2499,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         sport,
         book: book || 'default',
         markets,
-        note: sport.toUpperCase() === 'SOCCER'
-          ? 'Soccer uses Draw No Bet (not Moneyline), Match Handicap (not Spread), and Total Goals'
-          : undefined,
+        note:
+          sport.toUpperCase() === 'SOCCER'
+            ? 'Soccer uses Draw No Bet (not Moneyline), Match Handicap (not Spread), and Total Goals'
+            : undefined
       };
     },
 
@@ -2529,12 +2547,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             {
               name: 'quick_screen',
               one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
-              when_to_call: 'Default starting point. Use verbosity="standard" to get structured plays with edge, tier, risk, and research.'
+              when_to_call:
+                'Default starting point. Use verbosity="standard" to get structured plays with edge, tier, risk, and research.'
             },
             {
               name: 'validate_play',
-              one_liner: 'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
-              when_to_call: 'End-of-pipeline validation before recommending. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.',
+              one_liner:
+                'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
+              when_to_call:
+                'End-of-pipeline validation before recommending. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.'
             },
             {
               name: 'find_best_price',
@@ -2572,7 +2593,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             {
               name: 'quick_screen',
               one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
-              when_to_call: 'Default starting point. Use verbosity="full" for complete edge, tier, risk, line history, and research in one call.'
+              when_to_call:
+                'Default starting point. Use verbosity="full" for complete edge, tier, risk, line history, and research in one call.'
             },
             {
               name: 'all_slates',
@@ -2596,8 +2618,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             },
             {
               name: 'validate_play',
-              one_liner: 'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
-              when_to_call: 'End-of-pipeline validation. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.',
+              one_liner:
+                'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
+              when_to_call:
+                'End-of-pipeline validation. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.'
             },
             {
               name: 'staking_plan',
@@ -2627,7 +2651,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           'soccer_markets: quick_screen with leagues=["Soccer"] uses Draw No Bet / Match Handicap / Total Goals by default. If you get 0 results, the book may genuinely not have soccer that day. Probe find_best_price with market="Draw No Bet" on a known fixture.',
           'tennis_start_time: validate_play may return stale start timestamps for tennis. Check verdictSummary.movementDisposition and gameContext — if surface/level resolve to a real tournament, the match is live regardless of the API start time.',
           'movement_disposition: validate_play.verdictSummary.movementDisposition is the single field to check: supportive_clean = BET, supportive_bouncy = CONSIDER, adverse_recent/adverse_full = PASS. Do not cross-reference movementGrade + movementLabel separately.',
-          'empty_slate: If quick_screen returns 0 candidates across all leagues, run health_status first. If auth is valid, the slate is genuinely empty. Do not force recommendations.',
+          'empty_slate: If quick_screen returns 0 candidates across all leagues, run health_status first. If auth is valid, the slate is genuinely empty. Do not force recommendations.'
         ]
       };
     },

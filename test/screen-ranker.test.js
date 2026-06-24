@@ -476,7 +476,8 @@ describe('screen-ranker (direct unit tests)', () => {
       };
       // With requirePreferredBook=true — simulates explicit user book request.
       const ranked = rankScreenRows([row], {
-        preferredBook: 'NoVigApp', limit: 10,
+        preferredBook: 'NoVigApp',
+        limit: 10,
         requirePreferredBook: true
       });
       // With requirePreferredBook=true, expandScreenRow drops the row entirely
@@ -484,8 +485,11 @@ describe('screen-ranker (direct unit tests)', () => {
       // step. The main array is empty, focusBookMissingRows stays undefined,
       // and coverageGaps captures the missing coverage.
       assert.equal(ranked.length, 0);
-      assert.equal(ranked.focusBookMissingRows, undefined,
-        'with requirePreferredBook=true, row is dropped before partition — focusBookMissingRows stays undefined');
+      assert.equal(
+        ranked.focusBookMissingRows,
+        undefined,
+        'with requirePreferredBook=true, row is dropped before partition — focusBookMissingRows stays undefined'
+      );
       // coverageGaps is still populated by the expandScreenRow-returns-[] branch
       assert.ok(Array.isArray(ranked.coverageGaps));
       assert.ok(ranked.coverageGaps.length > 0, 'should have at least one coverage gap');

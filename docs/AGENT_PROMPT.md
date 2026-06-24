@@ -217,11 +217,11 @@ When presenting any play with riskScore ≥ 7:
 
 ### Pick `verbosity` based on what you'll do with the response
 
-| Use case                                | Verbosity  | Why                                                                        |
-| --------------------------------------- | ---------- | -------------------------------------------------------------------------- |
-| Chat reply to user, plain English       | `minimal`  | quick_screen with minimal returns a **summary string**. Relay it verbatim. |
-| Decision logic, filter by tier          | `standard` | Structured rows with edge/tier/risk + brief rationale. Fields stripped.    |
-| Debug, audit, replay                    | `full`     | Every field, including line history and debug payloads. Largest response.  |
+| Use case                          | Verbosity  | Why                                                                        |
+| --------------------------------- | ---------- | -------------------------------------------------------------------------- |
+| Chat reply to user, plain English | `minimal`  | quick_screen with minimal returns a **summary string**. Relay it verbatim. |
+| Decision logic, filter by tier    | `standard` | Structured rows with edge/tier/risk + brief rationale. Fields stripped.    |
+| Debug, audit, replay              | `full`     | Every field, including line history and debug payloads. Largest response.  |
 
 > **Footgun**: agents that pick `minimal` to save tokens and then try to parse the response will silently get a plain-English sentence instead of JSON. Use `minimal` only when the output goes directly to the user.
 
@@ -372,13 +372,13 @@ The old behavior returned `PASS`, which falsely implied the play was bad. The ne
 
 Don't cross-reference `movementGrade` + `movementLabel` + `recentSharpMoveDirection` separately. Read **one field**: `validate_play.verdictSummary.movementDisposition`.
 
-| Value | Meaning | Action |
-|---|---|---|
-| `supportive_clean` | Green movement, supportive direction, clean path | BET |
+| Value               | Meaning                                                            | Action   |
+| ------------------- | ------------------------------------------------------------------ | -------- |
+| `supportive_clean`  | Green movement, supportive direction, clean path                   | BET      |
 | `supportive_bouncy` | Direction right but path rocky (V-shaped recovery or yellow grade) | CONSIDER |
-| `adverse_recent` | Recent movement turned adverse | PASS |
-| `adverse_full` | Full-window direction is adverse | PASS |
-| `insufficient` | Not enough data | Skip |
+| `adverse_recent`    | Recent movement turned adverse                                     | PASS     |
+| `adverse_full`      | Full-window direction is adverse                                   | PASS     |
+| `insufficient`      | Not enough data                                                    | Skip     |
 
 ### Empty slate
 

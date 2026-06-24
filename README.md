@@ -229,7 +229,7 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `quick_screen`     | Best plays on any book with sharp consensus + player context                     |
 | `recommended_bets` | Top flagged movements with tier, risk, and plain English rationale               |
 | `player_context`   | Injury/availability check on a specific player                                   |
-| `validate_play`    | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS |
+| `validate_play`    | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS + playId + drift detection |
 | `mlb_game_context` | Starting pitchers, park factor, hourly weather, lineup lock for an MLB game      |
 | `find_best_price`  | Line-shop across all books for the best execution price                          |
 | `health_status`    | Auth freshness and endpoint connectivity                                         |
@@ -342,7 +342,7 @@ Full methodology, weight tables, and the tier assignment lookup in [docs/METHODO
 
 ### Hermes Agent
 
-Automatic setup via `make install`. The MCP is self-documenting — agents call `get_started` to discover the right workflow, `get_play_details` for deep dives, and `validate_play` for a synthesized verdict with verdictSummary, riskFlags, and actionableSummary.
+Automatic setup via `make install`. The MCP is self-documenting — agents call `get_started` to discover the right workflow, `get_play_details` for deep dives, and `validate_play` for a synthesized verdict with verdictSummary, riskFlags, actionableSummary, playId, and consensus drift detection.
 
 ### Discord / Telegram Alerts
 

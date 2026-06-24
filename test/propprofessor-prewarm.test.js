@@ -183,7 +183,7 @@ describe('propprofessor-prewarm', () => {
       const mockClient = {
         queryScreenOddsBestComps: async ({ league }) => {
           callOrder.push(`screen-start-${league}`);
-          
+
           if (league === 'NBA') {
             // Simulate a slow NBA API call
             await new Promise((r) => setTimeout(r, nbaDelayMs));
@@ -191,7 +191,7 @@ describe('propprofessor-prewarm', () => {
             // MLB should complete quickly
             await new Promise((r) => setTimeout(r, 10));
           }
-          
+
           callOrder.push(`screen-end-${league}`);
           return { game_data: [] };
         },
@@ -209,15 +209,12 @@ describe('propprofessor-prewarm', () => {
       // This proves parallel execution
       const mlbStartIdx = callOrder.indexOf('screen-start-MLB');
       const nbaEndIdx = callOrder.indexOf('screen-end-NBA');
-      
+
       assert.notEqual(mlbStartIdx, -1, 'MLB screen should have started');
       assert.notEqual(nbaEndIdx, -1, 'NBA screen should have ended');
-      
+
       // MLB screen should start before NBA screen ends (proving parallel execution)
-      assert.ok(
-        mlbStartIdx < nbaEndIdx,
-        'MLB screen should start before NBA screen ends - proving parallel execution'
-      );
+      assert.ok(mlbStartIdx < nbaEndIdx, 'MLB screen should start before NBA screen ends - proving parallel execution');
     });
   });
 });

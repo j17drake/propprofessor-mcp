@@ -93,7 +93,9 @@ describe('propprofessor-nhl-context', () => {
   it('returns riskFlag: unknown when missing gameDate', async () => {
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: '123', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens'
+      gamePk: '123',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens'
     });
     assert.strictEqual(result.riskFlag, 'unknown');
   });
@@ -101,7 +103,9 @@ describe('propprofessor-nhl-context', () => {
   it('returns riskFlag: unknown when missing awayTeam', async () => {
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: '123', homeTeam: 'Montreal Canadiens', gameDate: '2026-06-21'
+      gamePk: '123',
+      homeTeam: 'Montreal Canadiens',
+      gameDate: '2026-06-21'
     });
     assert.strictEqual(result.riskFlag, 'unknown');
   });
@@ -109,7 +113,9 @@ describe('propprofessor-nhl-context', () => {
   it('returns riskFlag: unknown when missing homeTeam', async () => {
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: '123', awayTeam: 'Boston Bruins', gameDate: '2026-06-21'
+      gamePk: '123',
+      awayTeam: 'Boston Bruins',
+      gameDate: '2026-06-21'
     });
     assert.strictEqual(result.riskFlag, 'unknown');
   });
@@ -126,7 +132,9 @@ describe('propprofessor-nhl-context', () => {
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: 'g1', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens',
+      gamePk: 'g1',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -143,24 +151,50 @@ describe('propprofessor-nhl-context', () => {
     // Return games on specific dates matching team names
     cp.execFile = (_cmd, args, _opts, cb) => {
       const fn = typeof cb === 'function' ? cb : typeof _opts === 'function' ? _opts : null;
-      const joined = (Array.isArray(args) ? args.join(' ') : String(args));
+      const joined = Array.isArray(args) ? args.join(' ') : String(args);
       if (joined.includes('/2026-06-20')) {
         // BOS (Boston Bruins) played Jun 20
-        fn(null, scheduleResponse('2026-06-20', [
-          makeGame({ gameId: 100, awayPlace: 'Boston', awayCommon: 'Bruins', awayAbbrev: 'BOS', homePlace: 'Toronto', homeCommon: 'Maple Leafs', homeAbbrev: 'TOR' })
-        ]), '');
+        fn(
+          null,
+          scheduleResponse('2026-06-20', [
+            makeGame({
+              gameId: 100,
+              awayPlace: 'Boston',
+              awayCommon: 'Bruins',
+              awayAbbrev: 'BOS',
+              homePlace: 'Toronto',
+              homeCommon: 'Maple Leafs',
+              homeAbbrev: 'TOR'
+            })
+          ]),
+          ''
+        );
       } else if (joined.includes('/2026-06-18')) {
         // MTL (Montreal Canadiens) played Jun 18
-        fn(null, scheduleResponse('2026-06-18', [
-          makeGame({ gameId: 101, awayPlace: 'Montréal', awayCommon: 'Canadiens', awayAbbrev: 'MTL', homePlace: 'Ottawa', homeCommon: 'Senators', homeAbbrev: 'OTT' })
-        ]), '');
+        fn(
+          null,
+          scheduleResponse('2026-06-18', [
+            makeGame({
+              gameId: 101,
+              awayPlace: 'Montréal',
+              awayCommon: 'Canadiens',
+              awayAbbrev: 'MTL',
+              homePlace: 'Ottawa',
+              homeCommon: 'Senators',
+              homeAbbrev: 'OTT'
+            })
+          ]),
+          ''
+        );
       } else {
         fn(null, scheduleResponse('2026-06-21', []), '');
       }
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: 'g2', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens',
+      gamePk: 'g2',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -178,19 +212,41 @@ describe('propprofessor-nhl-context', () => {
   it('detects both-teams on back-to-back', async () => {
     cp.execFile = (_cmd, args, _opts, cb) => {
       const fn = typeof cb === 'function' ? cb : typeof _opts === 'function' ? _opts : null;
-      const joined = (Array.isArray(args) ? args.join(' ') : String(args));
+      const joined = Array.isArray(args) ? args.join(' ') : String(args);
       if (joined.includes('/2026-06-20')) {
-        fn(null, scheduleResponse('2026-06-20', [
-          makeGame({ gameId: 200, awayPlace: 'Boston', awayCommon: 'Bruins', awayAbbrev: 'BOS', homePlace: 'New York', homeCommon: 'Rangers', homeAbbrev: 'NYR' }),
-          makeGame({ gameId: 201, awayPlace: 'Montréal', awayCommon: 'Canadiens', awayAbbrev: 'MTL', homePlace: 'Toronto', homeCommon: 'Maple Leafs', homeAbbrev: 'TOR' })
-        ]), '');
+        fn(
+          null,
+          scheduleResponse('2026-06-20', [
+            makeGame({
+              gameId: 200,
+              awayPlace: 'Boston',
+              awayCommon: 'Bruins',
+              awayAbbrev: 'BOS',
+              homePlace: 'New York',
+              homeCommon: 'Rangers',
+              homeAbbrev: 'NYR'
+            }),
+            makeGame({
+              gameId: 201,
+              awayPlace: 'Montréal',
+              awayCommon: 'Canadiens',
+              awayAbbrev: 'MTL',
+              homePlace: 'Toronto',
+              homeCommon: 'Maple Leafs',
+              homeAbbrev: 'TOR'
+            })
+          ]),
+          ''
+        );
       } else {
         fn(null, scheduleResponse('2026-06-21', []), '');
       }
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: 'g3', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens',
+      gamePk: 'g3',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -207,18 +263,32 @@ describe('propprofessor-nhl-context', () => {
   it('matches team by abbreviation', async () => {
     cp.execFile = (_cmd, args, _opts, cb) => {
       const fn = typeof cb === 'function' ? cb : typeof _opts === 'function' ? _opts : null;
-      const joined = (Array.isArray(args) ? args.join(' ') : String(args));
+      const joined = Array.isArray(args) ? args.join(' ') : String(args);
       if (joined.includes('/2026-06-20')) {
-        fn(null, scheduleResponse('2026-06-20', [
-          makeGame({ gameId: 300, awayPlace: 'Boston', awayCommon: 'Bruins', awayAbbrev: 'BOS', homePlace: 'New York', homeCommon: 'Rangers', homeAbbrev: 'NYR' })
-        ]), '');
+        fn(
+          null,
+          scheduleResponse('2026-06-20', [
+            makeGame({
+              gameId: 300,
+              awayPlace: 'Boston',
+              awayCommon: 'Bruins',
+              awayAbbrev: 'BOS',
+              homePlace: 'New York',
+              homeCommon: 'Rangers',
+              homeAbbrev: 'NYR'
+            })
+          ]),
+          ''
+        );
       } else {
         fn(null, scheduleResponse('2026-06-21', []), '');
       }
     };
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: 'g4', awayTeam: 'BOS', homeTeam: 'Montreal Canadiens',
+      gamePk: 'g4',
+      awayTeam: 'BOS',
+      homeTeam: 'Montreal Canadiens',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -229,11 +299,23 @@ describe('propprofessor-nhl-context', () => {
   it('matches team with accented characters (Montréal → Montreal)', async () => {
     cp.execFile = (_cmd, args, _opts, cb) => {
       const fn = typeof cb === 'function' ? cb : typeof _opts === 'function' ? _opts : null;
-      const joined = (Array.isArray(args) ? args.join(' ') : String(args));
+      const joined = Array.isArray(args) ? args.join(' ') : String(args);
       if (joined.includes('/2026-06-20')) {
-        fn(null, scheduleResponse('2026-06-20', [
-          makeGame({ gameId: 400, awayPlace: 'Montréal', awayCommon: 'Canadiens', awayAbbrev: 'MTL', homePlace: 'Boston', homeCommon: 'Bruins', homeAbbrev: 'BOS' })
-        ]), '');
+        fn(
+          null,
+          scheduleResponse('2026-06-20', [
+            makeGame({
+              gameId: 400,
+              awayPlace: 'Montréal',
+              awayCommon: 'Canadiens',
+              awayAbbrev: 'MTL',
+              homePlace: 'Boston',
+              homeCommon: 'Bruins',
+              homeAbbrev: 'BOS'
+            })
+          ]),
+          ''
+        );
       } else {
         fn(null, scheduleResponse('2026-06-21', []), '');
       }
@@ -241,7 +323,9 @@ describe('propprofessor-nhl-context', () => {
     const mod = require(MODULE_PATH);
     // Pass "Montreal" (without accent) — should match "Montréal" (with accent)
     const result = await mod.getNhlContext({
-      gamePk: 'g5', awayTeam: 'Montreal Canadiens', homeTeam: 'Boston Bruins',
+      gamePk: 'g5',
+      awayTeam: 'Montreal Canadiens',
+      homeTeam: 'Boston Bruins',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(result.ok, true);
@@ -256,7 +340,9 @@ describe('propprofessor-nhl-context', () => {
     // propagates to the outer catch in getNhlContext.
     const mod = require(MODULE_PATH);
     const result = await mod.getNhlContext({
-      gamePk: 'g6', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens',
+      gamePk: 'g6',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens',
       gameDate: 'not-a-date'
     });
     assert.strictEqual(result.ok, false);
@@ -275,12 +361,16 @@ describe('propprofessor-nhl-context', () => {
     };
     const mod = require(MODULE_PATH);
     const r1 = await mod.getNhlContext({
-      gamePk: 'cached1', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens',
+      gamePk: 'cached1',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens',
       gameDate: '2026-06-21'
     });
     const firstCallCount = callCount;
     const r2 = await mod.getNhlContext({
-      gamePk: 'cached1', awayTeam: 'Boston Bruins', homeTeam: 'Montreal Canadiens',
+      gamePk: 'cached1',
+      awayTeam: 'Boston Bruins',
+      homeTeam: 'Montreal Canadiens',
       gameDate: '2026-06-21'
     });
     assert.strictEqual(r1.ok, true);
@@ -301,9 +391,7 @@ describe('propprofessor-nhl-context', () => {
 
   it('parseScheduleGames parses a valid response', () => {
     const { parseScheduleGames } = require(MODULE_PATH);
-    const raw = JSON.parse(scheduleResponse('2026-06-21', [
-      makeGame({ gameId: 500, date: '2026-06-21' })
-    ]));
+    const raw = JSON.parse(scheduleResponse('2026-06-21', [makeGame({ gameId: 500, date: '2026-06-21' })]));
     const games = parseScheduleGames(raw);
     assert.strictEqual(games.length, 1);
     assert.strictEqual(games[0].gameId, '500');
@@ -333,8 +421,16 @@ describe('propprofessor-nhl-context', () => {
   it('findLastPlayedGame returns most recent prior game date', () => {
     const { findLastPlayedGame } = require(MODULE_PATH);
     const games = [
-      { gameDate: '2026-06-20', awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' }, homeTeam: { displayName: 'New York Rangers', commonName: 'Rangers', placeName: 'New York', abbrev: 'NYR' } },
-      { gameDate: '2026-06-21', awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' }, homeTeam: { displayName: 'Montréal Canadiens', commonName: 'Canadiens', placeName: 'Montréal', abbrev: 'MTL' } } // same date, skipped
+      {
+        gameDate: '2026-06-20',
+        awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' },
+        homeTeam: { displayName: 'New York Rangers', commonName: 'Rangers', placeName: 'New York', abbrev: 'NYR' }
+      },
+      {
+        gameDate: '2026-06-21',
+        awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' },
+        homeTeam: { displayName: 'Montréal Canadiens', commonName: 'Canadiens', placeName: 'Montréal', abbrev: 'MTL' }
+      } // same date, skipped
     ];
     const result = findLastPlayedGame(games, 'Boston Bruins', '2026-06-21');
     assert.strictEqual(result, '2026-06-20');
@@ -343,7 +439,11 @@ describe('propprofessor-nhl-context', () => {
   it('findLastPlayedGame returns null when no prior game exists', () => {
     const { findLastPlayedGame } = require(MODULE_PATH);
     const games = [
-      { gameDate: '2026-06-21', awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' }, homeTeam: { displayName: 'Montréal Canadiens', commonName: 'Canadiens', placeName: 'Montréal', abbrev: 'MTL' } }
+      {
+        gameDate: '2026-06-21',
+        awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' },
+        homeTeam: { displayName: 'Montréal Canadiens', commonName: 'Canadiens', placeName: 'Montréal', abbrev: 'MTL' }
+      }
     ];
     assert.strictEqual(findLastPlayedGame(games, 'Boston Bruins', '2026-06-21'), null);
   });
@@ -351,7 +451,11 @@ describe('propprofessor-nhl-context', () => {
   it('findLastPlayedGame matches by abbreviation', () => {
     const { findLastPlayedGame } = require(MODULE_PATH);
     const games = [
-      { gameDate: '2026-06-19', awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' }, homeTeam: { displayName: 'New York Rangers', commonName: 'Rangers', placeName: 'New York', abbrev: 'NYR' } }
+      {
+        gameDate: '2026-06-19',
+        awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' },
+        homeTeam: { displayName: 'New York Rangers', commonName: 'Rangers', placeName: 'New York', abbrev: 'NYR' }
+      }
     ];
     const result = findLastPlayedGame(games, 'BOS', '2026-06-21');
     assert.strictEqual(result, '2026-06-19');
@@ -360,7 +464,11 @@ describe('propprofessor-nhl-context', () => {
   it('findLastPlayedGame matches by commonName', () => {
     const { findLastPlayedGame } = require(MODULE_PATH);
     const games = [
-      { gameDate: '2026-06-19', awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' }, homeTeam: { displayName: 'New York Rangers', commonName: 'Rangers', placeName: 'New York', abbrev: 'NYR' } }
+      {
+        gameDate: '2026-06-19',
+        awayTeam: { displayName: 'Boston Bruins', commonName: 'Bruins', placeName: 'Boston', abbrev: 'BOS' },
+        homeTeam: { displayName: 'New York Rangers', commonName: 'Rangers', placeName: 'New York', abbrev: 'NYR' }
+      }
     ];
     const result = findLastPlayedGame(games, 'Bruins', '2026-06-21');
     assert.strictEqual(result, '2026-06-19');
