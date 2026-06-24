@@ -90,7 +90,7 @@
     "superjson": "^2.2.6"
   },
   "optionalDependencies": {
-    "playwright": "^1.52.0"
+    "playwright": "^1.61.1"
   },
   "c8": {
     "all": true,
@@ -117,7 +117,7 @@
     "c8": "^11.0.0",
     "eslint": "^10.5.0",
     "eslint-plugin-complexity": "^1.0.2",
-    "globals": "^17.6.0",
+    "globals": "^17.7.0",
     "madge": "^8.0.0",
     "prettier": "^3.8.4",
     "typescript": "^5.9.3"
