@@ -1985,6 +1985,147 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return response;
     },
 
+    async smart_bet(args = {}) {
+      const selection = String(args.selection || '').trim();
+      const book = String(args.book || '').trim();
+      const league = String(args.league || '').trim() || undefined;
+      const market = String(args.market || 'Moneyline').trim();
+      const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
+      const verbosity = args.verbosity || 'standard';
+
+      if (!selection) {
+        const error = new Error('selection is required');
+        error.code = 'MISSING_PARAMS';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+      if (!book) {
+        const error = new Error('book is required');
+        error.code = 'MISSING_PARAMS';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+
+      // Step 1: Quick screen to find the play (skip research — validate_play does it later)
+      const screenResult = await handlers.quick_screen({
+        book,
+        leagues: league ? [league] : undefined,
+        markets: [market],
+        limit: 20,
+        includeResearch: false,
+        verbosity: 'standard'
+      });
+
+      // Step 2: Find the matching candidate — track which league/market entry it came from
+      let match = null;
+      let matchLeague = league || null;
+      let matchMarket = market;
+
+      for (const entry of (screenResult.results || [])) {
+        const found = (entry.candidates || []).find(c =>
+          c.selection && c.selection.toLowerCase().includes(selection.toLowerCase())
+        );
+        if (found) {
+          match = found;
+          matchLeague = entry.league || matchLeague;
+          matchMarket = entry.market || matchMarket;
+          break;
+        }
+      }
+
+      if (!match) {
+        return {
+          ok: true,
+          found: false,
+          message: `No play found for "${selection}" on ${book}. The slate may be empty or the player/team isn't in today's games.`,
+          activeSlate: screenResult.activeSlate || []
+        };
+      }
+
+      // Step 3: Validate the play
+      let validation = null;
+      try {
+        validation = await handlers.validate_play({
+          league: matchLeague,
+          gameId: match.gameId,
+          selection: match.selection,
+          market: matchMarket,
+          book
+        });
+      } catch {
+        // validation failed — surface what we have
+      }
+
+      // Step 4: Line shop
+      let bestPrice = null;
+      try {
+        bestPrice = await handlers.find_best_price({
+          game: match.game,
+          league: matchLeague,
+          market: matchMarket,
+          selection: match.selection
+        });
+      } catch {
+        // line shop failed — not critical
+      }
+
+      // Step 5: Staking recommendation
+      let staking = null;
+      if (validation?.verdict === 'BET' || validation?.verdict === 'CONSIDER') {
+        try {
+          const stakingResult = await handlers.staking_plan({
+            bankroll,
+            leagues: matchLeague ? [matchLeague] : undefined,
+            markets: [matchMarket],
+            targetTiers: validation.verdict === 'BET' ? ['TIER 1'] : ['TIER 1', 'TIER 2']
+          });
+          const stakingStakes = stakingResult?.stakes || [];
+          staking = stakingStakes.find(p =>
+            p.selection && p.selection.toLowerCase().includes(selection.toLowerCase())
+          ) || null;
+        } catch {
+          // staking failed — not critical
+        }
+      }
+
+      return {
+        ok: true,
+        found: true,
+        play: {
+          selection: match.selection,
+          game: match.game,
+          league: matchLeague,
+          market: matchMarket,
+          odds: match.odds,
+          edge: match.edge,
+          executionQuality: match.executionQuality,
+          movementDisposition: match.movementDisposition,
+          displayTier: match.displayTier,
+          kaiCall: match.kaiCall,
+          confidenceTier: match.confidenceTier,
+          riskScore: match.riskScore
+        },
+        verdict: validation ? {
+          verdict: validation.verdict,
+          tier: validation.tier,
+          actionableSummary: validation.verdictSummary?.actionableSummary,
+          riskFlags: validation.verdictSummary?.riskFlags || [],
+          movementDisposition: validation.verdictSummary?.movementDisposition
+        } : null,
+        bestPrice: bestPrice?.found
+          ? bestPrice.bestPrice
+          : null,
+        staking: staking ? {
+          stake: staking.stakeDollars,
+          stakePct: staking.bankrollPct,
+          reason: staking.rationale
+        } : null,
+        verbosity
+      };
+    },
+
     async staking_plan(args = {}) {
       const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
