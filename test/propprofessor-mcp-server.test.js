@@ -1301,6 +1301,43 @@ describe('propprofessor MCP server stdio contract', () => {
       }
     }
   });
+
+  it('validate_play returns a structured response with required fields', async () => {
+    const { client } = createRankedScreenClientStub();
+    const handlers = createMcpHandlers({ client });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'stub-game-1',
+      selection: 'Stub Home'
+    });
+
+    assert.equal(result.ok, true);
+    // Core verdict fields
+    assert.equal(typeof result.verdict, 'string');
+    assert.ok(['BET', 'CONSIDER', 'PASS'].includes(result.verdict));
+    assert.equal(typeof result.lookupStatus, 'string');
+    assert.ok(['resolved', 'lookup_failed', 'stale_snapshot'].includes(result.lookupStatus));
+    assert.equal(typeof result.reasonType, 'string');
+    assert.ok(Array.isArray(result.reasons));
+    // Verdict summary
+    assert.ok(result.verdictSummary && typeof result.verdictSummary === 'object');
+    assert.equal(typeof result.verdictSummary.actionableSummary, 'string');
+    assert.equal(typeof result.verdictSummary.movementDisposition, 'string');
+    assert.equal(typeof result.verdictSummary.executionQuality, 'string');
+    // Drift fields
+    assert.equal(typeof result.consensusDrift, 'boolean');
+    // Play object shape (when found)
+    if (result.play) {
+      assert.equal(typeof result.play.playId, 'string');
+      assert.equal(typeof result.play.selectionKey, 'string');
+      assert.equal(typeof result.play.gameId, 'string');
+      assert.equal(typeof result.play.executionQuality, 'string');
+      assert.equal(typeof result.play.consensusBookCount, 'number');
+      assert.equal(typeof result.play.freshnessSource, 'string');
+    }
+  });
 });
 
 describe('validated candidate concurrency helpers', () => {
