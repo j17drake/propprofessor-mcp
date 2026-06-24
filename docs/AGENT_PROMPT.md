@@ -15,6 +15,7 @@ The PropProfessor tools are built around this principle:
 - `sharp_plays` only returns a "Bet candidate" when a **non-target** sharp book confirms the movement.
 - `recommended_bets` requires green movement quality (supportive label + high quality + strong consensus + positive CLV) for TIER 1.
 - `sharp_consensus` checks 6 time windows (1h–48h) for sustained agreement across all sharp books.
+- `quick_screen` bundles sharp consensus + target-book price + player research into one call — the recommended starting point for any agent.
 
 **If the sharp books don't agree, there is no play — regardless of how good one book's number looks.**
 
@@ -73,7 +74,7 @@ A qualitative assessment of the line movement quality:
 
 **Tools to call:**
 
-1. `recommended_bets` with `verbosity: "minimal"` — plain English top picks
+1. `quick_screen` with `verbosity: "minimal"` — plain English picks with sharp consensus, book price, and injury research in one call
 2. `player_context` — check injury risk on the plays you're showing
 
 **Verbosity:** Minimal. One sentence per play. No jargon.
@@ -100,7 +101,7 @@ No strong plays in MLB right now.
 
 **Tools to call:**
 
-1. `recommended_bets` with `verbosity: "standard"` — structured plays with edge/tier/risk
+1. `quick_screen` with `verbosity: "standard"` — structured plays with edge, tier, risk, and research — one call instead of three
 2. `player_context` — injury risk check
 3. `find_best_price` — line shop across books
 4. `league_presets` — show ranking weights if they ask "how does this work?"
@@ -218,8 +219,8 @@ When presenting any play with riskScore ≥ 7:
 
 | Use case                                | Verbosity  | Why                                                                        |
 | --------------------------------------- | ---------- | -------------------------------------------------------------------------- |
-| Chat reply to user, plain English       | `minimal`  | Returns a **summary string** (not JSON). Cannot be parsed — just relay it. |
-| Decision logic (filter, re-rank, store) | `standard` | Structured rows with edge/tier/risk + brief rationale. Fields stripped.    |
+| Chat reply to user, plain English       | `minimal`  | quick_screen with minimal returns a **summary string**. Relay it verbatim. |
+| Decision logic, filter by tier          | `standard` | Structured rows with edge/tier/risk + brief rationale. Fields stripped.    |
 | Debug, audit, replay                    | `full`     | Every field, including line history and debug payloads. Largest response.  |
 
 > **Footgun**: agents that pick `minimal` to save tokens and then try to parse the response will silently get a plain-English sentence instead of JSON. Use `minimal` only when the output goes directly to the user.
@@ -251,10 +252,10 @@ If a tool you expect to call isn't in the catalog, surface the `_meta` block so 
 
 ### "What's the best bet today?"
 
-Call `recommended_bets` with the user's preferred verbosity. Present TIER 1 plays first, then TIER 2. If nothing qualifies, say so honestly.
+Call `quick_screen` with the user's preferred verbosity. Present TIER 1 plays first, then TIER 2. If nothing qualifies, say so honestly.
 
 ```
-→ recommended_bets(verbosity: "minimal", leagues: ["NBA", "MLB", "NHL"])
+→ quick_screen(verbosity: "minimal", leagues: ["NBA", "MLB", "NHL"])
 ```
 
 ### "Is [player] safe to bet on?"
@@ -346,4 +347,5 @@ Edge: <1%=skip, 1-3%=playable, >3%=strong
 Movement: 🟢=all signals aligned, 🟡=some uncertainty, 🔴=do not bet
 Staking: T1=2%, T2=1%, T3=0.25% max, T4=0%
 Auth: pp-query login → verify with health_status
+Starting point: quick_screen (one-call: consensus + price + research)
 ```
