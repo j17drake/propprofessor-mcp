@@ -753,7 +753,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 const attemptedLookup = {
                   isoDate: seedStartDate,
                   awayTeam: seedAwayTeam,
-                  homeTeam: seedHomeTeam
+                  homeTeam: seedHomeTeam,
+                  unixStart: gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4]) ? Number(gameIdParts[4]) : undefined
                 };
                 const gamePk = await findMlbGamePk(attemptedLookup);
                 if (!gamePk) {
@@ -884,6 +885,24 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     let tier = matchingRow?.confidenceTier || 'TIER 4';
     let lookupStatus = 'resolved';
     let reasonType = 'signal';
+
+    // Consensus drift detection: compare the agent's snapshot against the re-fetched row.
+    let consensusDrift = false;
+    let driftReason = null;
+    if (matchingRow) {
+      const screenCbk = Number(args.screenConsensusBookCount);
+      const screenExec = String(args.screenExecutionQuality || '');
+      const currentCbk = Number(matchingRow.consensusBookCount || 0);
+      const currentExec = String(matchingRow.executionQuality || '');
+
+      if (Number.isFinite(screenCbk) && screenCbk > 0 && screenCbk !== currentCbk) {
+        consensusDrift = true;
+        driftReason = 'consensus changed';
+      } else if (screenExec && screenExec !== 'unknown' && screenExec !== currentExec) {
+        consensusDrift = true;
+        driftReason = 'execution quality changed';
+      }
+    }
 
     if (matchingRow) {
       // Base quality from the existing ranker output.
@@ -1023,6 +1042,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       reasons,
       verdictSummary,
       screenFreshness: detailResult?.freshness || null,
+      consensusDrift,
+      driftReason,
       play: matchingRow
         ? {
             playId: matchingRow.playId || buildCanonicalPlayId(matchingRow),

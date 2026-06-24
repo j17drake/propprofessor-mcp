@@ -194,6 +194,38 @@ describe('validate_play handler', () => {
     assert.equal(result.lookupStatus, 'resolved');
   });
 
+  it('detects consensus drift when screen snapshot differs from re-fetched row', async () => {
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'NBA:game-1',
+      selection: 'Lakers',
+      screenConsensusBookCount: 5,
+      screenExecutionQuality: 'best'
+    });
+
+    assert.equal(result.ok, true);
+    // The test client returns consensusBookCount=2 and executionQuality varies,
+    // so passing screenConsensusBookCount=5 should trigger drift
+    assert.equal(result.consensusDrift, true);
+    assert.equal(typeof result.driftReason, 'string');
+  });
+
+  it('returns no drift when screen snapshot matches re-fetched row', async () => {
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'NBA:game-1',
+      selection: 'Lakers'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.consensusDrift, false);
+    assert.equal(result.driftReason, null);
+  });
+
   it('surfaces typed MLB game-context lookup failures without forcing PASS', async () => {
     const handlers = createMcpHandlers({ client: makeClient() });
     handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
@@ -212,7 +244,8 @@ describe('validate_play handler', () => {
     assert.deepEqual(result.gameContext.attemptedLookup, {
       isoDate: '2026-06-24',
       awayTeam: 'Los Angeles Angels',
-      homeTeam: 'Baltimore Orioles'
+      homeTeam: 'Baltimore Orioles',
+      unixStart: 1782331620
     });
   });
 

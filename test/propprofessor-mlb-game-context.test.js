@@ -433,6 +433,64 @@ describe('propprofessor-mlb-game-context', () => {
       assert.equal(result, null);
     });
 
+    it('resolves the correct gamePk in a doubleheader using unix timestamp', async () => {
+      const { findMlbGamePk } = loadModule();
+      const scheduleBody = JSON.stringify({
+        dates: [{
+          date: '2026-06-17',
+          games: [
+            {
+              gamePk: 111111,
+              gameDate: '2026-06-17T17:10:00Z',
+              teams: { away: { team: { name: 'Tampa Bay Rays' } }, home: { team: { name: 'Los Angeles Dodgers' } } }
+            },
+            {
+              gamePk: 222222,
+              gameDate: '2026-06-18T00:10:00Z',
+              teams: { away: { team: { name: 'Tampa Bay Rays' } }, home: { team: { name: 'Los Angeles Dodgers' } } }
+            }
+          ]
+        }]
+      });
+      mockCurl([{ match: 'date=2026-06-17', body: scheduleBody }]);
+      // Unix 1781716200 = 2026-06-17T17:10:00Z → should pick game 111111
+      const result = await findMlbGamePk({
+        isoDate: '2026-06-17',
+        awayTeam: 'Tampa Bay Rays',
+        homeTeam: 'Los Angeles Dodgers',
+        unixStart: 1781716200
+      });
+      assert.equal(result, '111111');
+    });
+
+    it('picks first game when no unixStart provided even with multiple matches', async () => {
+      const { findMlbGamePk } = loadModule();
+      const scheduleBody = JSON.stringify({
+        dates: [{
+          date: '2026-06-17',
+          games: [
+            {
+              gamePk: 111111,
+              gameDate: '2026-06-17T17:10:00Z',
+              teams: { away: { team: { name: 'Tampa Bay Rays' } }, home: { team: { name: 'Los Angeles Dodgers' } } }
+            },
+            {
+              gamePk: 222222,
+              gameDate: '2026-06-18T00:10:00Z',
+              teams: { away: { team: { name: 'Tampa Bay Rays' } }, home: { team: { name: 'Los Angeles Dodgers' } } }
+            }
+          ]
+        }]
+      });
+      mockCurl([{ match: 'date=2026-06-17', body: scheduleBody }]);
+      const result = await findMlbGamePk({
+        isoDate: '2026-06-17',
+        awayTeam: 'Tampa Bay Rays',
+        homeTeam: 'Los Angeles Dodgers'
+      });
+      assert.equal(result, '111111');
+    });
+
     it('matches team names case-insensitively with surrounding whitespace trimmed', async () => {
       const { findMlbGamePk } = loadModule();
       const scheduleBody = JSON.stringify({
