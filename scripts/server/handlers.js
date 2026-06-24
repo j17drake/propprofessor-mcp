@@ -1148,6 +1148,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       market: args.market || 'Moneyline',
       books: normalizeBookList(args.books),
       is_live: Boolean(args.is_live),
+      cardWindow: String(args.cardWindow || 'all').trim().toLowerCase(),
       lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : null,
       games: args.games || [],
       participants: args.participants || []
@@ -1315,6 +1316,22 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
       if (screenResult?.result) {
         screenResult.result = await correctTennisTimes(screenResult.result);
+
+        // Date window filter: same logic as UFC — when cardWindow='today',
+        // drop rows whose start date doesn't match today's UTC date.
+        const cardWindow = String(args.cardWindow || 'all').trim().toLowerCase();
+        if (cardWindow === 'today' || cardWindow === 'next') {
+          const nowMs = Date.now();
+          const todayKey = new Date(nowMs).toISOString().slice(0, 10);
+          const nextKey = new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          screenResult.result = screenResult.result.filter((row) => {
+            if (!row || !row.start) return true; // keep rows without start time
+            const startDateKey = new Date(row.start).toISOString().slice(0, 10);
+            return cardWindow === 'today'
+              ? startDateKey === todayKey
+              : startDateKey === nextKey;
+          });
+        }
       }
       // Add market alias info to resultMeta if any aliases were used
       if (marketResolution.aliasesUsed.length) {
@@ -1630,6 +1647,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const allCandidates = [];
       const researchResults = [];
 
+      // Date window: try 'today' first to avoid showing tomorrow's matches;
+      // fall back to 'all' if the slate is empty (off-day or late evening).
+      let cardWindow = args.cardWindow || 'today';
+
       for (const league of leagues) {
         for (const market of resolvedMarketsByLeague[league] || []) {
           try {
@@ -1644,6 +1665,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               strict: false,
               includePasses: false,
               includeResearch: false,
+              cardWindow,
               debug
             });
 
@@ -1739,6 +1761,78 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               code: categorized.code,
               recovery: categorized.recovery
             });
+          }
+        }
+      }
+
+      // Auto-detect: if today's slate is empty, fall back to showing all
+      // available matches (handles off-days or late evening when today's
+      // games are already past).
+      const hasTodayCandidates = allCandidates.some(
+        r => r.candidates && r.candidates.length > 0
+      );
+      if (!hasTodayCandidates && cardWindow === 'today') {
+        allCandidates.length = 0;
+        cardWindow = 'all';
+        for (const league of leagues) {
+          for (const market of resolvedMarketsByLeague[league] || []) {
+            try {
+              const spResult = await handlers.sharp_plays({
+                targetBooks,
+                league,
+                market,
+                limit: scanLimit,
+                scanLimit,
+                lookbackHours,
+                is_live: Boolean(args.is_live),
+                strict: false,
+                includePasses: false,
+                includeResearch: false,
+                cardWindow,
+                debug
+              });
+
+              const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
+              if (!candidates.length) continue;
+
+              // Skip research on fallback pass — it's an empty-day fallback
+              allCandidates.push({
+                league,
+                market,
+                candidates: candidates.slice(0, limit).map((row) => ({
+                  playId: row.playId || null,
+                  selectionKey: row.selectionKey || null,
+                  gameId: row.gameId || null,
+                  game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
+                  selection: row.selection || row.participant || row.pick || null,
+                  start: row.start || null,
+                  odds: row.odds ?? row.currentOdds ?? null,
+                  edge: row.consensusEdge ?? null,
+                  clv: row.clvProxyPct ?? null,
+                  consensusBookCount: row.consensusBookCount ?? 0,
+                  executionQuality: row.executionQuality ?? 'unknown',
+                  movementGrade: row.movementGrade ?? 'unknown',
+                  movementLabel: row.movementLabel ?? null,
+                  sharpBookMovementConfirmed: row.sharpBookMovementConfirmed || false,
+                  sharpBookMovementSource: row.sharpBookMovementSource || null,
+                  riskScore: row.riskScore ?? null,
+                  kaiCall: row.kaiCall ?? 'PASS',
+                  confidenceTier: row.confidenceTier ?? 'TIER 4',
+                  rationale: row.rationale || null,
+                  screenScore: row.screenScore ?? 0,
+                  freshnessSource: row.freshnessSource ?? null,
+                  movementDisposition: row.movementDisposition || 'insufficient',
+                  displayTier: row.kaiCall === 'BET' ? 'BET'
+                    : row.kaiCall === 'CONSIDER' ? 'CONSIDER'
+                    : 'PASS',
+                  hoursUntilStart: row.start
+                    ? Math.round((new Date(row.start).getTime() - Date.now()) / 3600000 * 10) / 10
+                    : null
+                }))
+              });
+            } catch {
+              // League failed to scan — skip, continue with others
+            }
           }
         }
       }
