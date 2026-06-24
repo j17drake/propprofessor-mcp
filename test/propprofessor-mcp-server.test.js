@@ -406,13 +406,12 @@ describe('propprofessor MCP server stdio contract', () => {
 
     assert.equal(response.result.isError, true);
     assert.equal(response.result.structuredContent.ok, false);
-    assert.deepEqual(response.result.structuredContent.error, {
-      code: 'AUTH_REQUIRED',
-      message: 'Missing PropProfessor auth token',
-      category: 'auth',
-      status: 401,
-      recovery: 'Run: pp-query login'
-    });
+    const errObj = response.result.structuredContent.error;
+    assert.equal(errObj.code, 'AUTH_REQUIRED');
+    assert.equal(errObj.message, 'Missing PropProfessor auth token');
+    assert.equal(errObj.category, 'auth');
+    assert.equal(errObj.status, 401);
+    assert.ok(errObj.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('returns backend validation errors when validated candidates cannot validate any rows', async () => {

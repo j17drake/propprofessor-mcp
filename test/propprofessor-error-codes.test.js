@@ -6,11 +6,11 @@ const { categorizeError, createCategorizedError } = require('../lib/propprofesso
 const { createMcpServer } = require('../scripts/propprofessor-mcp-server');
 
 describe('structured error codes with recovery instructions', () => {
-  it('401 error maps to AUTH_EXPIRED with recovery mentioning pp-query login', () => {
+  it('401 error maps to AUTH_EXPIRED with recovery mentioning login command', () => {
     const result = categorizeError({ message: 'Unauthorized', status: 401 });
     assert.equal(result.code, 'AUTH_EXPIRED');
     assert.equal(result.category, 'auth');
-    assert.ok(result.recovery.includes('pp-query login'));
+    assert.ok(result.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('503 error maps to BACKEND_DOWN with recovery mentioning try again', () => {
@@ -31,7 +31,7 @@ describe('structured error codes with recovery instructions', () => {
     const result = categorizeError(new Error('Authentication failed'));
     assert.equal(result.code, 'AUTH_REQUIRED');
     assert.equal(result.category, 'auth');
-    assert.ok(result.recovery.includes('pp-query login'));
+    assert.ok(result.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('unknown error maps to INTERNAL_ERROR with recovery mentioning github', () => {
@@ -51,13 +51,13 @@ describe('structured error codes with recovery instructions', () => {
   it('unauthorized keyword maps to AUTH_EXPIRED', () => {
     const result = categorizeError(new Error('User is Unauthorized'));
     assert.equal(result.code, 'AUTH_EXPIRED');
-    assert.ok(result.recovery.includes('pp-query login'));
+    assert.ok(result.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('token keyword maps to AUTH_REQUIRED', () => {
     const result = categorizeError(new Error('bad token'));
     assert.equal(result.code, 'AUTH_REQUIRED');
-    assert.ok(result.recovery.includes('pp-query login'));
+    assert.ok(result.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('service unavailable keyword maps to BACKEND_DOWN', () => {
@@ -134,7 +134,7 @@ describe('structured error codes with recovery instructions', () => {
     assert.equal(errObj.code, 'AUTH_EXPIRED');
     assert.equal(errObj.category, 'auth');
     assert.equal(errObj.status, 401);
-    assert.ok(errObj.recovery.includes('pp-query login'));
+    assert.ok(errObj.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('MCP server includes recovery for backend errors', async () => {

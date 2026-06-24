@@ -62,7 +62,7 @@ describe('categorizeError', () => {
     assert.equal(result.category, 'auth');
     assert.equal(result.code, 'AUTH_EXPIRED');
     assert.equal(result.status, 401);
-    assert.ok(result.recovery.includes('pp-query login'));
+    assert.ok(result.recovery.includes('PP_LOGIN_HEADLESS'));
   });
 
   it('categorizes auth errors via "auth" keyword', () => {
