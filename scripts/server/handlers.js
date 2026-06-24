@@ -2462,8 +2462,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             },
             {
               name: 'validate_play',
-              one_liner: 'One-call verdict (BET/CONSIDER/PASS) for a single play.',
-              when_to_call: 'After finding a play in recommended_bets, call this to confirm before recommending.'
+              one_liner: 'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
+              when_to_call: 'End-of-pipeline validation before recommending. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.',
             },
             {
               name: 'find_best_price',
@@ -2525,8 +2525,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             },
             {
               name: 'validate_play',
-              one_liner: 'One-call verdict (BET/CONSIDER/PASS) for a single play.',
-              when_to_call: 'End-of-pipeline validation before recommending a bet to the user.'
+              one_liner: 'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
+              when_to_call: 'End-of-pipeline validation. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.',
             },
             {
               name: 'staking_plan',
@@ -2550,7 +2550,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return {
         ...workflow,
         honest_scope:
-          'TIER 1-4, kaiCall (BET/CONSIDER/PASS), edge, and screenScore are quality ratings on what sharp books are doing — NOT predictions about which side will win. TIER 1 means sharp books agree; it does not mean the side will win. Use to inform handicapping, not to outsource decisions.'
+          'TIER 1-4, kaiCall (BET/CONSIDER/PASS), edge, and screenScore are quality ratings on what sharp books are doing — NOT predictions about which side will win. TIER 1 means sharp books agree; it does not mean the side will win. Use to inform handicapping, not to outsource decisions.',
+        edge_cases: [
+          'validate_play_no_match: If validate_play returns SELECTION_NOT_FOUND "no row matched selection", the market moved between your screen call and validate. Do NOT retry via find_best_price. The play has evaporated — move on.',
+          'soccer_markets: quick_screen with leagues=["Soccer"] uses Draw No Bet / Match Handicap / Total Goals by default. If you get 0 results, the book may genuinely not have soccer that day. Probe find_best_price with market="Draw No Bet" on a known fixture.',
+          'tennis_start_time: validate_play may return stale start timestamps for tennis. Check verdictSummary.movementDisposition and gameContext — if surface/level resolve to a real tournament, the match is live regardless of the API start time.',
+          'movement_disposition: validate_play.verdictSummary.movementDisposition is the single field to check: supportive_clean = BET, supportive_bouncy = CONSIDER, adverse_recent/adverse_full = PASS. Do not cross-reference movementGrade + movementLabel separately.',
+          'empty_slate: If quick_screen returns 0 candidates across all leagues, run health_status first. If auth is valid, the slate is genuinely empty. Do not force recommendations.',
+        ]
       };
     },
 

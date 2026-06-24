@@ -345,7 +345,43 @@ Tiers: 1=Lock, 2=Value, 3=Speculative, 4=Avoid (never bet)
 Risk: 1-3=low, 4-6=moderate, 7-10=high (warn user)
 Edge: <1%=skip, 1-3%=playable, >3%=strong
 Movement: 🟢=all signals aligned, 🟡=some uncertainty, 🔴=do not bet
-Staking: T1=2%, T2=1%, T3=0.25% max, T4=0%
-Auth: pp-query login → verify with health_status
-Starting point: quick_screen (one-call: consensus + price + research)
+|Staking: T1=2%, T2=1%, T3=0.25% max, T4=0%
+|Auth: pp-query login → verify with health_status
+|Starting point: quick_screen (one-call: consensus + price + research)
 ```
+
+---
+
+## 8. Edge Cases
+
+### validate_play returns "no row matched selection" (SELECTION_NOT_FOUND)
+
+The market moved between your screen call and validate. Do NOT retry via `find_best_price` — the matcher is stricter and also returns no_match. The play has evaporated — move on to the next candidate.
+
+### Soccer returns 0 candidates on quick_screen
+
+`quick_screen` with `leagues=["Soccer"]` uses **Draw No Bet / Match Handicap / Total Goals** by default (not Moneyline/Spread/Total). If you get 0 results, the book may genuinely not have soccer that day. Probe `find_best_price` with `market="Draw No Bet"` on a known fixture to confirm.
+
+### Tennis start time is stale
+
+`validate_play` returns the screen's start timestamp, which can be hours off for rescheduled matches. Check `verdictSummary.movementDisposition` and `gameContext` — if surface/level resolve to a real tournament, the match is live regardless of the API start time.
+
+### Reading movement signals
+
+Don't cross-reference `movementGrade` + `movementLabel` + `recentSharpMoveDirection` separately. Read **one field**: `validate_play.verdictSummary.movementDisposition`.
+
+| Value | Meaning | Action |
+|---|---|---|
+| `supportive_clean` | Green movement, supportive direction, clean path | BET |
+| `supportive_bouncy` | Direction right but path rocky (V-shaped recovery or yellow grade) | CONSIDER |
+| `adverse_recent` | Recent movement turned adverse | PASS |
+| `adverse_full` | Full-window direction is adverse | PASS |
+| `insufficient` | Not enough data | Skip |
+
+### Empty slate
+
+If `quick_screen` returns 0 candidates across all leagues, call `health_status` first. If auth is valid, the slate is genuinely empty — do not force recommendations by lowering standards.
+
+### Auth failure recovery
+
+If any tool returns an auth error, the recovery message includes the exact command to re-authenticate. The error `code` distinguishes between expired session (`AUTH_EXPIRED`) and missing auth file (`AUTH_REQUIRED`). Run `health_status` after recovery to confirm.
