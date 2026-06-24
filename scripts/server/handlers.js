@@ -59,6 +59,8 @@ const {
   getLookbackHours,
   getMaxAgeMs,
   normalizeBookList,
+  normalizeSelectionKey,
+  buildCanonicalPlayId,
   getDebugFlag
 } = require('../../lib/propprofessor-mcp-ranked-screen');
 const {
@@ -664,6 +666,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const league = String(args.league || '').trim();
     const gameId = String(args.gameId || '').trim();
     const selection = String(args.selection || '').trim();
+    const requestedPlayId = String(args.playId || '').trim();
     if (!league) {
       return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'league is required' } };
     }
@@ -747,13 +750,21 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 if (!seedAwayTeam || !seedHomeTeam || !seedStartDate) {
                   return { ok: false, error: 'missing MLB matchup data for game context' };
                 }
-                const gamePk = await findMlbGamePk({
+                const attemptedLookup = {
                   isoDate: seedStartDate,
                   awayTeam: seedAwayTeam,
                   homeTeam: seedHomeTeam
-                });
+                };
+                const gamePk = await findMlbGamePk(attemptedLookup);
                 if (!gamePk) {
-                  return { ok: false, error: 'no MLB gamePk found for matchup' };
+                  return {
+                    ok: false,
+                    error: {
+                      errorType: 'schedule_not_found',
+                      errorDetail: 'no MLB gamePk found for matchup',
+                      attemptedLookup
+                    }
+                  };
                 }
                 return { ok: true, value: await getMlbGameContext({ gamePk }) };
               } catch (err) {
@@ -807,34 +818,54 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     //   3. Strip "Over "/"Under " prefix and re-try (total case).
     //   4. Fall back to home/away includes.
     const selLower = selection.toLowerCase().trim();
+    const normalizedRequestedSelectionKey = normalizeSelectionKey(selection);
     const stripLine = (s) => s.replace(/\s*[+-]?\d+(?:\.\d+)?\s*(sets|games)?\s*$/i, '').trim();
     const stripOverUnder = (s) => s.replace(/^(over|under)\s+/i, '').trim();
     const selStrippedLine = stripLine(selLower);
     const selStrippedOverUnder = stripOverUnder(selLower);
     const selStrippedLineOU = stripOverUnder(selStrippedLine);
-    const matchingRow = Array.isArray(detailResult?.result)
-      ? detailResult.result.find((r) => {
-          const stored = String(r.selection || r.participant || '').toLowerCase().trim();
-          if (stored === selLower) return true;
-          if (stored && (stored === selStrippedLine || stored === selStrippedOverUnder || stored === selStrippedLineOU)) return true;
-          if (String(r.homeTeam || '').toLowerCase().includes(selLower)) return true;
-          if (String(r.awayTeam || '').toLowerCase().includes(selLower)) return true;
-          // Check nested selections for soccer totals/handicaps
-          if (r.selections && typeof r.selections === 'object') {
-            for (const key of Object.keys(r.selections)) {
-              const sel = r.selections[key];
-              if (sel && typeof sel === 'object') {
-                const s1 = String(sel.selection1 || '').toLowerCase().trim();
-                const s2 = String(sel.selection2 || '').toLowerCase().trim();
-                if (s1 === selLower || s2 === selLower) return true;
-                if (s1 === selStrippedLine || s2 === selStrippedLine) return true;
-                if (s1 === selStrippedOverUnder || s2 === selStrippedOverUnder) return true;
-              }
-            }
+    const detailRows = Array.isArray(detailResult?.result) ? detailResult.result : [];
+    const matchingRow = (() => {
+      if (!detailRows.length) return null;
+
+      const exactRow = detailRows.find((r) => {
+        const rowPlayId = String(r.playId || buildCanonicalPlayId(r)).trim();
+        if (requestedPlayId && rowPlayId === requestedPlayId) return true;
+        const stored = String(r.selection || r.participant || '').toLowerCase().trim();
+        const storedSelectionKey = normalizeSelectionKey(r.selection || r.participant || r.pick || '');
+        return (
+          stored === selLower ||
+          (storedSelectionKey && storedSelectionKey === normalizedRequestedSelectionKey) ||
+          stored === selStrippedLine ||
+          stored === selStrippedOverUnder ||
+          stored === selStrippedLineOU
+        );
+      });
+      if (exactRow) return exactRow;
+
+      const nestedRow = detailRows.find((r) => {
+        if (!(r.selections && typeof r.selections === 'object')) return false;
+        for (const key of Object.keys(r.selections)) {
+          const sel = r.selections[key];
+          if (sel && typeof sel === 'object') {
+            const s1 = String(sel.selection1 || '').toLowerCase().trim();
+            const s2 = String(sel.selection2 || '').toLowerCase().trim();
+            if (s1 === selLower || s2 === selLower) return true;
+            if (s1 === selStrippedLine || s2 === selStrippedLine) return true;
+            if (s1 === selStrippedOverUnder || s2 === selStrippedOverUnder) return true;
           }
-          return false;
-        })
-      : null;
+        }
+        return false;
+      });
+      if (nestedRow) return nestedRow;
+
+      return detailRows.find((r) => {
+        if (String(r.selection || r.participant || '').trim()) return false;
+        if (String(r.homeTeam || '').toLowerCase().includes(selLower)) return true;
+        if (String(r.awayTeam || '').toLowerCase().includes(selLower)) return true;
+        return false;
+      }) || null;
+    })();
 
     // If research was started before we had the row, re-run it with
     // gameTime now that we know the start. Skip the round-trip when the
@@ -851,6 +882,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     let verdict = 'PASS';
     const reasons = [];
     let tier = matchingRow?.confidenceTier || 'TIER 4';
+    let lookupStatus = 'resolved';
+    let reasonType = 'signal';
 
     if (matchingRow) {
       // Base quality from the existing ranker output.
@@ -882,6 +915,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       else if (cbk >= 1) reasons.push(`consensus: ${cbk} comp book (thin)`);
       else reasons.push('no comp book consensus');
     } else {
+      lookupStatus = 'lookup_failed';
+      reasonType = 'lookup_failure';
+      verdict = 'CONSIDER';
       reasons.push(
         detailError
           ? `screen lookup failed: ${detailError}`
@@ -953,6 +989,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       _actionableSummary = 'No red flags. Clean play across all checks.';
     } else if (verdict === 'BET' && _riskFlags.length > 0) {
       _actionableSummary = `BET with caution — flags: ${_riskFlags.join(', ')}`;
+    } else if (lookupStatus === 'lookup_failed') {
+      _actionableSummary = "Couldn't be rehydrated from the current screen snapshot. Treat as stale / unverified, not an automatic fade.";
     } else if (verdict === 'CONSIDER') {
       _actionableSummary = `Thin play${_riskFlags.length > 0 ? ' — ' + _riskFlags.join(', ') : ''}. Reduce stake or skip.`;
     } else {
@@ -980,10 +1018,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       executionBook: String(args.book || books[0] || ''),
       verdict,
       tier,
+      lookupStatus,
+      reasonType,
       reasons,
       verdictSummary,
+      screenFreshness: detailResult?.freshness || null,
       play: matchingRow
         ? {
+            playId: matchingRow.playId || buildCanonicalPlayId(matchingRow),
+            selectionKey: matchingRow.selectionKey || normalizeSelectionKey(matchingRow.selection || matchingRow.participant || ''),
             gameId: matchingRow.gameId,
             homeTeam: matchingRow.homeTeam,
             awayTeam: matchingRow.awayTeam,
@@ -995,6 +1038,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             consensusBookCount: matchingRow.consensusBookCount,
             clvProxyPct: matchingRow.clvProxyPct,
             openToCurrentClvPct: matchingRow.openToCurrentClvPct,
+            freshnessSource: matchingRow.freshnessSource || null,
             movementLabel: matchingRow.movementLabel,
             kaiCall: matchingRow.kaiCall,
             screenScore: matchingRow.screenScore
@@ -1047,9 +1091,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ? skipResearch
             ? { skipped: true }
             : gameContextError
-              ? { error: gameContextError }
+              ? typeof gameContextError === 'string'
+                ? { error: gameContextError }
+                : gameContextError
               : null
           : null
+
     };
   }
 

@@ -433,6 +433,30 @@ describe('propprofessor-mlb-game-context', () => {
       assert.equal(result, null);
     });
 
+    it('matches team names case-insensitively with surrounding whitespace trimmed', async () => {
+      const { findMlbGamePk } = loadModule();
+      const scheduleBody = JSON.stringify({
+        dates: [
+          {
+            date: '2026-06-17',
+            games: [
+              {
+                gamePk: 333333,
+                teams: { away: { team: { name: 'Tampa Bay Rays' } }, home: { team: { name: 'Los Angeles Dodgers' } } }
+              }
+            ]
+          }
+        ]
+      });
+      mockCurl([{ match: 'date=2026-06-17', body: scheduleBody }]);
+      const result = await findMlbGamePk({
+        isoDate: '2026-06-17',
+        awayTeam: '  tampa bay rays ',
+        homeTeam: 'los angeles dodgers  '
+      });
+      assert.equal(result, '333333');
+    });
+
     it('rejects bad inputs gracefully', async () => {
       const { findMlbGamePk } = loadModule();
       const bad1 = await findMlbGamePk({ isoDate: '20260617', awayTeam: 'A', homeTeam: 'B' });

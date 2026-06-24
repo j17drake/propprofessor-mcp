@@ -142,7 +142,7 @@ describe('validate_play handler', () => {
     }
   });
 
-  it('returns PASS verdict when no row matches the selection', async () => {
+  it('returns degraded lookup metadata when no row matches the selection', async () => {
     const handlers = createMcpHandlers({ client: makeClient() });
     handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
     const result = await handlers.validate_play({
@@ -152,8 +152,68 @@ describe('validate_play handler', () => {
     });
     assert.equal(result.ok, true);
     assert.equal(result.play, null);
-    assert.equal(result.verdict, 'PASS');
+    assert.equal(result.verdict, 'CONSIDER');
+    assert.equal(result.lookupStatus, 'lookup_failed');
+    assert.equal(result.reasonType, 'lookup_failure');
     assert.ok(result.reasons.some((r) => /no row matched/.test(r)));
+    assert.match(result.verdictSummary.actionableSummary, /couldn't be rehydrated|stale \/ unverified/i);
+  });
+
+  it('returns canonical play identity and screen freshness for matched rows', async () => {
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'NBA:game-1',
+      selection: 'Lakers'
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(result.play);
+    assert.equal(result.play.playId, 'NBA:game-1::Moneyline::lakers');
+    assert.equal(result.play.selectionKey, 'lakers');
+    assert.equal(typeof result.play.freshnessSource, 'string');
+    assert.ok(result.screenFreshness && typeof result.screenFreshness === 'object');
+    assert.equal(typeof result.screenFreshness.newestAgeMs, 'number');
+    assert.equal(typeof result.screenFreshness.oldestAgeMs, 'number');
+  });
+
+  it('prefers playId when matching a validate_play row', async () => {
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'NBA:game-1',
+      selection: 'Wrong Name',
+      playId: 'NBA:game-1::Moneyline::lakers'
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(result.play);
+    assert.equal(result.play.selectionKey, 'lakers');
+    assert.equal(result.lookupStatus, 'resolved');
+  });
+
+  it('surfaces typed MLB game-context lookup failures without forcing PASS', async () => {
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'MLB',
+      gameId: 'MLB:PREMATCH:Baltimore_Orioles:Los_Angeles_Angels:1782331620',
+      selection: 'Nonexistent Player'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.verdict, 'CONSIDER');
+    assert.equal(result.lookupStatus, 'lookup_failed');
+    assert.equal(result.reasonType, 'lookup_failure');
+    assert.equal(result.gameContext.errorType, 'schedule_not_found');
+    assert.match(result.gameContext.errorDetail, /no MLB gamePk found for matchup/);
+    assert.deepEqual(result.gameContext.attemptedLookup, {
+      isoDate: '2026-06-24',
+      awayTeam: 'Los Angeles Angels',
+      homeTeam: 'Baltimore Orioles'
+    });
   });
 
   describe('UFC row resolution (Pinnacle-less events)', () => {
