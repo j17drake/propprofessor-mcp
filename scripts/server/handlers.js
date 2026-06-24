@@ -2372,41 +2372,41 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         casual: {
           summary: 'For casual bettors who just want top picks.',
           steps: [
-            'Call recommended_bets with verbosity="minimal" to get plain English picks.',
+            'Call quick_screen with verbosity="minimal" to get plain English picks — includes sharp consensus, book price, and research in one call.',
             'Present the top 3-5 plays to the user.',
             'If they want more detail on a specific play, call player_context to check injury risk.'
           ],
-          tools_to_use: ['recommended_bets', 'player_context'],
+          tools_to_use: ['quick_screen', 'player_context'],
           avoid: ['sharp_consensus', 'ev_candidates'],
           tool_descriptions: [
             {
-              name: 'recommended_bets',
-              one_liner: 'Curated TIER 1-2 plays across leagues.',
-              when_to_call: 'Your main "what should I bet" tool. Default to verbosity="minimal" for plain English.'
+              name: 'quick_screen',
+              one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
+              when_to_call: 'Default starting point. Use verbosity="minimal" for quick English picks.'
             },
             {
               name: 'player_context',
               one_liner: 'Injury / availability check for a specific player.',
-              when_to_call: 'After recommended_bets returns a play you want to validate before showing the user.'
+              when_to_call: 'After quick_screen returns a play you want to validate before showing the user.'
             }
           ]
         },
         intermediate: {
           summary: 'For bettors who understand edge and tier but want guidance.',
           steps: [
-            'Call recommended_bets with verbosity="standard" to get structured plays.',
-            'Filter by tier (TIER 1, TIER 2) for highest confidence.',
-            'For each top play, call player_context to check injury risk.',
+            'Call quick_screen with verbosity="standard" to get structured plays with edge, tier, risk, and research — one call.',
             'If riskScore >= 7, warn the user.',
-            'Optionally call find_best_price to line shop.'
+            'Filter by tier (TIER 1, TIER 2) for highest confidence.',
+            'Optionally call find_best_price to line shop.',
+            'For each top play, call player_context to check injury risk.'
           ],
-          tools_to_use: ['recommended_bets', 'player_context', 'find_best_price', 'league_presets'],
+          tools_to_use: ['quick_screen', 'player_context', 'find_best_price', 'league_presets'],
           avoid: ['sharp_consensus'],
           tool_descriptions: [
             {
-              name: 'recommended_bets',
-              one_liner: 'Curated TIER 1-2 plays across leagues.',
-              when_to_call: 'Default starting point. Use verbosity="standard" to see tier + edge + risk + rationale.'
+              name: 'quick_screen',
+              one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
+              when_to_call: 'Default starting point. Use verbosity="standard" to get structured plays with edge, tier, risk, and research.'
             },
             {
               name: 'validate_play',
@@ -2428,7 +2428,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         sharp: {
           summary: 'For sharp bettors who want full control and movement data.',
           steps: [
-            'Call screen_ranked with verbosity="full" for complete data.',
+            'Call quick_screen with verbosity="full" to get complete data — edge, tier, risk, line history, and research all at once.',
             'Use sharp_consensus to check multi-window movement.',
             'Use sharp_plays to find plays with independent sharp support.',
             'Call get_play_details for line history on specific plays.',
@@ -2436,7 +2436,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             'Check player_context for injury risk on final picks.'
           ],
           tools_to_use: [
-            'screen_ranked',
+            'quick_screen',
             'sharp_consensus',
             'sharp_plays',
             'get_play_details',
@@ -2447,10 +2447,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           avoid: [],
           tool_descriptions: [
             {
-              name: 'screen_ranked',
-              one_liner: 'Full ranked data for a (league, market) pair.',
-              when_to_call:
-                'When you want raw rows with all movement signals. Pass books=["Fliff"] for a specific book or omit for default.'
+              name: 'quick_screen',
+              one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
+              when_to_call: 'Default starting point. Use verbosity="full" for complete edge, tier, risk, line history, and research in one call.'
             },
             {
               name: 'all_slates',

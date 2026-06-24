@@ -41,7 +41,7 @@ describe('get_started handler', () => {
     assert.ok(Array.isArray(result.steps));
     assert.ok(result.steps.length > 0);
     assert.ok(Array.isArray(result.tools_to_use));
-    assert.ok(result.tools_to_use.includes('recommended_bets'));
+    assert.ok(result.tools_to_use.includes('quick_screen'));
     assert.ok(Array.isArray(result.avoid));
     assert.ok(result.avoid.includes('sharp_consensus'));
     assert.ok(result.avoid.includes('sharp_consensus'));
@@ -51,7 +51,7 @@ describe('get_started handler', () => {
     const result = await handlers.get_started({ user_type: 'sharp' });
     assert.ok(result.summary);
     assert.ok(Array.isArray(result.steps));
-    assert.ok(result.tools_to_use.includes('screen_ranked'));
+    assert.ok(result.tools_to_use.includes('quick_screen'));
     assert.ok(result.tools_to_use.includes('sharp_consensus'));
     assert.ok(result.tools_to_use.includes('sharp_plays'));
     assert.ok(result.tools_to_use.includes('staking_plan'));
