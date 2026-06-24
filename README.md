@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-998%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-1254%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -135,7 +135,7 @@ Confirms authentication, endpoint connectivity, and tool availability.
 make install
 ```
 
-This links the `propprofessor-coach` skill into `~/.hermes/skills/`, registers the MCP server, and installs the default config. Agents get automatic query routing when the skill is loaded.
+This registers the MCP server with Hermes and installs the default config. Agents learn the tool workflows via the `get_started` tool and [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md) — no separate skill required.
 
 ### Optional: Sharp-money alert cron
 
@@ -195,7 +195,7 @@ After setup, restart your MCP client. Your agent now has 26 sports betting intel
 
 ### Agent System Prompt
 
-For the best experience, load the agent prompt template from [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md). It encodes the philosophy, output interpretation rules, and betting guidance patterns your agent needs. Agents that load the `propprofessor-coach` skill (via `make install`) get automatic routing and context-aware responses.
+For the best experience, load the agent prompt template from [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md). It encodes the philosophy, output interpretation rules, and betting guidance patterns your agent needs. The `get_started` tool provides on-demand workflow guidance for any user type (casual/intermediate/sharp).
 
 ## 🎯 The Natural Language Flow
 
@@ -342,12 +342,7 @@ Full methodology, weight tables, and the tier assignment lookup in [docs/METHODO
 
 ### Hermes Agent
 
-Automatic setup via `make install`. The `propprofessor-coach` skill bundles:
-
-- Automatic query routing — your agent calls `ask` when it sees a betting query
-- Tier interpretation rules — TIER 4 is never recommended, high risk gets flagged
-- Player context auto-check — injury/news scan before any player-specific recommendation
-- Honest-scope enforcement — agents always qualify that tier/kaiCall are signal ratings, not predictions
+Automatic setup via `make install`. The MCP is self-documenting — agents call `get_started` to discover the right workflow, `get_play_details` for deep dives, and `validate_play` for a synthesized verdict with verdictSummary, riskFlags, and actionableSummary.
 
 ### Discord / Telegram Alerts
 
