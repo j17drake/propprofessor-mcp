@@ -1872,6 +1872,76 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         : [];
 
       const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
+
+      // === validateTop: run validate_play on top N candidates per league/market ===
+      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
+
+      if (validateTop > 0) {
+        const validationPromises = [];
+
+        for (let li = 0; li < allCandidates.length; li++) {
+          const entry = allCandidates[li];
+          if (!entry.candidates || !entry.candidates.length) continue;
+          const sorted = [...entry.candidates].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
+          const topN = sorted.slice(0, validateTop);
+
+          for (const candidate of entry.candidates) {
+            if (!topN.includes(candidate)) continue;
+
+            if (!candidate.gameId || !candidate.selection) continue;
+
+            validationPromises.push(
+              (async () => {
+                try {
+                  const result = await runValidatePlayImpl(client, {
+                    league: entry.league,
+                    gameId: candidate.gameId,
+                    selection: candidate.selection,
+                    market: entry.market,
+                    skipResearch: true,
+                    lookbackHours: 6
+                  });
+                  return { candidate, result };
+                } catch (err) {
+                  return { candidate, result: null, error: err.message };
+                }
+              })()
+            );
+          }
+        }
+
+        const validationResults = await Promise.all(validationPromises);
+
+        for (const vr of validationResults) {
+          if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
+
+          const candidate = vr.candidate;
+          const verdict = vr.result.verdictSummary;
+          const play = vr.result.play || {};
+          const gameCtx = vr.result.gameContext || null;
+
+          candidate.validatedTier = verdict.displayTier || candidate.displayTier;
+          candidate.validatedVerdict = vr.result.verdict || null;
+          candidate.validatedConsensusBookCount = play.consensusBookCount ?? candidate.consensusBookCount;
+          candidate.validatedMovementDisposition = verdict.movementDisposition || candidate.movementDisposition;
+          candidate.validatedRiskFlags = verdict.riskFlags || [];
+          candidate.validatedActionableSummary = verdict.actionableSummary || null;
+          candidate.validatedExecQuality = play.executionQuality || candidate.executionQuality;
+          candidate.validatedConsensusSupport = verdict.consensusSupport || null;
+
+          if (gameCtx) {
+            candidate.validatedGameContext = gameCtx;
+          }
+          if (play) {
+            candidate.validatedEdge = play.consensusEdge ?? candidate.edge;
+            candidate.validatedClv = play.clvProxyPct ?? candidate.clv;
+            candidate.validatedOdds = play.odds ?? candidate.odds;
+          }
+
+          candidate._validated = true;
+        }
+      }
+
       return {
         ok: true,
         targetBook: bookList,
@@ -1883,6 +1953,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         results: allCandidates,
         research: researchResults,
         warnings,
+        _meta: validateTop > 0 ? {
+          validation: {
+            requested: validateTop,
+            completedCount: allCandidates.reduce(
+              (sum, entry) => sum + (entry.candidates || []).filter(c => c._validated).length,
+              0
+            ),
+            note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
+          }
+        } : undefined,
         workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
