@@ -12,3 +12,4 @@ npm-debug.log*
 ranked-screen-rows.json
 backtest-data/
 coverage/
+circuit-cache.json
