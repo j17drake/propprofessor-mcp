@@ -103,6 +103,7 @@ No strong plays in MLB right now.
 **Tools to call:**
 
 1. `quick_screen` with `verbosity: "standard"` — structured plays with edge, tier, risk, and research — one call instead of three
+   - For immediate validation without an extra round-trip, use `validateTop: 3`. The top N candidates per league/market get real-time validate_play data merged in — `validatedTier`, `validatedConsensusBookCount`, `validatedActionableSummary`, and `validatedMovementDisposition` reflect the full-depth view.
 2. `player_context` — injury risk check
 3. `find_best_price` — line shop across books
 4. `league_presets` — show ranking weights if they ask "how does this work?"
