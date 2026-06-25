@@ -6,45 +6,52 @@ const assert = require('node:assert/strict');
 const { parseGameString } = require('../lib/propprofessor-game-context');
 
 describe('parseGameString', () => {
-  it('parses "A vs B"', () => {
+  it('parses "A vs B" and returns vs separator', () => {
     const r = parseGameString('Lakers vs Celtics');
     assert.strictEqual(r.team1, 'Lakers');
     assert.strictEqual(r.team2, 'Celtics');
+    assert.strictEqual(r.separator, 'vs');
   });
 
   it('parses "A vs B" with multi-word teams', () => {
     const r = parseGameString('New York Mets vs Philadelphia Phillies');
     assert.strictEqual(r.team1, 'New York Mets');
     assert.strictEqual(r.team2, 'Philadelphia Phillies');
+    assert.strictEqual(r.separator, 'vs');
   });
 
   it('parses with @ separator', () => {
     const r = parseGameString('Celtics @ Lakers');
     assert.strictEqual(r.team1, 'Celtics');
     assert.strictEqual(r.team2, 'Lakers');
+    assert.strictEqual(r.separator, '@');
   });
 
   it('parses with at separator', () => {
     const r = parseGameString('Celtics at Lakers');
     assert.strictEqual(r.team1, 'Celtics');
     assert.strictEqual(r.team2, 'Lakers');
+    assert.strictEqual(r.separator, 'at');
   });
 
-  it('returns empty strings for null/undefined', () => {
+  it('returns empty strings and null separator for null/undefined', () => {
     const r = parseGameString(null);
     assert.strictEqual(r.team1, '');
     assert.strictEqual(r.team2, '');
+    assert.strictEqual(r.separator, null);
   });
 
   it('returns single team as team1 for no separator', () => {
     const r = parseGameString('Lakers');
     assert.strictEqual(r.team1, 'Lakers');
     assert.strictEqual(r.team2, '');
+    assert.strictEqual(r.separator, null);
   });
   it('parses MLB-style "TeamA vs TeamB" correctly', () => {
     const r = parseGameString('Cincinnati Reds vs Milwaukee Brewers');
     assert.strictEqual(r.team1, 'Cincinnati Reds');
     assert.strictEqual(r.team2, 'Milwaukee Brewers');
+    assert.strictEqual(r.separator, 'vs');
   });
 });
 
