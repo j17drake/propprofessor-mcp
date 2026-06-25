@@ -386,6 +386,36 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
   };
 }
 
+/**
+ * Merge validate_play verdict data into a candidate/play object.
+ * Used by both quick_screen and recommended_bets validateTop loops.
+ * Sets validatedTier, validatedConsensusBookCount, validatedMovementDisposition,
+ * validatedActionableSummary, validatedEdge, validatedClv, validatedGameContext, etc.
+ */
+function applyValidatedFields(target, validationResult) {
+  const verdict = validationResult.verdictSummary;
+  const play = validationResult.play || {};
+  const gameCtx = validationResult.gameContext || null;
+
+  target.validatedTier = verdict.displayTier || target.displayTier;
+  target.validatedVerdict = validationResult.verdict || null;
+  target.validatedConsensusBookCount = play.consensusBookCount ?? target.consensusBookCount;
+  target.validatedMovementDisposition = verdict.movementDisposition || target.movementDisposition;
+  target.validatedRiskFlags = verdict.riskFlags || [];
+  target.validatedActionableSummary = verdict.actionableSummary || null;
+  target.validatedExecQuality = play.executionQuality || target.executionQuality;
+  target.validatedConsensusSupport = verdict.consensusSupport || null;
+
+  if (gameCtx) {
+    target.validatedGameContext = gameCtx;
+  }
+  if (play) {
+    target.validatedEdge = play.consensusEdge ?? target.edge;
+    target.validatedClv = play.clvProxyPct ?? target.clv;
+    target.validatedOdds = play.odds ?? target.odds;
+  }
+}
+
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   const { getRuntimeCache, getCacheTtlMs } = require('../../lib/mcp-runtime-config');
 
@@ -1877,18 +1907,28 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
 
       if (validateTop > 0) {
+        const validationCache = new Map(); // gameId → validated result, shared across candidates
         const validationPromises = [];
 
-        for (let li = 0; li < allCandidates.length; li++) {
-          const entry = allCandidates[li];
+        for (const entry of allCandidates) {
           if (!entry.candidates || !entry.candidates.length) continue;
           const sorted = [...entry.candidates].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
           const topN = sorted.slice(0, validateTop);
 
           for (const candidate of entry.candidates) {
             if (!topN.includes(candidate)) continue;
-
             if (!candidate.gameId || !candidate.selection) continue;
+
+            // Per-gameId cache: two candidates from the same game (e.g. Over 8.5, Under 8.5)
+            // share one validate_play call
+            if (validationCache.has(candidate.gameId)) {
+              const cached = validationCache.get(candidate.gameId);
+              if (cached) {
+                applyValidatedFields(candidate, cached);
+                candidate._validated = true;
+              }
+              continue;
+            }
 
             validationPromises.push(
               (async () => {
@@ -1901,6 +1941,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     skipResearch: true,
                     lookbackHours: 6
                   });
+                  if (candidate.gameId && result && result.ok) {
+                    validationCache.set(candidate.gameId, result);
+                  }
                   return { candidate, result };
                 } catch (err) {
                   return { candidate, result: null, error: err.message };
@@ -1914,33 +1957,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
         for (const vr of validationResults) {
           if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
-
-          const candidate = vr.candidate;
-          const verdict = vr.result.verdictSummary;
-          const play = vr.result.play || {};
-          const gameCtx = vr.result.gameContext || null;
-
-          candidate.validatedTier = verdict.displayTier || candidate.displayTier;
-          candidate.validatedVerdict = vr.result.verdict || null;
-          candidate.validatedConsensusBookCount = play.consensusBookCount ?? candidate.consensusBookCount;
-          candidate.validatedMovementDisposition = verdict.movementDisposition || candidate.movementDisposition;
-          candidate.validatedRiskFlags = verdict.riskFlags || [];
-          candidate.validatedActionableSummary = verdict.actionableSummary || null;
-          candidate.validatedExecQuality = play.executionQuality || candidate.executionQuality;
-          candidate.validatedConsensusSupport = verdict.consensusSupport || null;
-
-          if (gameCtx) {
-            candidate.validatedGameContext = gameCtx;
-          }
-          if (play) {
-            candidate.validatedEdge = play.consensusEdge ?? candidate.edge;
-            candidate.validatedClv = play.clvProxyPct ?? candidate.clv;
-            candidate.validatedOdds = play.odds ?? candidate.odds;
-          }
-
-          candidate._validated = true;
+          applyValidatedFields(vr.candidate, vr.result);
+          vr.candidate._validated = true;
         }
       }
+
+      const validatedCount = allCandidates.reduce(
+        (sum, entry) => sum + (entry.candidates || []).filter(c => c._validated).length,
+        0
+      );
 
       return {
         ok: true,
@@ -1956,10 +1981,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         _meta: validateTop > 0 ? {
           validation: {
             requested: validateTop,
-            completedCount: allCandidates.reduce(
-              (sum, entry) => sum + (entry.candidates || []).filter(c => c._validated).length,
-              0
-            ),
+            completedCount: validatedCount,
             note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
           }
         } : undefined,
@@ -2144,6 +2166,65 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         },
         { concurrency: 4 }
       );
+
+      // === validateTop: run validate_play on top N plays per league ===
+      const validateTopRB = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
+
+      if (validateTopRB > 0) {
+        const validationCache = new Map();
+        const validationPromises = [];
+
+        for (const leagueEntry of allRecommended) {
+          if (!leagueEntry.plays || !leagueEntry.plays.length) continue;
+          const sorted = [...leagueEntry.plays].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
+          const topN = sorted.slice(0, validateTopRB);
+
+          for (const play of leagueEntry.plays) {
+            if (!topN.includes(play)) continue;
+            if (!play.gameId || !play.selection) continue;
+
+            // Per-gameId cache: plays from the same game share one validate_play call
+            if (validationCache.has(play.gameId)) {
+              const cached = validationCache.get(play.gameId);
+              if (cached) {
+                applyValidatedFields(play, cached);
+                play._validated = true;
+              }
+              continue;
+            }
+
+            validationPromises.push(
+              (async () => {
+                try {
+                  const result = await runValidatePlayImpl(client, {
+                    league: leagueEntry.league,
+                    gameId: play.gameId,
+                    selection: play.selection,
+                    market: play.market || 'Moneyline',
+                    skipResearch: true,
+                    lookbackHours: 6
+                  });
+                  if (play.gameId && result && result.ok) {
+                    validationCache.set(play.gameId, result);
+                  }
+                  return { play, result };
+                } catch (err) {
+                  return { play, result: null, error: err.message };
+                }
+              })()
+            );
+          }
+        }
+
+        const validationResults = await Promise.all(validationPromises);
+
+        for (const vr of validationResults) {
+          if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
+          applyValidatedFields(vr.play, vr.result);
+          vr.play._validated = true;
+        }
+      }
+
       const total = allRecommended.reduce((sum, l) => sum + (l.count || 0), 0);
       const leagueBooks = Array.isArray(args.books) && args.books.length ? args.books : [];
       const focusBook = leagueBooks[0] || null;
@@ -2169,7 +2250,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             }
           }
           return breakdown;
-        })()
+        })(),
+        _meta: validateTopRB > 0 ? {
+          validation: {
+            requested: validateTopRB,
+            completedCount: allRecommended.reduce(
+              (sum, l) => sum + (l.plays || []).filter(p => p._validated).length,
+              0
+            ),
+            note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
+          }
+        } : undefined
       };
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
