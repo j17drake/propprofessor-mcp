@@ -24,6 +24,13 @@ Additive — existing consumers reading `verdict`, `reasons`, `verdictSummary` a
 - 1258/1258 passing
 - New regression tests for: lookup failure degradation, canonical identity, screen freshness, playId resolution, MLB typed errors
 
+### v2.4.0a — Bugfix: Tennis game context always returned "unknown" in validate_play
+
+- **Fixed: `game` parameter passed raw gameId instead of parseable matchup string.** When `validate_play` called `getGameContext`, it passed `game: gameId` (format `Tennis:PREMATCH:p1:p2:unixStart`) but the game-context dispatcher's `parseGameString` splits on "vs"/"@"/"at" separators — not colons. Player names were never extracted, so surface/level resolution always failed for every tennis play and returned `riskFlag: "unknown"`. The handler now parses indices 2 and 3 from the colon-delimited gameId and builds `"p1 vs p2"` before calling the dispatcher.
+- **Harden selection-line matching against ambiguous Over/Under lines.** When the `validate_play` row matcher strips "22.5" from "Over 22.5", the remaining "over" key is indistinguishable from "Over 24.5". Added a numeric-content guard that requires the stored selection to contain the numeric portion before allowing a stripped match.
+- **22 new regression tests** covering gameId parsing, numeric extraction, numeric guard, stripLine/stripOverUnder edge cases (all pass).
+- Pre-existing test failures unchanged — the 10 failing tests are tool-count mismatches from the market alias refactoring and tournament resolution edge cases unrelated to this fix.
+
 ---
 
 ## 2.3.2
