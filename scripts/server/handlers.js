@@ -780,17 +780,26 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               // map a matchup string ("Dart vs Sonmez") to a real
               // tourney via the 2026 weekly schedule.
               let derivedStart = null;
+              let tennisGameStr = gameId;
               if (league.toLowerCase() === 'tennis' && gameId) {
                 const parts = gameId.split(':');
                 const ts = parts[parts.length - 1];
                 if (ts && /^\d{10}$/.test(ts)) {
                   derivedStart = new Date(Number(ts) * 1000).toISOString();
                 }
+                // Build "player1 vs player2" from the gameId so parseGameString
+                // can extract player names (it splits on "vs"/"@"/"at", not colons).
+                // Format: Tennis:PREMATCH:player1:player2:unixTimestamp
+                const p1 = (parts[2] || '').trim();
+                const p2 = (parts[3] || '').trim();
+                if (p1 && p2) {
+                  tennisGameStr = `${p1} vs ${p2}`;
+                }
               }
               const ctx = await getGameContext({
                 sport: league,
                 selection,
-                game: gameId, // screen game ID includes matchup info
+                game: tennisGameStr,
                 start: derivedStart
               });
               return { ok: true, value: ctx };
@@ -825,6 +834,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const selStrippedLine = stripLine(selLower);
     const selStrippedOverUnder = stripOverUnder(selLower);
     const selStrippedLineOU = stripOverUnder(selStrippedLine);
+    // Extract numeric portion (e.g. "22.5" from "Over 22.5", "4.5" from "Bronzetti -4.5")
+    // for disambiguating when multiple lines share a stripped prefix (e.g. "Over 22.5" vs "Over 24.5").
+    const selNumeric = (selLower.match(/(\d+(?:\.\d+)?)/) || [])[1] || null;
     const detailRows = Array.isArray(detailResult?.result) ? detailResult.result : [];
     const matchingRow = (() => {
       if (!detailRows.length) return null;
@@ -836,9 +848,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           .toLowerCase()
           .trim();
         const storedSelectionKey = normalizeSelectionKey(r.selection || r.participant || r.pick || '');
+        // Exact match first (includes the line number, so unambiguous).
+        if (stored === selLower) return true;
+        if (storedSelectionKey && storedSelectionKey === normalizedRequestedSelectionKey) return true;
+        // Numeric-content match: when the selection contains a number (e.g. "22.5"),
+        // prefer rows whose stored selection also contains that number. This prevents
+        // "Over 22.5" from matching "Over 24.5" when both exist in the same market.
+        if (selNumeric && !stored.includes(selNumeric)) return false;
         return (
-          stored === selLower ||
-          (storedSelectionKey && storedSelectionKey === normalizedRequestedSelectionKey) ||
           stored === selStrippedLine ||
           stored === selStrippedOverUnder ||
           stored === selStrippedLineOU
@@ -858,6 +875,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               .toLowerCase()
               .trim();
             if (s1 === selLower || s2 === selLower) return true;
+            // Numeric guard for nested selections too
+            if (selNumeric && !s1.includes(selNumeric) && !s2.includes(selNumeric)) continue;
             if (s1 === selStrippedLine || s2 === selStrippedLine) return true;
             if (s1 === selStrippedOverUnder || s2 === selStrippedOverUnder) return true;
           }
