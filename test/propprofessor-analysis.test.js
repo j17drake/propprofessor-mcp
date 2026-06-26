@@ -864,8 +864,8 @@ describe('tennis screen ranking helpers', () => {
 
   it('maps spread and total market names into tennis screen query groups', () => {
     const { normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
-    assert.deepEqual(normalizeTennisMarketQuery('Spread'), ['Game Handicap', 'Set Handicap', 'Point Spread']);
-    assert.deepEqual(normalizeTennisMarketQuery('Total'), ['Total Sets', 'Total Games', 'Over/Under']);
+    assert.deepEqual(normalizeTennisMarketQuery('Spread'), ['Game Handicap']);
+    assert.deepEqual(normalizeTennisMarketQuery('Total'), ['Total Games']);
   });
 
   it('exposes the misleading consensusBookCount=0 for props with multiple comparison books (Kyle Freeland fixture)', () => {

@@ -126,12 +126,11 @@ assertEqual(
   '"Spread" + SOCCER -> "Match Handicap"'
 );
 
-// Tennis keeps "Spread" because normalizeTennisMarketQuery() expands it to
-// ['Game Handicap', 'Set Handicap', 'Point Spread'] before the /screen query.
+// Tennis resolves "Spread" to "Game Handicap" (consistent with other sports).
 assertEqual(
   resolveMarketName('Spread', 'TENNIS'),
-  { resolved: 'Spread', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
-  '"Spread" + TENNIS -> "Spread" (tennis expansion handles it)'
+  { resolved: 'Game Handicap', wasAliased: true, original: 'Spread', aliasKey: 'spread' },
+  '"Spread" + TENNIS -> "Game Handicap"'
 );
 
 // Handicap alias follows the same per-league mapping.

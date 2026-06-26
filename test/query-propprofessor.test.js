@@ -467,10 +467,10 @@ describe('query-propprofessor CLI command execution', () => {
     });
 
     const payload = JSON.parse(lines[0]);
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 1);
     assert.deepEqual(
       calls.map((call) => call.market),
-      ['Game Handicap', 'Set Handicap', 'Point Spread']
+      ['Game Handicap']
     );
     assert.equal(payload.league, 'Tennis');
   });
