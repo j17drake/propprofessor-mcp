@@ -1792,6 +1792,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 screenScore: row.screenScore ?? 0,
                 freshnessSource: row.freshnessSource ?? null,
                 movementDisposition: row.movementDisposition || 'insufficient',
+                staleMovementWarning: row.movementDisposition?.startsWith('adverse')
+                  && (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2')
+                  && (Number(row.consensusBookCount) || 0) >= 10,
                 displayTier: row.kaiCall === 'BET' ? 'BET'
                   : row.kaiCall === 'CONSIDER' ? 'CONSIDER'
                   : 'PASS',
@@ -1871,6 +1874,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   screenScore: row.screenScore ?? 0,
                   freshnessSource: row.freshnessSource ?? null,
                   movementDisposition: row.movementDisposition || 'insufficient',
+                  staleMovementWarning: row.movementDisposition?.startsWith('adverse')
+                    && (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2')
+                    && (Number(row.consensusBookCount) || 0) >= 10,
                   displayTier: row.kaiCall === 'BET' ? 'BET'
                     : row.kaiCall === 'CONSIDER' ? 'CONSIDER'
                     : 'PASS',
