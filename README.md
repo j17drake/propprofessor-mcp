@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 28 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 27 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -53,7 +53,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **28 tools** — organized into situational, analytical, and research tiers
+- **27 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 
@@ -232,7 +232,6 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `recommended_bets` | Top flagged movements with tier, risk, and plain English rationale               |
 | `player_context`   | Injury/availability check on a specific player                                   |
 | `validate_play`    | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS + playId + drift detection |
-| `live_monitor`     | Current odds across all books for a play, with target-odds comparison            |
 | `mlb_game_context` | Starting pitchers, park factor, hourly weather, lineup lock for an MLB game      |
 | `find_best_price`  | Line-shop across all books for the best execution price                          |
 | `health_status`    | Auth freshness and endpoint connectivity                                         |
@@ -302,7 +301,7 @@ Every tool carries a `category` field that groups it by purpose — agents can u
 | ------------ | ----- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | `discovery`  | 5     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `sharp_consensus`                   |
 | `screen`     | 7     | Score / rank plays for a target book             | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `smart_bet`, `staking_plan`, `ufc_card` |
-| `drill_down` | 4     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `live_monitor`, `validate_play` |
+| `drill_down` | 3     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `validate_play` |
 | `research`   | 3     | Context data (player news, game weather, alerts) | `get_alerts`, `mlb_game_context`, `player_context`                                             |
 | `tracking`   | 4     | Personal bet log                                 | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                               |
 | `admin`      | 2     | Bookkeeping (cache, hidden bets)                 | `clear_score_timeline`, `manage_hidden_bets`                                                   |

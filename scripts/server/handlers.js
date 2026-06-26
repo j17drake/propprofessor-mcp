@@ -468,7 +468,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       games: Array.isArray(args.games) ? args.games : [],
       participants: Array.isArray(args.participants) ? args.participants : [],
       books: augmentedBooks,
-      is_live: Boolean(args.is_live)
+      is_live: false
     });
     const response = await buildRankedScreenResponseShared({
       client,
@@ -1196,7 +1196,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       league,
       market: args.market || 'Moneyline',
       books: normalizeBookList(args.books),
-      is_live: Boolean(args.is_live),
+      is_live: false,
       cardWindow: String(args.cardWindow || 'all').trim().toLowerCase(),
       lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : null,
       games: args.games || [],
@@ -1236,7 +1236,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       games: Array.isArray(args.games) ? args.games : [],
       participants: Array.isArray(args.participants) ? args.participants : [],
       books: augmentedBooks,
-      is_live: Boolean(args.is_live)
+      is_live: false
     });
     const response = buildRankedScreenResponseShared({
       client,
@@ -1320,7 +1320,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         // when the complete book list is passed. The requestedBooks filter
         // is applied below via requirePreferredBook.
         books: ALL_SCREEN_BOOKS,
-        is_live: Boolean(args.is_live)
+        is_live: false
       });
       payloads.push(payload);
     }
@@ -1417,7 +1417,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         maxOdds: 9999,
         minValue: 0,
         maxHoursAway: 48,
-        isLive: Boolean(args.is_live)
+        isLive: false
       });
     } catch (error) {
       process.stderr.write(`[propprofessor-mcp] Tennis +EV fallback query failed: ${error?.message || error}\n`);
@@ -1555,7 +1555,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       const payload = await client.querySportsbook(
         defined({
-          isLive: args.is_live !== undefined ? Boolean(args.is_live) : Boolean(args.isLive),
+          isLive: false,
           showBreakOnly: args.showBreakOnly,
           showTimeoutOnly: args.showTimeoutOnly,
           showPeriodEndOnly: args.showPeriodEndOnly,
@@ -1710,7 +1710,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               limit: scanLimit,
               scanLimit,
               lookbackHours,
-              is_live: Boolean(args.is_live),
+              is_live: false,
               strict: false,
               includePasses: false,
               includeResearch: false,
@@ -1836,7 +1836,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 limit: scanLimit,
                 scanLimit,
                 lookbackHours,
-                is_live: Boolean(args.is_live),
+                is_live: false,
                 strict: false,
                 includePasses: false,
                 includeResearch: false,
@@ -2049,7 +2049,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   market,
                   books: args.books,
                   limit: limit * 2,
-                  is_live: Boolean(args.is_live),
+                  is_live: false,
                   includeAll: false,
                   debug: false,
                   compact: Boolean(args.compact),
@@ -2416,97 +2416,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
-    async live_monitor(args = {}) {
-      const selection = String(args.selection || '').trim();
-      const league = String(args.league || '').trim();
-      const market = String(args.market || 'Moneyline').trim();
-      const game = String(args.game || '').trim() || undefined;
-      const targetOdds = Number.isFinite(Number(args.targetOdds)) ? Number(args.targetOdds) : null;
-
-      if (!selection) {
-        const error = new Error('selection is required');
-        error.code = 'MISSING_PARAMS';
-        error.category = 'validation';
-        error.status = 400;
-        throw error;
-      }
-      if (!league) {
-        const error = new Error('league is required');
-        error.code = 'MISSING_PARAMS';
-        error.category = 'validation';
-        error.status = 400;
-        throw error;
-      }
-
-      // Use find_best_price to get current odds across all books
-      const priceResult = await handlers.find_best_price({
-        selection,
-        league,
-        market,
-        ...(game ? { game } : {})
-      });
-
-      if (!priceResult.found) {
-        return {
-          ok: true,
-          found: false,
-          selection,
-          league,
-          market,
-          message: priceResult.reason === 'empty_payload'
-            ? 'No screen data available for this league/market.'
-            : `No match found for "${selection}" in ${league} ${market}.`,
-          bookCount: 0,
-          bestPrice: null,
-          targetMet: null
-        };
-      }
-
-      const bestPrice = priceResult.bestPrice;
-      const allPrices = priceResult.allPrices || [];
-      const bookCount = priceResult.bookCount || 0;
-
-      // Compare to target odds if provided
-      let targetMet = null;
-      if (targetOdds !== null && bestPrice) {
-        const bestAmerican = bestPrice.odds;
-        if (bestAmerican !== null && bestAmerican !== undefined) {
-          const isUnderdog = bestAmerican > 0;
-          const targetIsUnderdog = targetOdds > 0;
-          if (isUnderdog === targetIsUnderdog) {
-            // Same sign — check if we're at or past the target
-            targetMet = targetOdds > 0
-              ? bestAmerican >= targetOdds   // +150 vs +120: better
-              : bestAmerican <= targetOdds;  // -110 vs -120: better (lower negative)
-          } else {
-            targetMet = false;
-          }
-        }
-      }
-
-      return {
-        ok: true,
-        found: true,
-        selection,
-        league,
-        market,
-        game: game || priceResult.match?.game || null,
-        bestPrice: bestPrice ? {
-          book: bestPrice.book,
-          odds: bestPrice.odds
-        } : null,
-        allPrices: allPrices.slice(0, 10).map(p => ({
-          book: p.book,
-          odds: p.odds
-        })),
-        spread: priceResult.spread ?? null,
-        bookCount,
-        targetOdds,
-        targetMet,
-        timestamp: new Date().toISOString()
-      };
-    },
-
     async staking_plan(args = {}) {
       const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
@@ -2524,7 +2433,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         markets,
         targetTiers,
         limit,
-        is_live: Boolean(args.is_live),
+        is_live: false,
         compact: Boolean(args.compact),
         fields: Array.isArray(args.fields) ? args.fields : undefined,
         include: Array.isArray(args.include) ? args.include : undefined,
@@ -2599,7 +2508,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         limit,
         lookbackHours,
         debug: false,
-        is_live: Boolean(args.is_live),
+        is_live: false,
         skipHistory: args.skipHistory === true
       });
       if (!rankedResponse?.ok || !Array.isArray(rankedResponse.result)) {
@@ -2658,7 +2567,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 limit,
                 includeAll: args.includeAll,
                 lookbackHours: args.lookbackHours,
-                is_live: Boolean(args.is_live),
+                is_live: false,
                 compact: Boolean(args.compact),
                 fields: Array.isArray(args.fields) ? args.fields : undefined,
                 include: Array.isArray(args.include) ? args.include : undefined,
@@ -2680,7 +2589,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 limit,
                 includeAll: args.includeAll,
                 lookbackHours: args.lookbackHours,
-                is_live: Boolean(args.is_live),
+                is_live: false,
                 compact: Boolean(args.compact),
                 fields: Array.isArray(args.fields) ? args.fields : undefined,
                 include: Array.isArray(args.include) ? args.include : undefined,
@@ -2972,7 +2881,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
         books: Array.isArray(args.books) ? args.books : undefined,
-        is_live: Boolean(args.is_live)
+        is_live: false
       });
       const rows = extractScreenRows(payload);
       const result = findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });

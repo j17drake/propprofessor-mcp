@@ -276,30 +276,15 @@ describe('mcp-arg-validator', () => {
 
   describe('normalizeArgs (canonical <-> alias sync at dispatch)', () => {
     it('returns a NEW object, does not mutate input', () => {
-      const input = { is_live: true };
-      const out = normalizeArgs('any_tool', input);
+      const input = { league: 'NBA', gameIds: ['a'] };
+      const out = normalizeArgs('get_play_details', input);
       assert.notStrictEqual(out, input);
-      assert.deepStrictEqual(input, { is_live: true });
+      assert.deepStrictEqual(input, { league: 'NBA', gameIds: ['a'] });
     });
 
     it('passes through null/undefined args unchanged', () => {
       assert.equal(normalizeArgs('any_tool', null), null);
       assert.equal(normalizeArgs('any_tool', undefined), undefined);
-    });
-
-    it('live <-> is_live: copies live -> is_live when is_live is missing', () => {
-      const out = normalizeArgs('any_tool', { live: true });
-      assert.deepStrictEqual(out, { live: true, is_live: true });
-    });
-
-    it('live <-> is_live: copies is_live -> live when live is missing', () => {
-      const out = normalizeArgs('any_tool', { is_live: true });
-      assert.deepStrictEqual(out, { live: true, is_live: true });
-    });
-
-    it('live <-> is_live: when BOTH present, preserves caller values (no overwrite)', () => {
-      const out = normalizeArgs('any_tool', { live: true, is_live: false });
-      assert.deepStrictEqual(out, { live: true, is_live: false });
     });
 
     it('get_play_details: gameIds <-> game_ids sync', () => {
@@ -320,7 +305,7 @@ describe('mcp-arg-validator', () => {
     it('preserves unknown keys (does not strip them)', () => {
       // Validator strips unknown keys via additionalProperties:false, but
       // normalizeArgs runs separately and shouldn't lose data.
-      const out = normalizeArgs('any_tool', { is_live: true, weirdExtra: 'ok' });
+      const out = normalizeArgs('any_tool', { weirdExtra: 'ok' });
       assert.equal(out.weirdExtra, 'ok');
     });
   });
