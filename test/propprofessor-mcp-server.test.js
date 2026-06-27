@@ -77,14 +77,12 @@ function createRankedScreenClientStub({
       },
       queryOddsHistory: async ({ sportsbooks } = {}) => {
         const requested = Array.isArray(sportsbooks) && sportsbooks.length ? sportsbooks : ['NoVigApp'];
-        // Mock returns history for the first SHARP book in the list (not the
-        // first user-requested book). This is what the ranker needs to identify
-        // movement from an independent sharp source (rather than the focus
-        // book). Audit 2026-06-15: with the augmented books list, requested[0]
-        // is the user's focus book; we want requested[1] (the first sharp
-        // book) for the movement source so classifySharpPlay sees
-        // sourceIsTargetBook=false and produces verdict='Bet candidate'.
         const book = requested.length > 1 ? requested[1] : requested[0];
+        // Movement for the primary side (selection1). With the isOppositeSide
+        // fix (2026-06-27), selection2 rows correctly invert this, so Lakers
+        // (sel1) gets supportive and Warriors (sel2) gets adverse from the
+        // same history stream. This is correct — you can't claim supportive
+        // movement for both sides from the same book's odds.
         return {
           [book]: [
             { odds: -118, start_ts: 1 },
@@ -944,14 +942,15 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls.queryScreenOddsBestComps.length, 2);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.ok(Array.isArray(result.result));
-    assert.equal(result.result.length, 2);
+    assert.equal(result.result.length, 1);
     assert.equal(result.result[0].executionBook, 'NoVigApp');
     assert.equal(result.result[0].verdict, 'Bet candidate');
     assert.equal(result.result[0].targetBook, 'NoVigApp');
-    assert.equal(result.result[0].executionBook, 'NoVigApp');
     assert.equal(result.result[0].sharpPlaySupport.movementIsSharpSourced, true);
     assert.equal(result.result[0].sharpPlaySupport.sourceIsTargetBook, false);
     assert.notEqual(result.result[0].movementSourceBook, 'NoVigApp');
+    // With isOppositeSide fix (2026-06-27), selection2 is correctly inverted
+    // to adverse from the same history stream. Only selection1 passes here.
   });
 
   it('sharp plays service preserves the mcp result shape when reused directly', async () => {
@@ -1043,7 +1042,7 @@ describe('propprofessor MCP server stdio contract', () => {
         queryOddsHistory: async () => ({
           NoVigApp: [
             { odds: -118, start_ts: 1 },
-            { odds: -130, start_ts: 2 }
+            { odds: -120, start_ts: 2 }
           ]
         }),
         healthStatus: async () => ({ ok: true, screen: { reachable: true } })
@@ -1065,14 +1064,19 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.deepEqual(result.resultMeta.classificationSummary, {
       totalRowsClassified: 2,
       verdictCounts: { Pass: 2 },
-      passReasonCounts: { consensus_book_count_below_1: 2, movement_source_is_target_book: 2 }
+      passReasonCounts: {
+        consensus_book_count_below_1: 2,
+        movement_source_is_target_book: 2,
+        movement_not_supportive_adverse: 1
+      }
     });
     assert.ok(result.resultMeta.emptyState);
     assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
     assert.equal(result.resultMeta.emptyState.scannedRowCount, 2);
     assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, {
       consensus_book_count_below_1: 2,
-      movement_source_is_target_book: 2
+      movement_source_is_target_book: 2,
+      movement_not_supportive_adverse: 1
     });
     assert.equal(result.resultMeta.emptyState.topNearMisses.length, 2);
     assert.equal(result.resultMeta.emptyState.topNearMisses[0].movementSourceBook, 'NoVigApp');
@@ -1145,7 +1149,7 @@ describe('propprofessor MCP server stdio contract', () => {
       'DraftKings'
     ]);
     assert.ok(calls.queryScreenOddsBestComps[2].books.length >= 5); // sharp book group
-    assert.equal(result.result.length, 4);
+    assert.equal(result.result.length, 2);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
   });
