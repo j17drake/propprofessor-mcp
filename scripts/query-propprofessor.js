@@ -69,6 +69,10 @@ function getCommandInventory() {
     {
       command: 'login',
       description: 'Open a browser to log in to PropProfessor and save auth automatically (requires playwright)'
+    },
+    {
+      command: 'init',
+      description: 'One-command setup: checks Node version, verifies auth, runs doctor, prints ready-to-paste MCP config for your client'
     }
   ];
 }
@@ -83,6 +87,7 @@ function buildHelpText() {
     '  pp-query health',
     '',
     'Common commands:',
+    '  pp-query init                            # one-command setup (Node check + auth + doctor + config)',
     '  pp-query login                           # automated browser login (requires playwright)',
     '  pp-query install-auth --source /path/to/auth.json',
     '  pp-query doctor',
@@ -438,6 +443,73 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
 
   if (command === 'list') {
     emitJson(logger, { command, commands: getCommandInventory() });
+    return;
+  }
+
+  if (command === 'init') {
+    const authPath = resolveAuthFile();
+    const authInfo = inspectAuthSetup();
+    const nodeVer = getNodeVersionStatus();
+
+    if (!nodeVer.ok) {
+      logger.log(`✖ Node.js ${nodeVer.current} — need ${nodeVer.required}. Install a newer Node.js first.`);
+      process.exitCode = 1;
+      return;
+    }
+    logger.log(`✓ Node.js ${nodeVer.current} (${nodeVer.required})`);
+
+    if (!authInfo.ok) {
+      logger.log('→ No valid auth found. Opening browser for PropProfessor login...');
+      try {
+        const { loginCli } = require('./pp-login');
+        await loginCli({
+          authFile: opts.destination || DEFAULT_USER_AUTH_FILE,
+          timeoutMs: opts.timeout ? Number(opts.timeout) : undefined,
+          json: false,
+          logger
+        });
+        logger.log('✓ Auth saved');
+      } catch (err) {
+        logger.log(`✖ Login failed: ${err.message}`);
+        logger.log('  → Try: pp-query login');
+        process.exitCode = 1;
+        return;
+      }
+    } else {
+      logger.log(`✓ Auth file found at ${authInfo.authFilePath || authPath}`);
+    }
+
+    // Run doctor
+    logger.log('');
+    logger.log('Running doctor...');
+    let healthResult;
+    try {
+      healthResult = await client.healthStatus();
+    } catch (error) {
+      healthResult = { ok: false, error: String(error?.message || error) };
+    }
+    logger.log(JSON.stringify(buildDoctorReport(healthResult), null, 2));
+
+    // Print MCP config
+    logger.log('');
+    logger.log('─── Ready-to-paste MCP Config ───');
+    logger.log('');
+    const scriptPath = path.resolve(__dirname, 'propprofessor-mcp-server.js');
+    const config = {
+      mcpServers: {
+        propprofessor: {
+          command: 'node',
+          args: [scriptPath],
+          env: {
+            PROPPROFESSOR_MCP_NDJSON: 'true',
+            AUTH_FILE: authInfo.authFilePath || path.join(os.homedir(), '.propprofessor', 'auth.json')
+          }
+        }
+      }
+    };
+    logger.log(JSON.stringify(config, null, 2));
+    logger.log('');
+    logger.log('Copy the above into your client\'s MCP config, then restart.');
     return;
   }
 
