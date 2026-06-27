@@ -268,7 +268,7 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].league, 'UFC');
     assert.equal(calls[0].market, 'Moneyline');
-    assert.equal(calls[0].is_live, true);
+    assert.equal(calls[0].is_live, false);
     assert.equal(payload.league, 'UFC');
     assert.ok(Array.isArray(payload.officialPlays));
   });

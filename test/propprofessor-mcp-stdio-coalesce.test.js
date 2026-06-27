@@ -92,11 +92,12 @@ describe('createCoalescingWriter', () => {
     writer('msg2');
 
     return new Promise((resolve) => {
-      setImmediate(() => {
-        // Should have written msg1 and msg2
+      setTimeout(() => {
+        // Should have written msg1 and msg2 (coalesceMs=1 timer fires at ~1ms,
+        // setTimeout at 0ms can race past it on fast machines)
         assert.ok(writes.length >= 1, 'Should have written at least once');
         resolve();
-      });
+      }, 50);
     });
   });
 });

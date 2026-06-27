@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-1257%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-1290%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 27 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 28 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -53,7 +53,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **27 tools** — organized into situational, analytical, and research tiers
+- **28 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 
@@ -379,7 +379,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 ## 🔧 For Maintainers
 
 ```bash
-npm test              # 998 tests, 0 failures
+npm test              # 1290 tests, 0 failures
 npm run test:coverage # ~82% statements
 npm run lint          # clean
 npm run format:check  # clean (npm run format to fix)

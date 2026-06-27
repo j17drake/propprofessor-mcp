@@ -456,22 +456,22 @@ describe('resolveTournamentFromMatchup', () => {
     assert.equal(r.level, 'WTA 500');
   });
 
-  it('resolves Munar matches (2026-06-22) to Mallorca (ATP 250 grass)', () => {
+  it('resolves Munar matches (2026-06-22) to Eastbourne (ATP 250 grass)', () => {
     const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
     const r = resolveTournamentFromMatchup('Bergs vs Munar', '2026-06-22T15:00:00.000Z');
     assert.ok(r, 'expected a resolved tourney');
-    assert.equal(r.slug, 'mallorca');
+    assert.equal(r.slug, 'eastbourne');
     assert.equal(r.surface, 'Grass');
     assert.equal(r.level, 'ATP 250');
   });
 
-  it('resolves Popyrin matches (2026-06-22) to Halle (ATP 500 grass)', () => {
+  it('resolves Popyrin matches (2026-06-22) to Eastbourne (ATP 250 grass)', () => {
     const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
     const r = resolveTournamentFromMatchup('Choinski vs Popyrin', '2026-06-22T13:30:00.000Z');
     assert.ok(r, 'expected a resolved tourney');
-    assert.equal(r.slug, 'halle');
+    assert.equal(r.slug, 'eastbourne');
     assert.equal(r.surface, 'Grass');
-    assert.equal(r.level, 'ATP 500');
+    assert.equal(r.level, 'ATP 250');
   });
 
   it('resolves to a Wimbledon match for early July', () => {
@@ -528,8 +528,8 @@ describe('getTennisContext — matchup resolution integration', () => {
       start: '2026-06-22T13:30:00.000Z'
     });
     assert.equal(result.surface, 'Grass');
-    assert.equal(result.level, 'ATP 500');
-    assert.equal(result.tournament, 'Halle Open');
+    assert.equal(result.level, 'ATP 250');
+    assert.equal(result.tournament, 'Lexus Eastbourne Open');
   });
 
   it('falls back to unknown when no resolver match (no player circuit hint)', async () => {

@@ -31,7 +31,6 @@
   "files": [
     "lib/",
     "scripts/",
-    "skills/",
     "config.default.json",
     "README.md",
     "INSTALL.md",
