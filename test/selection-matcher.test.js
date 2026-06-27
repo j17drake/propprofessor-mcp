@@ -1,0 +1,129 @@
+'use strict';
+
+const { test } = require('node:test');
+const assert = require('node:assert');
+const {
+  findBestMatch,
+  normalizeKey,
+  stripLine,
+  stripOverUnder,
+  extractNumeric
+} = require('../lib/selection-matcher.js');
+
+// ── unit tests ──
+
+test('stripLine removes trailing spread', () => {
+  assert.strictEqual(stripLine('Harris -1.5'), 'Harris');
+  assert.strictEqual(stripLine('Nadal +2.5'), 'Nadal');
+  assert.strictEqual(stripLine('Over 22.5'), 'Over');
+  assert.strictEqual(stripLine('Under 5.5 games'), 'Under');
+  assert.strictEqual(stripLine('Moneyline'), 'Moneyline');
+  assert.strictEqual(stripLine(''), '');
+});
+
+test('stripOverUnder removes Over/Under prefix', () => {
+  assert.strictEqual(stripOverUnder('Over 22.5'), '22.5');
+  assert.strictEqual(stripOverUnder('Under 8.5'), '8.5');
+  assert.strictEqual(stripOverUnder('Moneyline'), 'Moneyline');
+  assert.strictEqual(stripOverUnder(''), '');
+});
+
+test('extractNumeric pulls first number', () => {
+  assert.strictEqual(extractNumeric('over 22.5'), '22.5');
+  assert.strictEqual(extractNumeric('nadal -1.5'), '1.5');
+  assert.strictEqual(extractNumeric('moneyline'), null);
+});
+
+test('normalizeKey trims and lowercases', () => {
+  assert.strictEqual(normalizeKey('  OVER 22.5  '), 'over 22.5');
+  assert.strictEqual(normalizeKey(''), '');
+});
+
+// ── integration tests ──
+
+test('exact match wins over stripped', () => {
+  const rows = [
+    { selection: 'Over 22.5', gameId: '1' },
+    { selection: 'Over 24.5', gameId: '2' }
+  ];
+  const result = findBestMatch(rows, 'Over 22.5');
+  assert.strictEqual(result.gameId, '1');
+});
+
+test('numeric guard prevents cross-line Over/Under match', () => {
+  const rows = [
+    { selection: 'Over 22.5', gameId: '1' },
+    { selection: 'Over 24.5', gameId: '2' }
+  ];
+  // "Over 22.5" → strippedTo "over" would match both without guard
+  const result = findBestMatch(rows, 'Over 24.5');
+  assert.strictEqual(result.gameId, '2');
+});
+
+test('numeric guard prevents cross-line spread match', () => {
+  const rows = [
+    { selection: 'Nadal -1.5', participant: 'Nadal', gameId: '1' },
+    { selection: 'Nadal -2.5', participant: 'Nadal', gameId: '2' }
+  ];
+  const result = findBestMatch(rows, 'Nadal -1.5');
+  assert.strictEqual(result.gameId, '1');
+});
+
+test('fallback to stripped line when exact fails', () => {
+  const rows = [
+    { selection: 'Harris -1.5', gameId: '1' }
+  ];
+  const result = findBestMatch(rows, 'Harris');
+  assert.strictEqual(result.gameId, '1');
+});
+
+test('fallback to stripped Over/Under match', () => {
+  const rows = [
+    { selection: 'Under 8.5', gameId: '1' }
+  ];
+  const result = findBestMatch(rows, 'Under');
+  assert.strictEqual(result.gameId, '1');
+});
+
+test('playId exact match takes priority', () => {
+  const rows = [
+    { selection: 'Something Else', playId: 'exact-id', gameId: '2' },
+    { selection: 'Over 22.5', gameId: '1' }
+  ];
+  const result = findBestMatch(rows, 'Over 22.5', 'exact-id');
+  assert.strictEqual(result.gameId, '2');
+});
+
+test('nested selection match', () => {
+  const rows = [
+    {
+      gameId: 'nested',
+      selections: {
+        null: {
+          selection1: 'PlayerA',
+          selection2: 'PlayerB'
+        }
+      }
+    }
+  ];
+  const result = findBestMatch(rows, 'PlayerB');
+  assert.strictEqual(result.gameId, 'nested');
+});
+
+test('home team includes fallback', () => {
+  const rows = [
+    { homeTeam: 'Lakers', awayTeam: 'Celtics', gameId: 'lal-bos' }
+  ];
+  const result = findBestMatch(rows, 'Celtics');
+  assert.strictEqual(result.gameId, 'lal-bos');
+});
+
+test('returns null when no match', () => {
+  const rows = [{ selection: 'Something', gameId: '1' }];
+  assert.strictEqual(findBestMatch(rows, 'Nothing'), null);
+});
+
+test('returns null for empty inputs', () => {
+  assert.strictEqual(findBestMatch([], 'Anything'), null);
+  assert.strictEqual(findBestMatch(null, 'Anything'), null);
+});

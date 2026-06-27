@@ -53,6 +53,8 @@ function getDefaultMarketsForLeague(league, _targetBooks) {
 const { getOddsHistoryCache, getOddsHistoryCacheTtlMs } = require('../../lib/mcp-runtime-config');
 const { buildUfcShortlist } = require('../../lib/propprofessor-sharp-plays');
 const { findBestPrice } = require('../../lib/propprofessor-best-price');
+const { findBestMatch } = require('../../lib/selection-matcher');
+const { mapCandidateRow } = require('../../lib/propprofessor-mcp-candidate-mapper');
 const {
   buildRankedScreenResponse: buildRankedScreenResponseShared,
   getIncludeAll,
@@ -138,14 +140,7 @@ function resolveMarkets(args, league, defaultMarket = 'Moneyline') {
   const leagueKey = league ? String(league).trim().toUpperCase() : '';
   const result = { single: defaultMarket, array: [], aliasesUsed: [] };
 
-  // Resolve single market — only apply aliases when the user doesn't explicitly provide one
-  const singleRaw = args.market;
-  if (singleRaw !== undefined && singleRaw !== null) {
-    // User explicitly provided a market — pass through unchanged (no alias resolution)
-    result.single = singleRaw;
-  }
-
-  // Resolve markets array — apply aliases for each element
+  // Markets array takes precedence — always resolve it and derive single from it
   if (Array.isArray(args.markets) && args.markets.length) {
     result.array = args.markets.map((m) => {
       const resolved = resolveMarketName(m, leagueKey);
@@ -154,16 +149,18 @@ function resolveMarkets(args, league, defaultMarket = 'Moneyline') {
       }
       return resolved.resolved;
     });
+    result.single = result.array[0];
   } else if (Array.isArray(args.markets) && args.markets.length === 0) {
     // Empty array stays empty
     result.array = [];
-  } else if (singleRaw !== undefined && singleRaw !== null) {
-    // No markets array, but single market was provided
+  } else if (args.market !== undefined && args.market !== null) {
+    // No markets array, but single market was provided — pass through unchanged
+    result.single = String(args.market).trim();
     result.array = [result.single];
   }
 
-  // If only markets array provided (no single market), use first element as single
-  if ((singleRaw === undefined || singleRaw === null) && result.array.length > 0) {
+  // If only markets array provided (no single market explicit), use first resolved
+  if (args.market === undefined && result.array.length > 0) {
     result.single = result.array[0];
   }
 
@@ -858,79 +855,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     //   2. Strip trailing line digits and re-try (spread case).
     //   3. Strip "Over "/"Under " prefix and re-try (total case).
     //   4. Fall back to home/away includes.
-    const selLower = selection.toLowerCase().trim();
-    const normalizedRequestedSelectionKey = normalizeSelectionKey(selection);
-    const stripLine = (s) => s.replace(/\s*[+-]?\d+(?:\.\d+)?\s*(sets|games)?\s*$/i, '').trim();
-    const stripOverUnder = (s) => s.replace(/^(over|under)\s+/i, '').trim();
-    const selStrippedLine = stripLine(selLower);
-    const selStrippedOverUnder = stripOverUnder(selLower);
-    const selStrippedLineOU = stripOverUnder(selStrippedLine);
-    // Extract numeric portion (e.g. "22.5" from "Over 22.5", "4.5" from "Bronzetti -4.5")
-    // for disambiguating when multiple lines share a stripped prefix (e.g. "Over 22.5" vs "Over 24.5").
-    const selNumeric = (selLower.match(/(\d+(?:\.\d+)?)/) || [])[1] || null;
     const detailRows = Array.isArray(detailResult?.result) ? detailResult.result : [];
-    const matchingRow = (() => {
-      if (!detailRows.length) return null;
-
-      const exactRow = detailRows.find((r) => {
-        const rowPlayId = String(r.playId || buildCanonicalPlayId(r)).trim();
-        if (requestedPlayId && rowPlayId === requestedPlayId) return true;
-        const stored = String(r.selection || r.participant || '')
-          .toLowerCase()
-          .trim();
-        const storedSelectionKey = normalizeSelectionKey(r.selection || r.participant || r.pick || '');
-        // Exact match first (includes the line number, so unambiguous).
-        if (stored === selLower) return true;
-        if (storedSelectionKey && storedSelectionKey === normalizedRequestedSelectionKey) return true;
-        // Numeric-content match: when the selection contains a number (e.g. "22.5"),
-        // prefer rows whose stored selection also contains that number. This prevents
-        // "Over 22.5" from matching "Over 24.5" when both exist in the same market.
-        if (selNumeric && !stored.includes(selNumeric)) return false;
-        return stored === selStrippedLine || stored === selStrippedOverUnder || stored === selStrippedLineOU;
-      });
-      if (exactRow) return exactRow;
-
-      const nestedRow = detailRows.find((r) => {
-        if (!(r.selections && typeof r.selections === 'object')) return false;
-        for (const key of Object.keys(r.selections)) {
-          const sel = r.selections[key];
-          if (sel && typeof sel === 'object') {
-            const s1 = String(sel.selection1 || '')
-              .toLowerCase()
-              .trim();
-            const s2 = String(sel.selection2 || '')
-              .toLowerCase()
-              .trim();
-            if (s1 === selLower || s2 === selLower) return true;
-            // Numeric guard for nested selections too
-            if (selNumeric && !s1.includes(selNumeric) && !s2.includes(selNumeric)) continue;
-            if (s1 === selStrippedLine || s2 === selStrippedLine) return true;
-            if (s1 === selStrippedOverUnder || s2 === selStrippedOverUnder) return true;
-          }
-        }
-        return false;
-      });
-      if (nestedRow) return nestedRow;
-
-      return (
-        detailRows.find((r) => {
-          if (String(r.selection || r.participant || '').trim()) return false;
-          if (
-            String(r.homeTeam || '')
-              .toLowerCase()
-              .includes(selLower)
-          )
-            return true;
-          if (
-            String(r.awayTeam || '')
-              .toLowerCase()
-              .includes(selLower)
-          )
-            return true;
-          return false;
-        }) || null
-      );
-    })();
+    const matchingRow = findBestMatch(detailRows, selection, requestedPlayId);
 
     // If research was started before we had the row, re-run it with
     // gameTime now that we know the start. Skip the round-trip when the
@@ -1768,38 +1694,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             allCandidates.push({
               league,
               market,
-              candidates: candidates.slice(0, limit).map((row) => ({
-                playId: row.playId || null,
-                selectionKey: row.selectionKey || null,
-                gameId: row.gameId || null,
-                game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
-                selection: row.selection || row.participant || row.pick || null,
-                start: row.start || null,
-                odds: row.odds ?? row.currentOdds ?? null,
-                edge: row.consensusEdge ?? null,
-                clv: row.clvProxyPct ?? null,
-                consensusBookCount: row.consensusBookCount ?? 0,
-                executionQuality: row.executionQuality ?? 'unknown',
-                movementGrade: row.movementGrade ?? 'unknown',
-                movementLabel: row.movementLabel ?? null,
-                sharpBookMovementConfirmed: row.sharpBookMovementConfirmed || false,
-                sharpBookMovementSource: row.sharpBookMovementSource || null,
-                riskScore: row.riskScore ?? null,
-                kaiCall: row.kaiCall ?? 'PASS',
-                confidenceTier: row.confidenceTier ?? 'TIER 4',
-                rationale: row.rationale || null,
-                screenScore: row.screenScore ?? 0,
-                freshnessSource: row.freshnessSource ?? null,
-                movementDisposition: row.movementDisposition || 'insufficient',
-                staleMovementWarning:
-                  row.movementDisposition?.startsWith('adverse') &&
-                  (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2') &&
-                  (Number(row.consensusBookCount) || 0) >= 10,
-                displayTier: row.kaiCall === 'BET' ? 'BET' : row.kaiCall === 'CONSIDER' ? 'CONSIDER' : 'PASS',
-                hoursUntilStart: row.start
-                  ? Math.round(((new Date(row.start).getTime() - Date.now()) / 3600000) * 10) / 10
-                  : null
-              }))
+              candidates: candidates.slice(0, limit).map(mapCandidateRow)
             });
           } catch (error) {
             const categorized = categorizeError(error);
@@ -1847,38 +1742,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               allCandidates.push({
                 league,
                 market,
-                candidates: candidates.slice(0, limit).map((row) => ({
-                  playId: row.playId || null,
-                  selectionKey: row.selectionKey || null,
-                  gameId: row.gameId || null,
-                  game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
-                  selection: row.selection || row.participant || row.pick || null,
-                  start: row.start || null,
-                  odds: row.odds ?? row.currentOdds ?? null,
-                  edge: row.consensusEdge ?? null,
-                  clv: row.clvProxyPct ?? null,
-                  consensusBookCount: row.consensusBookCount ?? 0,
-                  executionQuality: row.executionQuality ?? 'unknown',
-                  movementGrade: row.movementGrade ?? 'unknown',
-                  movementLabel: row.movementLabel ?? null,
-                  sharpBookMovementConfirmed: row.sharpBookMovementConfirmed || false,
-                  sharpBookMovementSource: row.sharpBookMovementSource || null,
-                  riskScore: row.riskScore ?? null,
-                  kaiCall: row.kaiCall ?? 'PASS',
-                  confidenceTier: row.confidenceTier ?? 'TIER 4',
-                  rationale: row.rationale || null,
-                  screenScore: row.screenScore ?? 0,
-                  freshnessSource: row.freshnessSource ?? null,
-                  movementDisposition: row.movementDisposition || 'insufficient',
-                  staleMovementWarning:
-                    row.movementDisposition?.startsWith('adverse') &&
-                    (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2') &&
-                    (Number(row.consensusBookCount) || 0) >= 10,
-                  displayTier: row.kaiCall === 'BET' ? 'BET' : row.kaiCall === 'CONSIDER' ? 'CONSIDER' : 'PASS',
-                  hoursUntilStart: row.start
-                    ? Math.round(((new Date(row.start).getTime() - Date.now()) / 3600000) * 10) / 10
-                    : null
-                }))
+                candidates: candidates.slice(0, limit).map(mapCandidateRow)
               });
             } catch {
               // League failed to scan — skip, continue with others
