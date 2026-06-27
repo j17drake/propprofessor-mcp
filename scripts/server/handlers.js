@@ -1621,9 +1621,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const allCandidates = [];
       const researchResults = [];
 
-      // Date window: try 'today' first to avoid showing tomorrow's matches;
-      // fall back to 'all' if the slate is empty (off-day or late evening).
-      let cardWindow = args.cardWindow || 'today';
+      // Date window: always scan 'all' to avoid the two-pass HTTP call explosion
+      // on off-days (previously scanned 'today' first, then re-scanned 'all' if empty).
+      // Post-filter by date when a specific card window is requested.
+      const cardWindow = String(args.cardWindow || 'today')
+        .trim()
+        .toLowerCase();
 
       for (const league of leagues) {
         for (const market of resolvedMarketsByLeague[league] || []) {
@@ -1639,7 +1642,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               strict: false,
               includePasses: false,
               includeResearch: false,
-              cardWindow,
+              cardWindow: 'all', // always scan all — filter below
               debug
             });
 
@@ -1710,44 +1713,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
-      // Auto-detect: if today's slate is empty, fall back to showing all
-      // available matches (handles off-days or late evening when today's
-      // games are already past).
-      const hasTodayCandidates = allCandidates.some((r) => r.candidates && r.candidates.length > 0);
-      if (!hasTodayCandidates && cardWindow === 'today') {
-        allCandidates.length = 0;
-        cardWindow = 'all';
-        for (const league of leagues) {
-          for (const market of resolvedMarketsByLeague[league] || []) {
-            try {
-              const spResult = await handlers.sharp_plays({
-                targetBooks,
-                league,
-                market,
-                limit: scanLimit,
-                scanLimit,
-                lookbackHours,
-                is_live: false,
-                strict: false,
-                includePasses: false,
-                includeResearch: false,
-                cardWindow,
-                debug
-              });
+      // Post-filter by card window when 'today' or 'next' is requested
+      if (cardWindow === 'today' || cardWindow === 'next') {
+        const targetDateKey = cardWindow === 'today'
+          ? new Date().toISOString().slice(0, 10)
+          : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-              const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
-              if (!candidates.length) continue;
-
-              // Skip research on fallback pass — it's an empty-day fallback
-              allCandidates.push({
-                league,
-                market,
-                candidates: candidates.slice(0, limit).map(mapCandidateRow)
-              });
-            } catch {
-              // League failed to scan — skip, continue with others
-            }
-          }
+        for (const entry of allCandidates) {
+          if (!entry.candidates || !entry.candidates.length) continue;
+          entry.candidates = entry.candidates.filter((row) => {
+            if (!row.start) return true; // keep rows without start time
+            return new Date(row.start).toISOString().slice(0, 10) === targetDateKey;
+          });
         }
       }
 
