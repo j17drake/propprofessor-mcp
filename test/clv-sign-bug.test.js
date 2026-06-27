@@ -54,6 +54,9 @@ describe('CLV sign inversion — opposite-side moneyline plays', () => {
     // If the ROW is Cubs and the HISTORY is Brewers: inversion IS needed
     // -(-0.75) = +0.75% for Cubs (supportive for Cubs because Brewers line softened)
     const cubsInvertedClv = -brewersClv;
-    assert.ok(cubsInvertedClv > 0, 'Inverted CLV should be positive for Cubs (line softened against Brewers = good for Cubs)');
+    assert.ok(
+      cubsInvertedClv > 0,
+      'Inverted CLV should be positive for Cubs (line softened against Brewers = good for Cubs)'
+    );
   });
 });

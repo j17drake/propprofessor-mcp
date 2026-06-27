@@ -121,36 +121,36 @@ describe('query-propprofessor CLI parsing', () => {
   });
 
   it('exposes the documented command inventory', () => {
-  const commands = getCommandInventory().map((c) => c.command);
-  assert.deepEqual(commands, [
-    'setup',
-    'opinion',
-    'sportsbook',
-    'smart',
-    'tennis',
-    'sharp-plays',
-    'screen',
-    'sport',
-    'nba',
-    'wnba',
-    'mlb',
-    'nfl',
-    'nhl',
-    'ufc',
-    'ufc-card',
-    'mma',
-    'soccer',
-    'ncaab',
-    'ncaaf',
-    'presets',
-    'exe',
-    'list',
-    'health',
-    'doctor',
-    'install-auth',
-    'login',
-    'init'
-  ]);
+    const commands = getCommandInventory().map((c) => c.command);
+    assert.deepEqual(commands, [
+      'setup',
+      'opinion',
+      'sportsbook',
+      'smart',
+      'tennis',
+      'sharp-plays',
+      'screen',
+      'sport',
+      'nba',
+      'wnba',
+      'mlb',
+      'nfl',
+      'nhl',
+      'ufc',
+      'ufc-card',
+      'mma',
+      'soccer',
+      'ncaab',
+      'ncaaf',
+      'presets',
+      'exe',
+      'list',
+      'health',
+      'doctor',
+      'install-auth',
+      'login',
+      'init'
+    ]);
   });
 
   it('prints beginner-friendly help text', () => {

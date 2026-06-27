@@ -17,7 +17,7 @@ function gameIdToMatchupString(gameId) {
   const parts = gameId.split(':');
   const p1 = (parts[2] || '').trim();
   const p2 = (parts[3] || '').trim();
-  return (p1 && p2) ? `${p1} vs ${p2}` : null;
+  return p1 && p2 ? `${p1} vs ${p2}` : null;
 }
 
 describe('gameIdToMatchupString (Tennis game context fix)', () => {
@@ -82,7 +82,10 @@ describe('gameIdToMatchupString (Tennis game context fix)', () => {
  */
 function extractNumeric(sel) {
   if (!sel || typeof sel !== 'string') return null;
-  const m = sel.toLowerCase().trim().match(/(\d+(?:\.\d+)?)/);
+  const m = sel
+    .toLowerCase()
+    .trim()
+    .match(/(\d+(?:\.\d+)?)/);
   return m ? m[1] : null;
 }
 
@@ -180,9 +183,6 @@ describe('stripLine + stripOverUnder regression guard', () => {
     // "Over 24.5" would also strip to "over" — hence the need for selNumeric guard
     assert.equal(stripOverUnder(stripLine('over 24.5')), 'over');
     // Prove they're indistinguishable without the numeric guard
-    assert.equal(
-      stripOverUnder(stripLine('over 22.5')),
-      stripOverUnder(stripLine('over 24.5'))
-    );
+    assert.equal(stripOverUnder(stripLine('over 22.5')), stripOverUnder(stripLine('over 24.5')));
   });
 });

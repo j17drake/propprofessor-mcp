@@ -70,17 +70,13 @@ test('numeric guard prevents cross-line spread match', () => {
 });
 
 test('fallback to stripped line when exact fails', () => {
-  const rows = [
-    { selection: 'Harris -1.5', gameId: '1' }
-  ];
+  const rows = [{ selection: 'Harris -1.5', gameId: '1' }];
   const result = findBestMatch(rows, 'Harris');
   assert.strictEqual(result.gameId, '1');
 });
 
 test('fallback to stripped Over/Under match', () => {
-  const rows = [
-    { selection: 'Under 8.5', gameId: '1' }
-  ];
+  const rows = [{ selection: 'Under 8.5', gameId: '1' }];
   const result = findBestMatch(rows, 'Under');
   assert.strictEqual(result.gameId, '1');
 });
@@ -111,9 +107,7 @@ test('nested selection match', () => {
 });
 
 test('home team includes fallback', () => {
-  const rows = [
-    { homeTeam: 'Lakers', awayTeam: 'Celtics', gameId: 'lal-bos' }
-  ];
+  const rows = [{ homeTeam: 'Lakers', awayTeam: 'Celtics', gameId: 'lal-bos' }];
   const result = findBestMatch(rows, 'Celtics');
   assert.strictEqual(result.gameId, 'lal-bos');
 });

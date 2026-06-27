@@ -137,16 +137,16 @@ When a tool returns ranked rows, each row may include:
 
 #### validated fields (when `validateTop > 0`)
 
-| Field | Type | Source |
-|---|---|---|
-| validatedTier | string | BET/CONSIDER/PASS from validate_play |
-| validatedConsensusBookCount | number | Full-book consensus count (may differ from the screen's condensed view) |
-| validatedMovementDisposition | string | supportive_clean / supportive_bouncy / adverse_full / insufficient |
-| validatedRiskFlags | string[] | Risk flags from validation |
-| validatedActionableSummary | string | Human-readable summary from validate_play verdictSummary |
-| validatedEdge | number | Validated consensus edge (may differ from screen value) |
-| validatedClv | number | Validated CLV |
-| validatedGameContext | object | MLB weather/pitchers/park or Tennis surface/tournament |
+| Field                        | Type     | Source                                                                  |
+| ---------------------------- | -------- | ----------------------------------------------------------------------- |
+| validatedTier                | string   | BET/CONSIDER/PASS from validate_play                                    |
+| validatedConsensusBookCount  | number   | Full-book consensus count (may differ from the screen's condensed view) |
+| validatedMovementDisposition | string   | supportive_clean / supportive_bouncy / adverse_full / insufficient      |
+| validatedRiskFlags           | string[] | Risk flags from validation                                              |
+| validatedActionableSummary   | string   | Human-readable summary from validate_play verdictSummary                |
+| validatedEdge                | number   | Validated consensus edge (may differ from screen value)                 |
+| validatedClv                 | number   | Validated CLV                                                           |
+| validatedGameContext         | object   | MLB weather/pitchers/park or Tennis surface/tournament                  |
 
 The `_meta.validation` block on the response root reports how many candidates were validated:
 

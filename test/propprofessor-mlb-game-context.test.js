@@ -536,23 +536,27 @@ describe('propprofessor-mlb-game-context', () => {
       // and homeTeam="Washington Nationals" (should be away) — simulating
       // a "vs"-separated game string where ordering is unreliable.
       const scheduleBody = JSON.stringify({
-        dates: [{
-          date: '2026-06-25',
-          games: [{
-            gamePk: 745123,
-            gameDate: '2026-06-25T22:45:00Z',
-            teams: {
-              away: { team: { name: 'Washington Nationals' } },
-              home: { team: { name: 'Philadelphia Phillies' } }
-            }
-          }]
-        }]
+        dates: [
+          {
+            date: '2026-06-25',
+            games: [
+              {
+                gamePk: 745123,
+                gameDate: '2026-06-25T22:45:00Z',
+                teams: {
+                  away: { team: { name: 'Washington Nationals' } },
+                  home: { team: { name: 'Philadelphia Phillies' } }
+                }
+              }
+            ]
+          }
+        ]
       });
       mockCurl([{ match: 'date=2026-06-25', body: scheduleBody }]);
       const result = await findMlbGamePk({
         isoDate: '2026-06-25',
-        awayTeam: 'Philadelphia Phillies',  // Actually home in the schedule
-        homeTeam: 'Washington Nationals'     // Actually away in the schedule
+        awayTeam: 'Philadelphia Phillies', // Actually home in the schedule
+        homeTeam: 'Washington Nationals' // Actually away in the schedule
       });
       assert.equal(result, '745123');
     });

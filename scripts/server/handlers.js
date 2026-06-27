@@ -1715,9 +1715,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       // Post-filter by card window when 'today' or 'next' is requested
       if (cardWindow === 'today' || cardWindow === 'next') {
-        const targetDateKey = cardWindow === 'today'
-          ? new Date().toISOString().slice(0, 10)
-          : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const targetDateKey =
+          cardWindow === 'today'
+            ? new Date().toISOString().slice(0, 10)
+            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
         for (const entry of allCandidates) {
           if (!entry.candidates || !entry.candidates.length) continue;

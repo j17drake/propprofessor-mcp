@@ -22,7 +22,7 @@ describe('Opposite-side CLV inversion', () => {
       { odds: -102, book: '4cx', time: 1782551889460, liquidity: 16320 },
       { odds: -101, book: '4cx', time: 1782551891017, liquidity: 27 },
       { odds: +100, book: '4cx', time: 1782555487674, liquidity: 107 },
-      { odds: +101, book: '4cx', time: 1782555493583, liquidity: 26 },
+      { odds: +101, book: '4cx', time: 1782555493583, liquidity: 26 }
     ];
 
     // Magomedov side (default — no invert)
@@ -35,8 +35,11 @@ describe('Opposite-side CLV inversion', () => {
     // Magomedov should have negative CLV (his odds got worse)
     assert.strictEqual(typeof magomedovResult.openToCurrentClvPct, 'number');
     assert.ok(magomedovResult.openToCurrentClvPct < 0, 'Magomedov CLV should be negative');
-    assert.strictEqual(magomedovResult.fullWindowSharpMoveDirection, 'adverse',
-      'Magomedov direction should be adverse');
+    assert.strictEqual(
+      magomedovResult.fullWindowSharpMoveDirection,
+      'adverse',
+      'Magomedov direction should be adverse'
+    );
 
     // Oleksiejczuk side (invertDirection = true)
     const oleksiejczukResult = summarizeSharpMovement({
@@ -48,14 +51,19 @@ describe('Opposite-side CLV inversion', () => {
 
     // Oleksiejczuk should have POSITIVE CLV — sharps moved the line toward him
     assert.strictEqual(typeof oleksiejczukResult.openToCurrentClvPct, 'number');
-    assert.ok(oleksiejczukResult.openToCurrentClvPct > 0,
-      'Oleksiejczuk CLV should be positive when inverted');
-    assert.strictEqual(oleksiejczukResult.fullWindowSharpMoveDirection, 'supportive',
-      'Oleksiejczuk direction should be supportive when inverted');
+    assert.ok(oleksiejczukResult.openToCurrentClvPct > 0, 'Oleksiejczuk CLV should be positive when inverted');
+    assert.strictEqual(
+      oleksiejczukResult.fullWindowSharpMoveDirection,
+      'supportive',
+      'Oleksiejczuk direction should be supportive when inverted'
+    );
 
     // Movement label should be supportive for Oleksiejczuk
-    assert.strictEqual(oleksiejczukResult.movementLabel, 'supportive',
-      'Movement label should be supportive for Oleksiejczuk');
+    assert.strictEqual(
+      oleksiejczukResult.movementLabel,
+      'supportive',
+      'Movement label should be supportive for Oleksiejczuk'
+    );
 
     // CLV magnitudes should be near-mirrors (within rounding tolerance of juice spread)
     assert.ok(
@@ -68,7 +76,7 @@ describe('Opposite-side CLV inversion', () => {
     // When invertDirection is not set, behavior is unchanged
     const lineHistory = [
       { odds: -120, book: '4cx', time: 1782551782005 },
-      { odds: -110, book: '4cx', time: 1782555493583 },
+      { odds: -110, book: '4cx', time: 1782555493583 }
     ];
 
     const result = summarizeSharpMovement({
@@ -79,15 +87,12 @@ describe('Opposite-side CLV inversion', () => {
 
     // -120 (54.5%) → -110 (52.4%) = CLV ≈ -2.16%, direction = adverse
     assert.ok(result.openToCurrentClvPct < 0, 'Non-inverted negative CLV preserved');
-    assert.strictEqual(result.fullWindowSharpMoveDirection, 'adverse',
-      'Non-inverted adverse direction preserved');
+    assert.strictEqual(result.fullWindowSharpMoveDirection, 'adverse', 'Non-inverted adverse direction preserved');
   });
 
   it('should handle insufficient_history gracefully with invert', () => {
     // Single point = insufficient history. Invert flag should not crash.
-    const lineHistory = [
-      { odds: -110, book: '4cx', time: 1782551782005 },
-    ];
+    const lineHistory = [{ odds: -110, book: '4cx', time: 1782551782005 }];
 
     const result = summarizeSharpMovement({
       lineHistory,
@@ -106,7 +111,7 @@ describe('Opposite-side CLV inversion', () => {
     // Supportive move: odds improved from +110 → -105
     const lineHistory = [
       { odds: +110, book: '4cx', time: 1782551782005 },
-      { odds: -105, book: '4cx', time: 1782555493583 },
+      { odds: -105, book: '4cx', time: 1782555493583 }
     ];
 
     // Default (supportive)

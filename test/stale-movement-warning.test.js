@@ -8,11 +8,7 @@ function staleMovementWarning(row) {
   const disposition = String(row.movementDisposition || '').toLowerCase();
   const tier = String(row.confidenceTier || '').toUpperCase();
   const cbk = Number(row.consensusBookCount) || 0;
-  return (
-    disposition.startsWith('adverse') &&
-    (tier === 'TIER 1' || tier === 'TIER 2') &&
-    cbk >= 10
-  );
+  return disposition.startsWith('adverse') && (tier === 'TIER 1' || tier === 'TIER 2') && cbk >= 10;
 }
 
 describe('staleMovementWarning heuristic', () => {

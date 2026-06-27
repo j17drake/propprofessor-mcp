@@ -43,11 +43,7 @@ describe('minimal verbosity returns parseable JSON with type', () => {
   });
 
   it('every minimal formatter returns {summary, count, type}', () => {
-    const funcs = [
-      formatSharpPlaysMinimal,
-      formatScreenRankedMinimal,
-      formatGetPlayDetailsMinimal
-    ];
+    const funcs = [formatSharpPlaysMinimal, formatScreenRankedMinimal, formatGetPlayDetailsMinimal];
     for (const fn of funcs) {
       const result = fn({ result: [] });
       assert.ok('summary' in result, `${fn.name} missing summary`);

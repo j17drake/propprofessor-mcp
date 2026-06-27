@@ -72,7 +72,8 @@ function getCommandInventory() {
     },
     {
       command: 'init',
-      description: 'One-command setup: checks Node version, verifies auth, runs doctor, prints ready-to-paste MCP config for your client'
+      description:
+        'One-command setup: checks Node version, verifies auth, runs doctor, prints ready-to-paste MCP config for your client'
     }
   ];
 }
@@ -509,7 +510,7 @@ async function main({ argv = process.argv, client = createPropProfessorClient(),
     };
     logger.log(JSON.stringify(config, null, 2));
     logger.log('');
-    logger.log('Copy the above into your client\'s MCP config, then restart.');
+    logger.log("Copy the above into your client's MCP config, then restart.");
     return;
   }
 
