@@ -51,18 +51,34 @@ A weighted score, base 5, modified by:
 | Movement red          | +3       |
 | Edge > 2%             | −1       |
 | Edge > 0.5%           | 0        |
-| Edge < 0.5%           | +1       |
-| No edge               | +2       |
+| Edge > 0%             | +1       |
+| Edge ≤ 0% or missing  | +2       |
 | Consensus ≥ 10 books  | −1       |
-| Consensus 3–9 books   | 0        |
-| Consensus 1–2 books   | +1       |
+| Consensus 5–9 books   | 0        |
+| Consensus 3–4 books   | +1       |
+| Consensus 1–2 books   | +2       |
+| Consensus 0 books     | +3       |
 | Execution best        | −1       |
 | Execution playable    | 0        |
 | Execution bad/unknown | +2       |
 | Supportive steam      | −1       |
 | Adverse steam         | +3       |
-| CLV > 0               | −1       |
-| CLV < −3              | +2       |
+| CLV > 2%              | −1       |
+| CLV > 0%              | −0.5     |
+| CLV > −1%             | 0        |
+| CLV > −3%             | +1       |
+| CLV ≤ −3%             | +2       |
+| Peak adverse < −3%    | +2       |
+| Peak adverse < −2%    | +1       |
+| Multi-window ≥ 0.83   | −1       |
+| Multi-window ≥ 0.66   | −0.5     |
+| Multi-window ≥ 0.50   | 0        |
+| Multi-window ≤ 0.33   | +0.5     |
+| Multi-window ≤ 0.16   | +1       |
+| Multi-window = 0.0    | +1.5     |
+| Multi-window no data  | 0        |
+
+An edge of `-999` is the sentinel for "no edge data available" — it maps to the +2 penalty.
 
 Final score is clamped to **1 (cleanest) to 10 (riskiest)** and rounded.
 
@@ -154,3 +170,23 @@ What you **can't** trust from the system alone: that any flagged play will win. 
 - Tool definitions: [`lib/propprofessor-tool-definitions.js`](../lib/propprofessor-tool-definitions.js)
 - Backtest: [`scripts/backtest-synthetic.js`](../scripts/backtest-synthetic.js)
 - Backtest methodology: [`BACKTESTING.md`](./BACKTESTING.md)
+
+---
+
+## Design Notes
+
+### Steam direction contract
+
+The steam move signal (`steamMove`, `steamDirection`) is computed by `detectSteamMove` in `lib/propprofessor-steam-move.js` and consumed by `calculateRiskScore`. The direction is relative to the current pick's selection. `calculateRiskScore` only penalizes steam when `steamDirection === 'adverse'` — null or undefined directions receive no penalty. The contract is implicit (the detector returns `null` when it can't determine direction), not validated by the consumer.
+
+### Staking: Kelly-inspired, not mathematically rigorous
+
+The `suggestStakes` function uses flat tier multipliers (TIER 1 → 2%, TIER 2 → 1%, TIER 3 → 0.5%) scaled by `edgeFactor` and `clvFactor`, but does not incorporate the actual odds value into the stake calculation. A true Kelly Criterion would use `edge / (decimalOdds - 1)`. The current approach is intentionally simpler — "Kelly-inspired fractional staking" suitable for casual use, not mathematical portfolio optimization.
+
+### Multi-window threshold
+
+The green movement grade gate requires `multiWindowScore >= 0.66` (4/6 windows). The risk score modifier uses graduated brackets (0.0 → +1.5 through 1.0 → −1.5). The gate is intentionally coarser than the risk modifier — a play with 3/6 windows falls to yellow grade but gets no risk penalty, which is correct: the signal is weaker but not actively adverse.
+
+### kaiCall/tier consistency
+
+The `gradeRiskToTierAndCall` function is the single source of truth for tier and kaiCall assignment. Both `getKaiCall` and `getConfidenceTier` delegate to it, making contradiction between tier and call structurally impossible. The focus-book-missing cap (TIER 4 → TIER 3, PASS → CONSIDER for the kaiCall) is the only divergence — it acknowledges that a non-executable signal is weaker but still informative.
