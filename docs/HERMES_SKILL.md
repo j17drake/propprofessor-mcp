@@ -90,6 +90,6 @@ Auth tokens are cached to `~/.propprofessor/token-cache.json`. Reduces login fre
 ## Resources
 
 - [`AGENT_PROMPT.md`](./AGENT_PROMPT.md) — full agent prompt with tool-by-tool guidance
-- [`SETUP.md`](../SETUP.md) — setup, install, auth, MCP client configs
+- [`README.md#Quick Start`](../README.md#quick-start) — setup, install, auth, MCP client configs
 - [`MARKET-BOOK-AVAILABILITY.md`](./MARKET-BOOK-AVAILABILITY.md) — which books post which markets
 - [`CHANGELOG.md`](../CHANGELOG.md) — version history

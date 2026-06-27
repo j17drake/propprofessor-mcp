@@ -99,44 +99,70 @@ flowchart LR
 
 ## 🛠 Getting Started
 
-### Prerequisites
-
-- **Node.js** 18+
-- A paid [PropProfessor](https://propprofessor.com) account
-- ~5 minutes
-
-### Step 1 — Install
+### Quick Start
 
 ```bash
 git clone https://github.com/j17drake/propprofessor-mcp.git
 cd propprofessor-mcp
 npm install
 npm link
+pp-query init          # auth + verification + config — all at once
 ```
 
-### Step 2 — Log in
+`pp-query init` checks Node version, opens PropProfessor login if needed, runs `doctor`, and prints ready-to-paste MCP config for your client. Or do it step by step:
 
 ```bash
-pp-query login
+pp-query login         # browser login
+pp-query doctor        # verify everything works
 ```
 
-A browser opens. Log into PropProfessor (Google auth works). Press Enter in the terminal when the site loads — your session saves to `~/.propprofessor/auth.json`.
+Requires a paid [PropProfessor](https://propprofessor.com) account. That's it — you're ready to connect your AI agent.
 
-### Step 3 — Verify
+### MCP Client Setup
+
+Add to your client's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "propprofessor": {
+      "command": "node",
+      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
+      "env": {
+        "PROPPROFESSOR_MCP_NDJSON": "true",
+        "AUTH_FILE": "/path/to/.propprofessor/auth.json"
+      }
+    }
+  }
+}
+```
+
+Replace `/path/to/` with your actual install path (e.g. `/Users/you/projects/propprofessor-mcp`). Supports Claude Desktop, Cursor, Cline, Zed, Continue.dev, Windsurf, and any other stdio-based MCP client. See each client's docs for where MCP config lives.
+
+**For short-lived one-off sessions:**
+```json
+{ "command": "npx", "args": ["-y", "propprofessor-mcp"] }
+```
+Requires publishing (not yet — coming soon).
+
+### CLI Commands
+
+| Command           | Purpose                                             |
+| ----------------- | --------------------------------------------------- |
+| `pp-mcp`          | MCP server (stdio) — what your AI agent connects to |
+| `pp-query init`   | One-command setup (Node check + auth + doctor + config) |
+| `pp-query login`  | Browser login to PropProfessor                      |
+| `pp-query doctor` | Full diagnostic check                               |
+
+### Hermes Agent
+
+If you use [Hermes Agent](https://github.com/NousResearch/hermes-agent):
 
 ```bash
-pp-query doctor
+make install          # register MCP server + install default config
 ```
 
-Confirms authentication, endpoint connectivity, and tool availability.
-
-### Optional: Hermes auto-setup
-
-```bash
-make install
-```
-
-This registers the MCP server with Hermes and installs the default config. Agents learn the tool workflows via the `get_started` tool and [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md) — no separate skill required.
+Or manually: add `propprofessor` to your `mcp_servers` in config.yaml. The `get_started` tool provides on-demand workflow guidance.
 
 ### Optional: Sharp-money alert cron
 
@@ -154,49 +180,6 @@ Runs hourly, delivers TIER 1 plays to your home Telegram channel.
 | `pp-query`        | CLI for setup, debug, and quick one-off queries     |
 | `pp-query login`  | Browser login to PropProfessor                      |
 | `pp-query doctor` | Full diagnostic check                               |
-
-## 🤖 MCP Client Setup
-
-### Claude Desktop / Cursor / Cline / Zed
-
-Add to your MCP config (typically `~/.mcp.json` or `~/.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "propprofessor": {
-      "command": "node",
-      "args": ["/path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js"],
-      "env": {
-        "AUTH_FILE": "/path/to/.propprofessor/auth.json",
-        "PROPPROFESSOR_MCP_NDJSON": "true"
-      }
-    }
-  }
-}
-```
-
-Replace `/path/to/propprofessor-mcp/` with wherever you cloned the repo. `NDJSON` mode is recommended for Claude Desktop.
-
-### Hermes Agent
-
-```yaml
-mcp_servers:
-  propprofessor:
-    command: node
-    args:
-      - /path/to/propprofessor-mcp/scripts/propprofessor-mcp-server.js
-    enabled: true
-    env:
-      AUTH_FILE: /path/to/.propprofessor/auth.json
-      PROPPROFESSOR_MCP_NDJSON: 'true'
-```
-
-After setup, restart your MCP client. Your agent now has 28 sports betting intelligence tools.
-
-### Agent System Prompt
-
-For the best experience, load the agent prompt template from [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md). It encodes the philosophy, output interpretation rules, and betting guidance patterns your agent needs. The `get_started` tool provides on-demand workflow guidance for any user type (casual/intermediate/sharp).
 
 ## 🎯 The Natural Language Flow
 
@@ -410,8 +393,8 @@ Release: push a `v*` tag → CI runs lint + tests on Node 20 + 22 → auto-creat
 
 ### Docs index
 
-- [SETUP.md](SETUP.md) — install, auth, MCP client configs, troubleshooting
-- [AUTH.md](AUTH.md) — auth flow, session management
+- [Quick Start](README.md#quick-start) — install, auth, MCP client configs, troubleshooting
+- [Auth & Session Management](README.md#mcp-client-setup) — auth flow, session management
 - [CONFIG.md](CONFIG.md) — env vars, book config
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to add a tool
 - [SECURITY.md](SECURITY.md) — auth handling, threat model
