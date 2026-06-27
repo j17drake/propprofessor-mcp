@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-1290%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-1333%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -140,19 +140,21 @@ Add to your client's MCP config:
 Replace `/path/to/` with your actual install path (e.g. `/Users/you/projects/propprofessor-mcp`). Supports Claude Desktop, Cursor, Cline, Zed, Continue.dev, Windsurf, and any other stdio-based MCP client. See each client's docs for where MCP config lives.
 
 **For short-lived one-off sessions:**
+
 ```json
 { "command": "npx", "args": ["-y", "propprofessor-mcp"] }
 ```
+
 Requires publishing (not yet — coming soon).
 
 ### CLI Commands
 
-| Command           | Purpose                                             |
-| ----------------- | --------------------------------------------------- |
-| `pp-mcp`          | MCP server (stdio) — what your AI agent connects to |
+| Command           | Purpose                                                 |
+| ----------------- | ------------------------------------------------------- |
+| `pp-mcp`          | MCP server (stdio) — what your AI agent connects to     |
 | `pp-query init`   | One-command setup (Node check + auth + doctor + config) |
-| `pp-query login`  | Browser login to PropProfessor                      |
-| `pp-query doctor` | Full diagnostic check                               |
+| `pp-query login`  | Browser login to PropProfessor                          |
+| `pp-query doctor` | Full diagnostic check                                   |
 
 ### Hermes Agent
 
@@ -206,18 +208,19 @@ Agent: quick_screen({ books: ["Fliff"] })
 
 ### Quick Situational Checks
 
-| Tool               | What it does                                                                     |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `ask`              | Parse natural language into the right tool + args                                |
-| `get_started`      | Returns recommended workflow for casual/intermediate/sharp users                 |
-| `quick_screen`     | Best plays on any book with sharp consensus + player context                     |
-| `smart_bet`        | One-call: play details + validate_play verdict + best price + staking            |
-| `recommended_bets` | Top flagged movements with tier, risk, and plain English rationale               |
-| `player_context`   | Injury/availability check on a specific player                                   |
-| `validate_play`    | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS + playId + drift detection |
-| `mlb_game_context` | Starting pitchers, park factor, hourly weather, lineup lock for an MLB game      |
-| `find_best_price`  | Line-shop across all books for the best execution price                          |
-| `health_status`    | Auth freshness and endpoint connectivity                                         |
+| Tool                  | What it does                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ask`                 | Parse natural language into the right tool + args                                                           |
+| `get_started`         | Returns recommended workflow for casual/intermediate/sharp users                                            |
+| `get_market_registry` | List available markets for a sport, with per-book market names (e.g. Soccer → Draw No Bet)                  |
+| `quick_screen`        | Best plays on any book with sharp consensus + player context                                                |
+| `smart_bet`           | One-call: play details + validate_play verdict + best price + staking                                       |
+| `recommended_bets`    | Top flagged movements with tier, risk, and plain English rationale                                          |
+| `player_context`      | Injury/availability check on a specific player                                                              |
+| `validate_play`       | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS + playId + drift detection |
+| `mlb_game_context`    | Starting pitchers, park factor, hourly weather, lineup lock for an MLB game                                 |
+| `find_best_price`     | Line-shop across all books for the best execution price                                                     |
+| `health_status`       | Auth freshness and endpoint connectivity                                                                    |
 
 ### Deeper Signal Analysis
 
@@ -280,15 +283,15 @@ The `tools/list` response always includes a `_meta` block so agents can tell whi
 
 Every tool carries a `category` field that groups it by purpose — agents can use this to mentally cluster the surface rather than reading 28 individual descriptions:
 
-| Category     | Count | Purpose                                          | Tools                                                                                          |
-| ------------ | ----- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `discovery`  | 5     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `sharp_consensus`                   |
+| Category     | Count | Purpose                                          | Tools                                                                                                       |
+| ------------ | ----- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `discovery`  | 5     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `sharp_consensus`                                |
 | `screen`     | 7     | Score / rank plays for a target book             | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `smart_bet`, `staking_plan`, `ufc_card` |
-| `drill_down` | 3     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `validate_play` |
-| `research`   | 3     | Context data (player news, game weather, alerts) | `get_alerts`, `mlb_game_context`, `player_context`                                             |
-| `tracking`   | 4     | Personal bet log                                 | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                               |
-| `admin`      | 2     | Bookkeeping (cache, hidden bets)                 | `clear_score_timeline`, `manage_hidden_bets`                                                   |
-| `meta`       | 3     | Server info / workflow guides                    | `get_started`, `health_status`, `league_presets`                                               |
+| `drill_down` | 3     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `validate_play`                                                      |
+| `research`   | 3     | Context data (player news, game weather, alerts) | `get_alerts`, `mlb_game_context`, `player_context`                                                          |
+| `tracking`   | 4     | Personal bet log                                 | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                                            |
+| `admin`      | 2     | Bookkeeping (cache, hidden bets)                 | `clear_score_timeline`, `manage_hidden_bets`                                                                |
+| `meta`       | 3     | Server info / workflow guides                    | `get_started`, `health_status`, `league_presets`                                                            |
 
 ### Canonical vs Deprecated Param Names
 
