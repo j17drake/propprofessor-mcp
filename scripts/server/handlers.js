@@ -1628,90 +1628,97 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         .trim()
         .toLowerCase();
 
-      for (const league of leagues) {
-        for (const market of resolvedMarketsByLeague[league] || []) {
-          try {
-            const spResult = await handlers.sharp_plays({
-              targetBooks,
-              league,
-              market,
-              limit: scanLimit,
-              scanLimit,
-              lookbackHours,
-              is_live: false,
-              strict: false,
-              includePasses: false,
-              includeResearch: false,
-              cardWindow: 'all', // always scan all — filter below
-              debug
-            });
+      // Fan out leagues concurrently with concurrency=4.
+      // Previously serialized 10 leagues × 3 markets = 30 sequential HTTP calls;
+      // now bounded by max(per-call) rather than sum(per-call) — ~3-5x speedup.
+      await mapWithConcurrency(
+        leagues,
+        async (league) => {
+          for (const market of resolvedMarketsByLeague[league] || []) {
+            try {
+              const spResult = await handlers.sharp_plays({
+                targetBooks,
+                league,
+                market,
+                limit: scanLimit,
+                scanLimit,
+                lookbackHours,
+                is_live: false,
+                strict: false,
+                includePasses: false,
+                includeResearch: false,
+                cardWindow: 'all', // always scan all — filter below
+                debug
+              });
 
-            const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
-            if (!candidates.length) continue;
+              const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
+              if (!candidates.length) continue;
 
-            if (includeResearch) {
-              const researchBatch = [];
-              for (const row of candidates) {
-                const player = row.selection || row.participant || row.pick;
-                if (!player) continue;
-                const league = String(row.league || league || '').trim();
-                const game = row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`;
-                researchBatch.push({ player, league, game, row });
+              if (includeResearch) {
+                const researchBatch = [];
+                for (const row of candidates) {
+                  const player = row.selection || row.participant || row.pick;
+                  if (!player) continue;
+                  const league = String(row.league || league || '').trim();
+                  const game = row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`;
+                  researchBatch.push({ player, league, game, row });
+                }
+
+                // Run research in parallel with concurrency-3, routing by selection type
+                const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
+                const researchOpts = {
+                  rows: researchBatch.map((r) => ({
+                    selection: r.player,
+                    league: r.league,
+                    game: r.game,
+                    start: r.row.start || r.row.eventStart || null,
+                    market: r.row.market || ''
+                  })),
+                  limit: researchBatch.length,
+                  playerContextFn: handlers.player_context,
+                  gameContextFn: (opts) =>
+                    getGameContext({
+                      sport: opts.sport || opts.league,
+                      selection: opts.selection,
+                      game: opts.game,
+                      start: opts.start,
+                      market: opts.market
+                    }),
+                  concurrency: 3
+                };
+                const researchOut = await runResearchOnTopRows(researchOpts);
+                for (const r of researchOut.results) {
+                  researchResults.push({
+                    player: r.player,
+                    game: r.game,
+                    riskFlag: r.riskFlag,
+                    riskSummary: r.riskSummary || null,
+                    contextType: r.contextType || 'player',
+                    ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {})
+                  });
+                }
               }
 
-              // Run research in parallel with concurrency-3, routing by selection type
-              const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
-              const researchOpts = {
-                rows: researchBatch.map((r) => ({
-                  selection: r.player,
-                  league: r.league,
-                  game: r.game,
-                  start: r.row.start || r.row.eventStart || null,
-                  market: r.row.market || ''
-                })),
-                limit: researchBatch.length,
-                playerContextFn: handlers.player_context,
-                gameContextFn: (opts) =>
-                  getGameContext({
-                    sport: opts.sport || opts.league,
-                    selection: opts.selection,
-                    game: opts.game,
-                    start: opts.start,
-                    market: opts.market
-                  }),
-                concurrency: 3
-              };
-              const researchOut = await runResearchOnTopRows(researchOpts);
-              for (const r of researchOut.results) {
-                researchResults.push({
-                  player: r.player,
-                  game: r.game,
-                  riskFlag: r.riskFlag,
-                  riskSummary: r.riskSummary || null,
-                  contextType: r.contextType || 'player',
-                  ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {})
-                });
-              }
+              allCandidates.push({
+                league,
+                market,
+                candidates: candidates.slice(0, limit).map(mapCandidateRow)
+              });
+            } catch (error) {
+              const categorized = categorizeError(error);
+              allCandidates.push({
+                league,
+                market,
+                candidates: [],
+                error: categorized.message,
+                code: categorized.code,
+                recovery: categorized.recovery
+              });
             }
-
-            allCandidates.push({
-              league,
-              market,
-              candidates: candidates.slice(0, limit).map(mapCandidateRow)
-            });
-          } catch (error) {
-            const categorized = categorizeError(error);
-            allCandidates.push({
-              league,
-              market,
-              candidates: [],
-              error: categorized.message,
-              code: categorized.code,
-              recovery: categorized.recovery
-            });
           }
-        }
-      }
+        },
+        { concurrency: 4 }
+      );
 
       // Post-filter by card window when 'today' or 'next' is requested
       if (cardWindow === 'today' || cardWindow === 'next') {
