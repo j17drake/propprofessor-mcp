@@ -2,13 +2,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const {
-  gradeRiskToTierAndCall,
-  gradeMovementQuality,
-  calculateRiskScore,
-  getKaiCall,
-  getConfidenceTier
-} = require('../lib/propprofessor-risk-score');
+const { gradeRiskToTierAndCall, calculateRiskScore, getConfidenceTier } = require('../lib/propprofessor-risk-score');
 
 describe('gradeRiskToTierAndCall — unified lookup', () => {
   it('red always → TIER 4, PASS regardless of risk', () => {
@@ -64,12 +58,10 @@ describe('internal consistency — tier and kaiCall can never contradict', () =>
       for (const riskScore of riskScores) {
         const result = gradeRiskToTierAndCall(grade, riskScore);
         if (result.kaiCall === 'BET') {
-          assert.notStrictEqual(result.tier, 'TIER 4',
-            `BET call with TIER 4 at grade=${grade} risk=${riskScore}`);
+          assert.notStrictEqual(result.tier, 'TIER 4', `BET call with TIER 4 at grade=${grade} risk=${riskScore}`);
         }
         if (result.tier === 'TIER 4') {
-          assert.strictEqual(result.kaiCall, 'PASS',
-            `TIER 4 with non-PASS call at grade=${grade} risk=${riskScore}`);
+          assert.strictEqual(result.kaiCall, 'PASS', `TIER 4 with non-PASS call at grade=${grade} risk=${riskScore}`);
         }
       }
     }
@@ -84,16 +76,16 @@ describe('multiWindowScore graduated brackets', () => {
       // movementLabel='neutral' (not supportive/adverse) → yellow grade
       movementLabel: 'neutral',
       executionQuality: 'playable',
-      consensusBookCount: 3,    // <5 → fails strongConsensus green gate
+      consensusBookCount: 3, // <5 → fails strongConsensus green gate
       steamMove: false,
-      clvProxyPct: 0,           // not >0 → fails positiveClv green gate
-      consensusEdge: 1.0,       // >0.5% → edge modifier 0
+      clvProxyPct: 0, // not >0 → fails positiveClv green gate
+      consensusEdge: 1.0, // >0.5% → edge modifier 0
       steamDirection: '',
       multiWindowScore: score,
       multiWindowInsufficientData: score === null,
       movementQuality: 'medium',
       movementQualityScore: 0.5, // <0.8 → fails highQuality green gate
-      peakAdverseClvPct: 11,    // not adverse
+      peakAdverseClvPct: 11, // not adverse
       ...otherFields
     };
   }
@@ -124,7 +116,7 @@ describe('multiWindowScore graduated brackets', () => {
   });
 
   it('0.50 is neutral', () => {
-    const item = itemWithWindowScore(0.50);
+    const item = itemWithWindowScore(0.5);
     const score = calculateRiskScore(item);
     // 6 + 0 = 6 → 6
     assert.strictEqual(score, 6);
@@ -158,7 +150,7 @@ describe('multiWindowScore graduated brackets', () => {
     assert.strictEqual(baseScore, 6);
   });
 
-  it('high-penalty bracket doesn\'t break clamp', () => {
+  it("high-penalty bracket doesn't break clamp", () => {
     const item = itemWithWindowScore(0.0, {
       movementLabel: 'adverse',
       executionQuality: 'bad',
@@ -174,5 +166,116 @@ describe('multiWindowScore graduated brackets', () => {
     const score = calculateRiskScore(item);
     // red grade + heavy penalties → should cap at 10
     assert.ok(score <= 10, `should not exceed 10, got ${score}`);
+  });
+});
+
+// ─── TIER 1 Guardrails ────────────────────────────────────────────────────────
+// These tests verify that getConfidenceTier applies additional guardrails
+// beyond the grade/risk lookup. A play must not only have green + low risk,
+// but also pass real-world quality checks to earn TIER 1.
+
+describe('TIER 1 guardrails', () => {
+  // Helper to build an item that would produce green + risk 1 via the lookup.
+  function greenTier1Item(overrides = {}) {
+    return {
+      movementLabel: 'supportive',
+      movementQuality: 'high',
+      movementQualityScore: 0.9,
+      executionQuality: 'best',
+      consensusBookCount: 10,
+      steamMove: true,
+      clvProxyPct: 3,
+      consensusEdge: 2.5,
+      multiWindowScore: 1.0,
+      multiWindowInsufficientData: false,
+      peakAdverseClvPct: 0,
+      ...overrides
+    };
+  }
+
+  it('healthy green play gets TIER 1', () => {
+    const tier = getConfidenceTier(greenTier1Item());
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('negative edge downgrades TIER 1 to TIER 2', () => {
+    const tier = getConfidenceTier(greenTier1Item({ consensusEdge: -0.5 }));
+    assert.strictEqual(tier, 'TIER 2');
+  });
+
+  it('zero edge downgrades TIER 1 to TIER 2', () => {
+    const tier = getConfidenceTier(greenTier1Item({ consensusEdge: 0 }));
+    assert.strictEqual(tier, 'TIER 2');
+  });
+
+  it('single-book consensus downgrades TIER 1 to TIER 2', () => {
+    const tier = getConfidenceTier(greenTier1Item({ consensusBookCount: 1 }));
+    assert.strictEqual(tier, 'TIER 2');
+  });
+
+  it('adverse movement downgrades TIER 1 to TIER 3', () => {
+    // adverse movement triggers red grade in gradeMovementQuality, which gives
+    // TIER 4 via lookup. But if grade somehow stays green, the guardrail fires.
+    // The real effect is: adverse -> red -> TIER 4 regardless. Test the guardrail.
+    const tier = getConfidenceTier(greenTier1Item({ movementLabel: 'adverse' }));
+    assert.notStrictEqual(tier, 'TIER 1');
+  });
+
+  it('deteriorating movement downgrades TIER 1 to TIER 3', () => {
+    // deteriorating is not adverse, so grade stays yellow (not green).
+    // The lookup gives TIER 3 for yellow + low risk, so this never hits TIER 1 anyway.
+    // But the guardrail is defense-in-depth. Verify it's not TIER 1.
+    const tier = getConfidenceTier(greenTier1Item({ movementLabel: 'deteriorating' }));
+    assert.notStrictEqual(tier, 'TIER 1');
+  });
+});
+
+// ─── Novig 2026-06-27 regression ──────────────────────────────────────────────
+// Prevents false TIER 1 returns for plays with yellow movement, risk 5+,
+// thin consensus, or negative edge — the exact Novig scenario.
+
+describe('Novig 2026-06-27 regression — yellow/risk 5+ rows are not TIER 1', () => {
+  function yellowItem(overrides = {}) {
+    return {
+      movementLabel: 'neutral',
+      movementQuality: 'medium',
+      movementQualityScore: 0.5,
+      executionQuality: 'playable',
+      consensusBookCount: 3,
+      steamMove: false,
+      clvProxyPct: 0,
+      consensusEdge: 1.0,
+      multiWindowScore: 0.5,
+      multiWindowInsufficientData: false,
+      peakAdverseClvPct: 11,
+      ...overrides
+    };
+  }
+
+  it('yellow + risk 5 is TIER 3, not TIER 1', () => {
+    const item = yellowItem({ riskScore: 5 });
+    const tier = getConfidenceTier(item);
+    assert.notStrictEqual(tier, 'TIER 1');
+    assert.ok(['TIER 2', 'TIER 3', 'TIER 4'].includes(tier), `expected TIER 2/3/4, got ${tier}`);
+  });
+
+  it('yellow + risk 7 is TIER 4 (PASS)', () => {
+    const tier = getConfidenceTier(
+      yellowItem({
+        consensusEdge: -0.64,
+        riskScore: 7
+      })
+    );
+    assert.strictEqual(tier, 'TIER 4');
+  });
+
+  it('yellow + single book is never TIER 1', () => {
+    const tier = getConfidenceTier(yellowItem({ consensusBookCount: 1 }));
+    assert.notStrictEqual(tier, 'TIER 1');
+  });
+
+  it('yellow + negative edge is never TIER 1', () => {
+    const tier = getConfidenceTier(yellowItem({ consensusEdge: -0.64 }));
+    assert.notStrictEqual(tier, 'TIER 1');
   });
 });

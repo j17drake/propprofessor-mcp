@@ -83,6 +83,7 @@ const {
   DEFAULT_SHARP_BOOKS
 } = require('../../lib/propprofessor-sharp-consensus');
 const {
+  getConfidenceTier,
   getConfidenceTierStable,
   clearScoreTimeline,
   buildRationale,
@@ -885,11 +886,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         // prefer rows whose stored selection also contains that number. This prevents
         // "Over 22.5" from matching "Over 24.5" when both exist in the same market.
         if (selNumeric && !stored.includes(selNumeric)) return false;
-        return (
-          stored === selStrippedLine ||
-          stored === selStrippedOverUnder ||
-          stored === selStrippedLineOU
-        );
+        return stored === selStrippedLine || stored === selStrippedOverUnder || stored === selStrippedLineOU;
       });
       if (exactRow) return exactRow;
 
@@ -1197,7 +1194,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       market: args.market || 'Moneyline',
       books: normalizeBookList(args.books),
       is_live: false,
-      cardWindow: String(args.cardWindow || 'all').trim().toLowerCase(),
+      cardWindow: String(args.cardWindow || 'all')
+        .trim()
+        .toLowerCase(),
       lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : null,
       games: args.games || [],
       participants: args.participants || []
@@ -1368,7 +1367,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
         // Date window filter: same logic as UFC — when cardWindow='today',
         // drop rows whose start date doesn't match today's UTC date.
-        const cardWindow = String(args.cardWindow || 'all').trim().toLowerCase();
+        const cardWindow = String(args.cardWindow || 'all')
+          .trim()
+          .toLowerCase();
         if (cardWindow === 'today' || cardWindow === 'next') {
           const nowMs = Date.now();
           const todayKey = new Date(nowMs).toISOString().slice(0, 10);
@@ -1376,9 +1377,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           screenResult.result = screenResult.result.filter((row) => {
             if (!row || !row.start) return true; // keep rows without start time
             const startDateKey = new Date(row.start).toISOString().slice(0, 10);
-            return cardWindow === 'today'
-              ? startDateKey === todayKey
-              : startDateKey === nextKey;
+            return cardWindow === 'today' ? startDateKey === todayKey : startDateKey === nextKey;
           });
         }
       }
@@ -1792,14 +1791,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 screenScore: row.screenScore ?? 0,
                 freshnessSource: row.freshnessSource ?? null,
                 movementDisposition: row.movementDisposition || 'insufficient',
-                staleMovementWarning: row.movementDisposition?.startsWith('adverse')
-                  && (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2')
-                  && (Number(row.consensusBookCount) || 0) >= 10,
-                displayTier: row.kaiCall === 'BET' ? 'BET'
-                  : row.kaiCall === 'CONSIDER' ? 'CONSIDER'
-                  : 'PASS',
+                staleMovementWarning:
+                  row.movementDisposition?.startsWith('adverse') &&
+                  (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2') &&
+                  (Number(row.consensusBookCount) || 0) >= 10,
+                displayTier: row.kaiCall === 'BET' ? 'BET' : row.kaiCall === 'CONSIDER' ? 'CONSIDER' : 'PASS',
                 hoursUntilStart: row.start
-                  ? Math.round((new Date(row.start).getTime() - Date.now()) / 3600000 * 10) / 10
+                  ? Math.round(((new Date(row.start).getTime() - Date.now()) / 3600000) * 10) / 10
                   : null
               }))
             });
@@ -1820,9 +1818,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Auto-detect: if today's slate is empty, fall back to showing all
       // available matches (handles off-days or late evening when today's
       // games are already past).
-      const hasTodayCandidates = allCandidates.some(
-        r => r.candidates && r.candidates.length > 0
-      );
+      const hasTodayCandidates = allCandidates.some((r) => r.candidates && r.candidates.length > 0);
       if (!hasTodayCandidates && cardWindow === 'today') {
         allCandidates.length = 0;
         cardWindow = 'all';
@@ -1874,14 +1870,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   screenScore: row.screenScore ?? 0,
                   freshnessSource: row.freshnessSource ?? null,
                   movementDisposition: row.movementDisposition || 'insufficient',
-                  staleMovementWarning: row.movementDisposition?.startsWith('adverse')
-                    && (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2')
-                    && (Number(row.consensusBookCount) || 0) >= 10,
-                  displayTier: row.kaiCall === 'BET' ? 'BET'
-                    : row.kaiCall === 'CONSIDER' ? 'CONSIDER'
-                    : 'PASS',
+                  staleMovementWarning:
+                    row.movementDisposition?.startsWith('adverse') &&
+                    (row.confidenceTier === 'TIER 1' || row.confidenceTier === 'TIER 2') &&
+                    (Number(row.consensusBookCount) || 0) >= 10,
+                  displayTier: row.kaiCall === 'BET' ? 'BET' : row.kaiCall === 'CONSIDER' ? 'CONSIDER' : 'PASS',
                   hoursUntilStart: row.start
-                    ? Math.round((new Date(row.start).getTime() - Date.now()) / 3600000 * 10) / 10
+                    ? Math.round(((new Date(row.start).getTime() - Date.now()) / 3600000) * 10) / 10
                     : null
                 }))
               });
@@ -1893,16 +1888,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
 
       const activeSlate = allCandidates
-        .filter(r => r.candidates && r.candidates.length > 0)
-        .map(r => ({
+        .filter((r) => r.candidates && r.candidates.length > 0)
+        .map((r) => ({
           league: r.league,
           market: r.market,
           count: r.candidates.length,
           error: r.error || null
         }));
 
-      const warnings = allCandidates.some(r =>
-        r.candidates?.some(c => c.hoursUntilStart !== null && c.hoursUntilStart < 0)
+      const warnings = allCandidates.some((r) =>
+        r.candidates?.some((c) => c.hoursUntilStart !== null && c.hoursUntilStart < 0)
       )
         ? ['Some games have already started. Live odds may be stale.']
         : [];
@@ -1969,7 +1964,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
 
       const validatedCount = allCandidates.reduce(
-        (sum, entry) => sum + (entry.candidates || []).filter(c => c._validated).length,
+        (sum, entry) => sum + (entry.candidates || []).filter((c) => c._validated).length,
         0
       );
 
@@ -1984,13 +1979,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         results: allCandidates,
         research: researchResults,
         warnings,
-        _meta: validateTop > 0 ? {
-          validation: {
-            requested: validateTop,
-            completedCount: validatedCount,
-            note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
-          }
-        } : undefined,
+        _meta:
+          validateTop > 0
+            ? {
+                validation: {
+                  requested: validateTop,
+                  completedCount: validatedCount,
+                  note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
+                }
+              }
+            : undefined,
         workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
@@ -2073,9 +2071,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               }
             }
             const deduped = Array.from(seen.values());
-            let eligible = deduped.filter((row) =>
-              targetTiers.includes(row.confidenceTier || getConfidenceTierStable(row))
-            );
+            let eligible = deduped.filter((row) => {
+              // Use the live (current) tier for filtering so a deteriorating play
+              // that was cached as TIER 1 earlier cannot sneak into TIER 1 results.
+              const liveTier = row.confidenceTierLive || row.confidenceTier || getConfidenceTierStable(row);
+              return targetTiers.includes(liveTier);
+            });
             const recommended = eligible
               .sort((a, b) => {
                 const tierOrder = { 'TIER 1': 0, 'TIER 2': 1, 'TIER 3': 2, 'TIER 4': 3 };
@@ -2145,6 +2146,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     riskScore: row.riskScore,
                     kaiCall: row.kaiCall,
                     confidenceTier: row.confidenceTier,
+                    confidenceTierLive: row.confidenceTierLive,
                     rationale: row.rationale || buildRationale(row),
                     screenScore: row.screenScore,
                     ...(research
@@ -2257,16 +2259,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           }
           return breakdown;
         })(),
-        _meta: validateTopRB > 0 ? {
-          validation: {
-            requested: validateTopRB,
-            completedCount: allRecommended.reduce(
-              (sum, l) => sum + (l.plays || []).filter(p => p._validated).length,
-              0
-            ),
-            note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
-          }
-        } : undefined
+        _meta:
+          validateTopRB > 0
+            ? {
+                validation: {
+                  requested: validateTopRB,
+                  completedCount: allRecommended.reduce(
+                    (sum, l) => sum + (l.plays || []).filter((p) => p._validated).length,
+                    0
+                  ),
+                  note: 'Validated rows have validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedActionableSummary, and _validated=true'
+                }
+              }
+            : undefined
       };
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
@@ -2313,9 +2318,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       let matchLeague = league || null;
       let matchMarket = market;
 
-      for (const entry of (screenResult.results || [])) {
-        const found = (entry.candidates || []).find(c =>
-          c.selection && c.selection.toLowerCase().includes(selection.toLowerCase())
+      for (const entry of screenResult.results || []) {
+        const found = (entry.candidates || []).find(
+          (c) => c.selection && c.selection.toLowerCase().includes(selection.toLowerCase())
         );
         if (found) {
           match = found;
@@ -2372,9 +2377,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             targetTiers: validation.verdict === 'BET' ? ['TIER 1'] : ['TIER 1', 'TIER 2']
           });
           const stakingStakes = stakingResult?.stakes || [];
-          staking = stakingStakes.find(p =>
-            p.selection && p.selection.toLowerCase().includes(selection.toLowerCase())
-          ) || null;
+          staking =
+            stakingStakes.find((p) => p.selection && p.selection.toLowerCase().includes(selection.toLowerCase())) ||
+            null;
         } catch {
           // staking failed — not critical
         }
@@ -2397,21 +2402,23 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           confidenceTier: match.confidenceTier,
           riskScore: match.riskScore
         },
-        verdict: validation ? {
-          verdict: validation.verdict,
-          tier: validation.tier,
-          actionableSummary: validation.verdictSummary?.actionableSummary,
-          riskFlags: validation.verdictSummary?.riskFlags || [],
-          movementDisposition: validation.verdictSummary?.movementDisposition
-        } : null,
-        bestPrice: bestPrice?.found
-          ? bestPrice.bestPrice
+        verdict: validation
+          ? {
+              verdict: validation.verdict,
+              tier: validation.tier,
+              actionableSummary: validation.verdictSummary?.actionableSummary,
+              riskFlags: validation.verdictSummary?.riskFlags || [],
+              movementDisposition: validation.verdictSummary?.movementDisposition
+            }
           : null,
-        staking: staking ? {
-          stake: staking.stakeDollars,
-          stakePct: staking.bankrollPct,
-          reason: staking.rationale
-        } : null,
+        bestPrice: bestPrice?.found ? bestPrice.bestPrice : null,
+        staking: staking
+          ? {
+              stake: staking.stakeDollars,
+              stakePct: staking.bankrollPct,
+              reason: staking.rationale
+            }
+          : null,
         verbosity
       };
     },
@@ -2928,7 +2935,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               ...(parsed.book ? { book: parsed.book } : {})
             }
           },
-          workflow: 'This looks like a validation query. Call quick_screen first to get the gameId, then call validate_play with the gameId and selection. Or if you already have a gameId from a prior call, use it directly.'
+          workflow:
+            'This looks like a validation query. Call quick_screen first to get the gameId, then call validate_play with the gameId and selection. Or if you already have a gameId from a prior call, use it directly.'
         };
       }
 
