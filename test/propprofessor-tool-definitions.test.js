@@ -114,6 +114,18 @@ describe('propprofessor-tool-definitions', () => {
     });
   });
 
+  describe('validateTop defaults to 3 on quick_screen', () => {
+    it('quick_screen validateTop default is 3', () => {
+      const tools = buildToolDefinitions();
+      const qs = tools.find(t => t.name === 'quick_screen');
+      assert.ok(qs, 'quick_screen tool definition exists');
+      assert.strictEqual(
+        qs.inputSchema.properties.validateTop.default, 3,
+        'quick_screen validateTop should default to 3'
+      );
+    });
+  });
+
   describe('tools are sorted alphabetically by name', () => {
     it('returns tools in alphabetical order', () => {
       const tools = buildToolDefinitions();

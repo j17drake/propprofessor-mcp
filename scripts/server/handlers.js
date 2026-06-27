@@ -1910,7 +1910,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
 
       // === validateTop: run validate_play on top N candidates per league/market ===
-      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
+      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 3;
 
       if (validateTop > 0) {
         const validationCache = new Map(); // gameId → validated result, shared across candidates
