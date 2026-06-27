@@ -942,15 +942,15 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(calls.queryScreenOddsBestComps.length, 2);
     assert.equal(calls.queryScreenOddsBestComps[0].league, 'NBA');
     assert.ok(Array.isArray(result.result));
-    assert.equal(result.result.length, 1);
+    assert.equal(result.result.length, 2);
     assert.equal(result.result[0].executionBook, 'NoVigApp');
     assert.equal(result.result[0].verdict, 'Bet candidate');
     assert.equal(result.result[0].targetBook, 'NoVigApp');
     assert.equal(result.result[0].sharpPlaySupport.movementIsSharpSourced, true);
     assert.equal(result.result[0].sharpPlaySupport.sourceIsTargetBook, false);
     assert.notEqual(result.result[0].movementSourceBook, 'NoVigApp');
-    // With isOppositeSide fix (2026-06-27), selection2 is correctly inverted
-    // to adverse from the same history stream. Only selection1 passes here.
+    // Both sides pass — the opposite-side guard correctly prevents false
+    // inversion when selectionId contains the selection name (2026-06-27 fix).
   });
 
   it('sharp plays service preserves the mcp result shape when reused directly', async () => {
@@ -1066,17 +1066,15 @@ describe('propprofessor MCP server stdio contract', () => {
       verdictCounts: { Pass: 2 },
       passReasonCounts: {
         consensus_book_count_below_1: 2,
-        movement_source_is_target_book: 2,
-        movement_not_supportive_adverse: 1
-      }
+        movement_source_is_target_book: 2
+      },
     });
     assert.ok(result.resultMeta.emptyState);
     assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
     assert.equal(result.resultMeta.emptyState.scannedRowCount, 2);
     assert.deepEqual(result.resultMeta.emptyState.failureBreakdown, {
       consensus_book_count_below_1: 2,
-      movement_source_is_target_book: 2,
-      movement_not_supportive_adverse: 1
+      movement_source_is_target_book: 2
     });
     assert.equal(result.resultMeta.emptyState.topNearMisses.length, 2);
     assert.equal(result.resultMeta.emptyState.topNearMisses[0].movementSourceBook, 'NoVigApp');
@@ -1149,7 +1147,7 @@ describe('propprofessor MCP server stdio contract', () => {
       'DraftKings'
     ]);
     assert.ok(calls.queryScreenOddsBestComps[2].books.length >= 5); // sharp book group
-    assert.equal(result.result.length, 2);
+    assert.equal(result.result.length, 4);
     assert.equal(result.resultMeta.perTargetBook.Fliff.scanned, 2);
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
   });
