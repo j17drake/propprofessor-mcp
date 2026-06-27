@@ -325,9 +325,7 @@ Full methodology, weight tables, and the tier assignment lookup in [docs/METHODO
 
 ## 🔌 Integrations
 
-### Hermes Agent
-
-Automatic setup via `make install`. The MCP is self-documenting — agents call `get_started` to discover the right workflow, `get_play_details` for deep dives, and `validate_play` for a synthesized verdict with verdictSummary, riskFlags, actionableSummary, playId, and consensus drift detection.
+See [Quick Start](#quick-start) for Hermes Agent setup. The MCP is self-documenting — agents call `get_started` to discover the right workflow.
 
 ### Discord / Telegram Alerts
 
