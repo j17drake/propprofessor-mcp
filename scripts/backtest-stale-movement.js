@@ -18,7 +18,7 @@ const {
   setRandomSeed,
   resetRandomSeed
 } = require('./backtest-synthetic');
-const { extractScreenRows } = require('../lib/propprofessor-screen-utils');
+const { extractScreenRows } = require('../lib/screen-parser');
 const { rankLeagueScreenRows } = require('../lib/screen-ranker');
 const {
   clearTierCache,

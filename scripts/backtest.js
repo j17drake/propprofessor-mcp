@@ -25,7 +25,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
-const { extractScreenRows } = require('../lib/propprofessor-screen-utils');
+const { extractScreenRows } = require('../lib/screen-parser');
 const { getConfidenceTier } = require('../lib/propprofessor-risk-score');
 const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
 

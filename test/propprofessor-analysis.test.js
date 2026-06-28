@@ -6,20 +6,13 @@ const assert = require('node:assert/strict');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const {
   americanOddsToImpliedProbability,
-  extractHistoryTrail,
-  extractScreenRows,
-  isTennisRow,
   normalizeDirection,
-  normalizeMarketName,
-  parseBetPrompt,
-  rankScreenRows,
-  rankTennisScreenRows,
-  rankLeagueScreenRows,
-  summarizeFreshness,
-  getLeagueRankingPreset,
-  getMarketPriorityScore,
-  passesLeagueRankingGate
-} = require('../lib/propprofessor-screen-utils');
+  normalizeMarketName
+} = require('../lib/propprofessor-shared-utils');
+const { extractScreenRows, parseBetPrompt, extractHistoryTrail } = require('../lib/screen-parser');
+const { isTennisRow, rankTennisScreenRows } = require('../lib/screen-tennis');
+const { rankScreenRows, rankLeagueScreenRows, getLeagueRankingPreset, getMarketPriorityScore, passesLeagueRankingGate } = require('../lib/screen-ranker');
+const { summarizeFreshness } = require('../lib/screen-summary');
 const { summarizeSharpMovement } = require('../lib/propprofessor-sharp-history');
 
 describe('normalizeMarketName', () => {
@@ -863,7 +856,7 @@ describe('tennis screen ranking helpers', () => {
   });
 
   it('maps spread and total market names into tennis screen query groups', () => {
-    const { normalizeTennisMarketQuery } = require('../lib/propprofessor-screen-utils');
+    const { normalizeTennisMarketQuery } = require('../lib/screen-tennis');
     assert.deepEqual(normalizeTennisMarketQuery('Spread'), ['Game Handicap']);
     assert.deepEqual(normalizeTennisMarketQuery('Total'), ['Total Games']);
   });

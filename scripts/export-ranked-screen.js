@@ -3,12 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 const { createPropProfessorClient } = require('../lib/propprofessor-api');
-const {
-  extractScreenRows,
-  rankTennisScreenRows,
-  rankLeagueScreenRows,
-  summarizeFreshness
-} = require('../lib/propprofessor-screen-utils');
+const { extractScreenRows } = require('../lib/screen-parser');
+const { rankTennisScreenRows } = require('../lib/screen-tennis');
+const { rankLeagueScreenRows } = require('../lib/screen-ranker');
+const { summarizeFreshness } = require('../lib/screen-summary');
 const { hydrateScreenRowsWithHistory } = require('../lib/propprofessor-screen-history');
 const { getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
 const { getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');

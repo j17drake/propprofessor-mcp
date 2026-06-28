@@ -18,7 +18,6 @@
     "./league-presets": "./lib/league-presets.js",
     "./screen-summary": "./lib/screen-summary.js",
     "./screen-tennis": "./lib/screen-tennis.js",
-    "./screen-utils": "./lib/propprofessor-screen-utils.js",
     "./sharp-books": "./lib/propprofessor-sharp-books.js",
     "./sharp-plays": "./lib/propprofessor-sharp-plays.js",
     "./sharp-plays-service": "./lib/propprofessor-sharp-plays-service.js"

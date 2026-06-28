@@ -17,7 +17,7 @@
  */
 
 const { rankLeagueScreenRows } = require('../lib/screen-ranker');
-const { extractScreenRows } = require('../lib/propprofessor-screen-utils');
+const { extractScreenRows } = require('../lib/screen-parser');
 const { clearTierCache, clearScoreTimeline } = require('../lib/propprofessor-risk-score');
 
 // ---------------------------------------------------------------------------

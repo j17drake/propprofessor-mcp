@@ -21,10 +21,10 @@ const {
   getTennisMarketFamily,
   normalizeTennisMarketQuery,
   rankTennisScreenRows,
-  rankLeagueScreenRows,
-  extractScreenRows,
   enrichTennisEvCandidates
-} = require('../../lib/propprofessor-screen-utils');
+} = require('../../lib/screen-tennis');
+const { rankLeagueScreenRows } = require('../../lib/screen-ranker');
+const { extractScreenRows } = require('../../lib/screen-parser');
 const {
   resolveMarketName,
   DEFAULT_LEAGUES,
@@ -365,7 +365,7 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
     ok: true,
     result: ranked,
     count: ranked.length,
-    freshness: require('../../lib/propprofessor-screen-utils').summarizeFreshness(
+    freshness: require('../../lib/screen-summary').summarizeFreshness(
       extractScreenRows(validatedRows),
       Date.now(),
       { maxAgeMs }

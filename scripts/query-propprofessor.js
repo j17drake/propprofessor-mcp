@@ -15,13 +15,9 @@ const {
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
 const { correctTennisTimes } = require('../lib/propprofessor-tennis');
-const {
-  rankTennisScreenRows,
-  rankLeagueScreenRows,
-  extractScreenRows,
-  getLeagueRankingPreset,
-  normalizeTennisMarketQuery
-} = require('../lib/propprofessor-screen-utils');
+const { rankTennisScreenRows, normalizeTennisMarketQuery } = require('../lib/screen-tennis');
+const { rankLeagueScreenRows, getLeagueRankingPreset } = require('../lib/screen-ranker');
+const { extractScreenRows } = require('../lib/screen-parser');
 const { buildRankedScreenResponse, getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
 const { createMcpHandlers } = require('./propprofessor-mcp-server');
 
