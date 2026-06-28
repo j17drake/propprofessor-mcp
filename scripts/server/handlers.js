@@ -365,11 +365,9 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
     ok: true,
     result: ranked,
     count: ranked.length,
-    freshness: require('../../lib/screen-summary').summarizeFreshness(
-      extractScreenRows(validatedRows),
-      Date.now(),
-      { maxAgeMs }
-    ),
+    freshness: require('../../lib/screen-summary').summarizeFreshness(extractScreenRows(validatedRows), Date.now(), {
+      maxAgeMs
+    }),
     warnings: validationWarnings,
     resultMeta: {
       lookbackHoursUsed,
@@ -1622,9 +1620,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       const resolvedMarketsByLeague = {};
       for (const league of leagues) {
-        const marketsForResolution = markets === null
-          ? getDefaultMarketsForLeague(league, targetBooks)
-          : markets;
+        const marketsForResolution = markets === null ? getDefaultMarketsForLeague(league, targetBooks) : markets;
         const marketResolution = resolveMarkets({ markets: marketsForResolution }, league);
         resolvedMarketsByLeague[league] = marketResolution.array.length
           ? marketResolution.array

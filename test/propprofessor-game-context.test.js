@@ -99,10 +99,13 @@ describe('getGameContext', () => {
     // to stats.nba.com which may be blocked on some networks
     try {
       await new Promise((resolve, reject) => {
-        require('child_process').exec('curl -fsS --max-time 3 https://stats.nba.com/stats/scoreboardv3 2>/dev/null', (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
+        require('child_process').exec(
+          'curl -fsS --max-time 3 https://stats.nba.com/stats/scoreboardv3 2>/dev/null',
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
       });
     } catch {
       context.diagnostic('skipping: NBA API unreachable');

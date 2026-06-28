@@ -13,36 +13,45 @@
  *   node scripts/backtest-stale-movement.js [--scenarios=1000] [--seed=42]
  */
 
-const {
-  generateScenario,
-  setRandomSeed,
-  resetRandomSeed
-} = require('./backtest-synthetic');
+const { generateScenario, setRandomSeed, resetRandomSeed } = require('./backtest-synthetic');
 const { extractScreenRows } = require('../lib/screen-parser');
 const { rankLeagueScreenRows } = require('../lib/screen-ranker');
-const {
-  clearTierCache,
-  clearScoreTimeline
-} = require('../lib/propprofessor-risk-score');
-const {
-  americanOddsToImpliedProbability
-} = require('../lib/propprofessor-shared-utils');
+const { clearTierCache, clearScoreTimeline } = require('../lib/propprofessor-risk-score');
+const { americanOddsToImpliedProbability } = require('../lib/propprofessor-shared-utils');
 
 // ── Targeted scenario: contrarian value ──
 
 const TEAMS = [
-  ['Lakers', 'Celtics'], ['Warriors', 'Nuggets'], ['Bucks', 'Heat'],
-  ['76ers', 'Knicks'], ['Suns', 'Clippers'], ['Mavericks', 'Grizzlies']
+  ['Lakers', 'Celtics'],
+  ['Warriors', 'Nuggets'],
+  ['Bucks', 'Heat'],
+  ['76ers', 'Knicks'],
+  ['Suns', 'Clippers'],
+  ['Mavericks', 'Grizzlies']
 ];
 
 const BOOKS = [
-  'Pinnacle', 'Circa', 'BetOnline', 'BookMaker', 'NoVigApp', 'Fliff',
-  'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet', 'BetRivers'
+  'Pinnacle',
+  'Circa',
+  'BetOnline',
+  'BookMaker',
+  'NoVigApp',
+  'Fliff',
+  'DraftKings',
+  'FanDuel',
+  'BetMGM',
+  'Caesars',
+  'PointsBet',
+  'BetRivers'
 ];
 
 let _rng = Math.random;
-function rand() { return _rng(); }
-function randInt(min, max) { return Math.floor(rand() * (max - min + 1)) + min; }
+function rand() {
+  return _rng();
+}
+function randInt(min, max) {
+  return Math.floor(rand() * (max - min + 1)) + min;
+}
 
 function generateContrarianScenario() {
   const [home, away] = TEAMS[Math.floor(rand() * TEAMS.length)];
@@ -81,21 +90,28 @@ function generateContrarianScenario() {
 
   return {
     screenPayload: {
-      game_data: [{
-        gameId, league: 'NBA', market: 'Moneyline',
-        updatedAt: new Date().toISOString(),
-        homeTeam: home, awayTeam: away,
-        selections: {
-          ml: {
-            selection1: home, participant1: home,
-            selection1Id: `Moneyline:${home.replace(/\s+/g, '_')}`,
-            selection2: away, participant2: away,
-            selection2Id: `Moneyline:${away.replace(/\s+/g, '_')}`,
-            odds
-          }
-        },
-        defaultKey: 'ml'
-      }]
+      game_data: [
+        {
+          gameId,
+          league: 'NBA',
+          market: 'Moneyline',
+          updatedAt: new Date().toISOString(),
+          homeTeam: home,
+          awayTeam: away,
+          selections: {
+            ml: {
+              selection1: home,
+              participant1: home,
+              selection1Id: `Moneyline:${home.replace(/\s+/g, '_')}`,
+              selection2: away,
+              participant2: away,
+              selection2Id: `Moneyline:${away.replace(/\s+/g, '_')}`,
+              odds
+            }
+          },
+          defaultKey: 'ml'
+        }
+      ]
     },
     oddsHistory: { [gameId]: history },
     outcome: homeWins ? home : away,
@@ -137,15 +153,19 @@ function runStaleBacktest({ scenarios = 1000, seed = 42 } = {}) {
           }
         }
         row.lineHistory = bookHistory.sort((a, b) => (a.start_ts || 0) - (b.start_ts || 0));
-        const earliest = bookHistory.length > 0
-          ? bookHistory.reduce((min, p) => (p.start_ts || Infinity) < (min.start_ts || Infinity) ? p : min)
-          : null;
+        const earliest =
+          bookHistory.length > 0
+            ? bookHistory.reduce((min, p) => ((p.start_ts || Infinity) < (min.start_ts || Infinity) ? p : min))
+            : null;
         row.openingOdds = earliest ? earliest.odds : row.odds;
       }
 
       const ranked = rankLeagueScreenRows(rows, {
-        league: 'NBA', market: 'Moneyline', limit: 20,
-        includeAll: true, books: ['NoVigApp']
+        league: 'NBA',
+        market: 'Moneyline',
+        limit: 20,
+        includeAll: true,
+        books: ['NoVigApp']
       });
 
       for (const row of ranked) {
@@ -207,8 +227,8 @@ function reportStaleBacktest({ results, scenarios, errorCount, seed, contrarianC
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const sArg = args.find(a => a.startsWith('--scenarios='));
-  const seedArg = args.find(a => a.startsWith('--seed='));
+  const sArg = args.find((a) => a.startsWith('--scenarios='));
+  const seedArg = args.find((a) => a.startsWith('--seed='));
   const s = sArg ? parseInt(sArg.split('=')[1], 10) : 1000;
   const seed = seedArg ? parseInt(seedArg.split('=')[1], 10) : undefined;
   reportStaleBacktest(runStaleBacktest({ scenarios: s, seed }));

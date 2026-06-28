@@ -287,7 +287,12 @@ describe('Novig 2026-06-27 regression — yellow/risk 5+ rows are not TIER 1', (
   });
 
   it('time-to-start: <2h play gets risk reduction', () => {
-    const item = yellowItem({ consensusBookCount: 5, consensusEdge: 1.5, executionQuality: 'best', start: new Date(Date.now() + 30 * 60000).toISOString() });
+    const item = yellowItem({
+      consensusBookCount: 5,
+      consensusEdge: 1.5,
+      executionQuality: 'best',
+      start: new Date(Date.now() + 30 * 60000).toISOString()
+    });
     const score = calculateRiskScore(item);
     assert.ok(score <= 4, `Expected <=4 but got ${score}`);
   });

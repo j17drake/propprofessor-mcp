@@ -1067,7 +1067,7 @@ describe('propprofessor MCP server stdio contract', () => {
       passReasonCounts: {
         consensus_book_count_below_1: 2,
         movement_source_is_target_book: 2
-      },
+      }
     });
     assert.ok(result.resultMeta.emptyState);
     assert.equal(result.resultMeta.emptyState.reason, 'rows_failed_post_filter');
@@ -1322,7 +1322,7 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.ok, true);
     assert.ok(result.activeSlate.length <= 3, 'should have up to 3 leagues in active slate');
     // Each league should have at least one entry (or error)
-    const leagueNames = result.results.map(r => r.league);
+    const leagueNames = result.results.map((r) => r.league);
     assert.ok(leagueNames.includes('NBA') || leagueNames.includes('MLB') || leagueNames.includes('WNBA'));
   });
 

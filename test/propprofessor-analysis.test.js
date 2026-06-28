@@ -11,7 +11,13 @@ const {
 } = require('../lib/propprofessor-shared-utils');
 const { extractScreenRows, parseBetPrompt, extractHistoryTrail } = require('../lib/screen-parser');
 const { isTennisRow, rankTennisScreenRows } = require('../lib/screen-tennis');
-const { rankScreenRows, rankLeagueScreenRows, getLeagueRankingPreset, getMarketPriorityScore, passesLeagueRankingGate } = require('../lib/screen-ranker');
+const {
+  rankScreenRows,
+  rankLeagueScreenRows,
+  getLeagueRankingPreset,
+  getMarketPriorityScore,
+  passesLeagueRankingGate
+} = require('../lib/screen-ranker');
 const { summarizeFreshness } = require('../lib/screen-summary');
 const { summarizeSharpMovement } = require('../lib/propprofessor-sharp-history');
 

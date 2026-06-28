@@ -9,7 +9,11 @@ const os = require('node:os');
 // Isolate test calibration from real data
 const TEST_CALIBRATION_FILE = path.join(os.homedir(), '.propprofessor', 'signal-calibration.json');
 const backup = (() => {
-  try { return fs.readFileSync(TEST_CALIBRATION_FILE, 'utf8'); } catch { return null; }
+  try {
+    return fs.readFileSync(TEST_CALIBRATION_FILE, 'utf8');
+  } catch {
+    return null;
+  }
 })();
 
 // Reload with test-isolated path
@@ -21,7 +25,9 @@ process.on('exit', () => {
     fs.mkdirSync(path.dirname(TEST_CALIBRATION_FILE), { recursive: true });
     fs.writeFileSync(TEST_CALIBRATION_FILE, backup, 'utf8');
   } else {
-    try { fs.unlinkSync(TEST_CALIBRATION_FILE); } catch {}
+    try {
+      fs.unlinkSync(TEST_CALIBRATION_FILE);
+    } catch {}
   }
 });
 
