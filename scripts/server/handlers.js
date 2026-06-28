@@ -1622,16 +1622,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       const resolvedMarketsByLeague = {};
       for (const league of leagues) {
-        if (markets === null) {
-          // Use per-league defaults
-          resolvedMarketsByLeague[league] = getDefaultMarketsForLeague(league, targetBooks);
-        } else {
-          const marketResolution = resolveMarkets({ markets }, league);
-          resolvedMarketsByLeague[league] = marketResolution.array.length
-            ? marketResolution.array
-            : [marketResolution.single];
-          allAliasesUsed.push(...marketResolution.aliasesUsed);
-        }
+        const marketsForResolution = markets === null
+          ? getDefaultMarketsForLeague(league, targetBooks)
+          : markets;
+        const marketResolution = resolveMarkets({ markets: marketsForResolution }, league);
+        resolvedMarketsByLeague[league] = marketResolution.array.length
+          ? marketResolution.array
+          : [marketResolution.single];
+        allAliasesUsed.push(...marketResolution.aliasesUsed);
       }
 
       const allCandidates = [];
@@ -1866,20 +1864,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const allAliasesUsed = [];
       const resolvedMarketsByLeague = {};
       for (const league of leagues) {
-        if (args.markets === undefined && args.market === undefined) {
-          // Use per-league defaults
-          resolvedMarketsByLeague[league] = getDefaultMarketsForLeague(league);
-        } else {
-          const marketResolution = resolveMarkets(
-            { markets: args.markets, market: args.market },
-            league,
-            'Moneyline' // fallback for resolveMarkets
-          );
-          resolvedMarketsByLeague[league] = marketResolution.array.length
-            ? marketResolution.array
-            : [marketResolution.single];
-          allAliasesUsed.push(...marketResolution.aliasesUsed);
-        }
+        const userProvidedMarkets = !(args.markets === undefined && args.market === undefined);
+        const marketResolution = resolveMarkets(
+          {
+            markets: userProvidedMarkets ? args.markets : getDefaultMarketsForLeague(league),
+            market: userProvidedMarkets ? args.market : undefined
+          },
+          league,
+          'Moneyline' // fallback for resolveMarkets
+        );
+        resolvedMarketsByLeague[league] = marketResolution.array.length
+          ? marketResolution.array
+          : [marketResolution.single];
+        allAliasesUsed.push(...marketResolution.aliasesUsed);
       }
       // Use the first league's resolved markets as the default "markets" for response
       const firstLeague = leagues[0];
