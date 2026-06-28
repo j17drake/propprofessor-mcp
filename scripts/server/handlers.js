@@ -50,7 +50,7 @@ function getDefaultMarketsForLeague(league, _targetBooks) {
   }
   return ['Moneyline', 'Spread', 'Total'];
 }
-const { getOddsHistoryCache, getOddsHistoryCacheTtlMs } = require('../../lib/mcp-runtime-config');
+const { getOddsHistoryCache, DEFAULT_ODDS_HISTORY_CACHE_TTL_MS } = require('../../lib/mcp-runtime-config');
 const { buildUfcShortlist } = require('../../lib/propprofessor-sharp-plays');
 const { findBestPrice } = require('../../lib/propprofessor-best-price');
 const { findBestMatch } = require('../../lib/selection-matcher');
@@ -2639,7 +2639,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             misses: oddsHistoryCacheStats.misses,
             evictions: oddsHistoryCacheStats.evictions,
             hitRate: Number(oddsHistoryHitRate.toFixed(4)),
-            ttlMs: getOddsHistoryCacheTtlMs()
+            ttlMs: DEFAULT_ODDS_HISTORY_CACHE_TTL_MS
           }
         }
       };
