@@ -82,8 +82,7 @@
     "test:coverage": "c8 --reporter=text-summary --reporter=lcov node --test test/*.test.js"
   },
   "dependencies": {
-    "got-scraping": "^4.2.1",
-    "superjson": "^2.2.6"
+    "got-scraping": "^4.2.1"
   },
   "optionalDependencies": {
     "playwright": "^1.52.0"

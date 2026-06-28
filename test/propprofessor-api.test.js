@@ -596,7 +596,7 @@ describe('createPropProfessorClient', () => {
     }
   });
 
-  it('serializes trpc hide payloads with date metadata for superjson', async () => {
+  it('serializes trpc hide payloads with dates as ISO strings', async () => {
     const { dir, file } = makeTempAuthState({
       cookies: [{ domain: '.propprofessor.com', name: 'session', value: 'cookie-value' }],
       origins: []
@@ -626,9 +626,8 @@ describe('createPropProfessorClient', () => {
     try {
       await client.hideBet({ id: 'row-1', start: new Date('2026-04-21T12:00:00.000Z') });
       const parsedInput = JSON.parse(new URL(fetchCalls[0].url).searchParams.get('input'));
-      assert.equal(parsedInput['0'].json.start, '2026-04-21T12:00:00.000Z');
-      assert.ok(parsedInput['0'].meta);
-      assert.ok(Object.keys(parsedInput['0'].meta).length > 0);
+      const payload = JSON.parse(parsedInput['0'].json);
+      assert.equal(payload.start, '2026-04-21T12:00:00.000Z');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
