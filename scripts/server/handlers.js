@@ -998,7 +998,23 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       _actionableSummary =
         "Couldn't be rehydrated from the current screen snapshot. Treat as stale / unverified, not an automatic fade.";
     } else if (verdict === 'CONSIDER') {
-      _actionableSummary = `Thin play${_riskFlags.length > 0 ? ' — ' + _riskFlags.join(', ') : ''}. Reduce stake or skip.`;
+      // Nuanced tiers within CONSIDER — not all thin plays are equal.
+      const cbk = Number(matchingRow?.consensusBookCount || 0);
+      const edge = Number(matchingRow?.consensusEdge || 0);
+      const clv = Number(matchingRow?.clvProxyPct || 0);
+      const riskFlagsSuffix = _riskFlags.length > 0 ? ` — ${_riskFlags.join(', ')}` : '';
+
+      if (cbk >= 8 && _disposition === 'supportive_clean' && edge > 1.5) {
+        _actionableSummary = `Strong signal across deep consensus (${cbk} books, ${edge.toFixed(1)}% edge). Playable with standard sizing.`;
+      } else if (cbk >= 5 && _disposition === 'supportive_clean' && edge > 0.5) {
+        _actionableSummary = `Solid signal — ${cbk} books agree, clean movement. Standard sizing${riskFlagsSuffix}.`;
+      } else if (cbk >= 3 && _disposition !== 'adverse_recent') {
+        _actionableSummary = `Thin consensus (${cbk} books) but direction is right. Reduce stake or skip${riskFlagsSuffix}.`;
+      } else if (cbk >= 1) {
+        _actionableSummary = `Marginal — only ${cbk} book${cbk > 1 ? 's' : ''} in consensus. Skip unless you have a strong read${riskFlagsSuffix}.`;
+      } else {
+        _actionableSummary = `No comp book consensus. Pass${riskFlagsSuffix}.`;
+      }
     } else {
       _actionableSummary = 'PASS — one or more hard checks failed.';
     }
@@ -1754,7 +1770,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
 
       // === validateTop: run validate_play on top N candidates per league/market ===
-      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 3;
+      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
 
       if (validateTop > 0) {
         const validationCache = new Map(); // gameId → validated result, shared across candidates
