@@ -1637,6 +1637,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const cardWindow = String(args.cardWindow || 'today')
         .trim()
         .toLowerCase();
+      let cardWindowFallthrough = null; // set when today is dead and we fall through to 'next'
 
       // Fan out leagues concurrently with concurrency=4.
       // Previously serialized 10 leagues × 3 markets = 30 sequential HTTP calls;
@@ -1655,7 +1656,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 lookbackHours,
                 is_live: false,
                 strict: false,
-                includePasses: false,
+                includePasses: true,
                 includeResearch: false,
                 cardWindow: 'all', // always scan all — filter below
                 debug
@@ -1730,19 +1731,95 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         { concurrency: 4 }
       );
 
-      // Post-filter by card window when 'today' or 'next' is requested
+      // Post-filter by card window when 'today' or 'next' is requested.
+      // When 'today' returns a dead slate (<=1 surviving candidates total) and
+      // the user didn't explicitly ask for 'today', fall through to 'next' so
+      // we surface tomorrow's action instead of a near-empty response.
       if (cardWindow === 'today' || cardWindow === 'next') {
-        const targetDateKey =
+        let targetDateKey =
           cardWindow === 'today'
             ? new Date().toISOString().slice(0, 10)
             : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-        for (const entry of allCandidates) {
-          if (!entry.candidates || !entry.candidates.length) continue;
-          entry.candidates = entry.candidates.filter((row) => {
-            if (!row.start) return true; // keep rows without start time
-            return new Date(row.start).toISOString().slice(0, 10) === targetDateKey;
-          });
+        const filterBy = (key) => {
+          for (const entry of allCandidates) {
+            if (!entry.candidates || !entry.candidates.length) continue;
+            entry.candidates = entry.candidates.filter((row) => {
+              if (!row.start) return true; // keep rows without start time
+              return new Date(row.start).toISOString().slice(0, 10) === key;
+            });
+          }
+        };
+
+        // Snapshot the full scan before filtering so we can fall through to 'next'
+        const fullCandidatesSnapshot = allCandidates.map((entry) => ({
+          ...entry,
+          candidates: [...(entry.candidates || [])]
+        }));
+
+        filterBy(targetDateKey);
+
+        // Multi-day merge: when cardWindow='today', also surface tomorrow's
+        // candidates as separate league/market entries. The previous logic
+        // only fell through when today had <=1 total candidate — but when
+        // today has action (e.g. 6 Tennis matches), tomorrow's matches (e.g.
+        // Korneeva/Birrell Wimbledon R1) were silently dropped. Instead of
+        // choosing one day, merge both: keep today's filtered set, then
+        // append a second pass of tomorrow's candidates under the same
+        // league/market entries so the caller sees the full upcoming slate.
+        if (cardWindow === 'today') {
+          const totalLive = allCandidates.reduce((sum, e) => sum + (e.candidates?.length || 0), 0);
+          // Always check tomorrow — if there are ANY tomorrow candidates,
+          // merge them in instead of replacing today.
+          const nextKey = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          const nextCandidates = [];
+          for (const entry of fullCandidatesSnapshot) {
+            if (!entry.candidates || !entry.candidates.length) continue;
+            const nextRows = entry.candidates.filter((row) => {
+              if (!row.start) return true;
+              return new Date(row.start).toISOString().slice(0, 10) === nextKey;
+            });
+            if (nextRows.length > 0) {
+              nextCandidates.push({
+                league: entry.league,
+                market: entry.market,
+                candidates: nextRows
+              });
+            }
+          }
+
+          if (totalLive <= 1 && allCandidates.length > 0) {
+            // Dead-today fall-through: today has nothing, replace with tomorrow
+            // (original behavior preserved)
+            for (let i = 0; i < allCandidates.length; i++) {
+              allCandidates[i].candidates = [...fullCandidatesSnapshot[i].candidates];
+            }
+            targetDateKey = nextKey;
+            filterBy(targetDateKey);
+            cardWindowFallthrough = targetDateKey;
+          } else if (nextCandidates.length > 0) {
+            // Today has action AND tomorrow has action — merge both days
+            for (const nc of nextCandidates) {
+              // Avoid duplicate entries: if the same league+market already
+              // exists from today, append tomorrow's candidates to it.
+              const existing = allCandidates.find(
+                (e) => e.league === nc.league && e.market === nc.market
+              );
+              if (existing) {
+                // Filter out duplicates (same gameId + selection already in today)
+                const todayKeys = new Set(
+                  existing.candidates.map((c) => `${c.gameId || ''}:${c.selection || ''}`)
+                );
+                const newRows = nc.candidates.filter(
+                  (c) => !todayKeys.has(`${c.gameId || ''}:${c.selection || ''}`)
+                );
+                existing.candidates.push(...newRows);
+              } else {
+                allCandidates.push(nc);
+              }
+            }
+            cardWindowFallthrough = nextKey;
+          }
         }
       }
 
@@ -1835,6 +1912,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         markets,
         totalCandidates: allCandidates.reduce((sum, l) => sum + (l.candidates?.length || 0), 0),
         activeSlate,
+        cardWindow: cardWindowFallthrough || cardWindow,
+        ...(cardWindowFallthrough ? { cardWindowFallthrough: true } : {}),
         results: allCandidates,
         research: researchResults,
         warnings,
