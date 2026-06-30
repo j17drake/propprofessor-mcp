@@ -457,7 +457,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // (used by sharp_plays) but missing from screen_ranked. Symptom: every
     // screen_ranked call on a single non-sharp book returned consBk=0.
     const sharpBookSet = getSharpBookComparisonSet({ league, market });
-    const augmentedBooks = uniqueBooks([...requestedBooks, ...sharpBookSet]);
+    // Non-major leagues (Tennis, Soccer, UFC, WNBA, etc.) need
+    // ALL_SCREEN_BOOKS for the backend to return multi-book data.
+    // The default sharp-book set (5 books) is too narrow — the backend
+    // only populates full odds maps when the complete list is sent.
+    // Matches the same non-major logic in queryScreenOddsBestComps
+    // (lib/propprofessor-api.js:511-515).
+    const leagueUpper = (league || '').toUpperCase();
+    const augmentedBooks = !['NBA', 'NFL', 'MLB'].includes(leagueUpper)
+      ? ALL_SCREEN_BOOKS
+      : uniqueBooks([...requestedBooks, ...sharpBookSet]);
     const payload = await client.queryScreenOddsBestComps({
       market,
       league,

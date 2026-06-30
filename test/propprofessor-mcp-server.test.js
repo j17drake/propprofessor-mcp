@@ -13,6 +13,7 @@ const {
   mapWithConcurrency
 } = require('../scripts/propprofessor-mcp-server');
 const { runSharpPlays } = require('../lib/propprofessor-sharp-plays-service');
+const { ALL_SCREEN_BOOKS } = require('../lib/propprofessor-sharp-books');
 
 const serverPath = path.join(__dirname, '..', 'scripts', 'propprofessor-mcp-server.js');
 
@@ -781,13 +782,14 @@ describe('propprofessor MCP server stdio contract', () => {
 
   const screenLeagueExpectedBooks = {
     NBA: ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings'],
-    WNBA: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
+    // Non-major leagues use ALL_SCREEN_BOOKS for multi-book backend data
+    WNBA: ALL_SCREEN_BOOKS,
     MLB: ['Pinnacle', 'Circa', 'BookMaker', 'BetOnline', 'DraftKings', 'BetMGM'],
     NFL: ['Pinnacle', 'Circa', 'BookMaker', 'NoVigApp', 'FanDuel'],
-    NHL: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
-    UFC: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
-    NCAAB: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa'],
-    NCAAF: ['Pinnacle', 'Polymarket', 'Kalshi', 'BetOnline', 'Circa']
+    NHL: ALL_SCREEN_BOOKS,
+    UFC: ALL_SCREEN_BOOKS,
+    NCAAB: ALL_SCREEN_BOOKS,
+    NCAAF: ALL_SCREEN_BOOKS
   };
   for (const { league } of [
     { league: 'NBA' },
