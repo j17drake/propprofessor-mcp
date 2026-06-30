@@ -104,7 +104,9 @@ const {
   formatScreenRankedMinimal,
   formatScreenRankedStandard,
   formatGetPlayDetailsMinimal,
-  formatGetPlayDetailsStandard
+  formatGetPlayDetailsStandard,
+  formatQuickScreenMinimal,
+  formatQuickScreenStandard
 } = require('../../lib/propprofessor-formatter');
 const {
   getPickHistory,
@@ -1832,6 +1834,27 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
+      // Apply tennis time correction before returning, so hoursUntilStart
+      // and date-based cardWindow filtering use real match times from ESPN
+      // rather than the raw timestamp embedded in the odds-feed game ID.
+      const hasTennis = leagues.some((l) => String(l).toLowerCase() === 'tennis');
+      if (hasTennis) {
+        const allRows = allCandidates.flatMap((e) => e.candidates).filter(Boolean);
+        if (allRows.length) {
+          await correctTennisTimes(allRows);
+        }
+      }
+
+      // Recompute hoursUntilStart after tennis time correction
+      for (const entry of allCandidates) {
+        if (!entry.candidates) continue;
+        for (const row of entry.candidates) {
+          if (row.start) {
+            row.hoursUntilStart = Math.round(((new Date(row.start).getTime() - Date.now()) / 3600000) * 10) / 10;
+          }
+        }
+      }
+
       const activeSlate = allCandidates
         .filter((r) => r.candidates && r.candidates.length > 0)
         .map((r) => ({
@@ -1913,7 +1936,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         0
       );
 
-      return {
+      const screenResponse = {
         ok: true,
         targetBook: bookList,
         targetBooks,
@@ -1939,6 +1962,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
+      // Apply verbosity formatting
+      const verbosity = String(args.verbosity || 'full').toLowerCase();
+      if (verbosity === 'minimal') return formatQuickScreenMinimal(screenResponse);
+      if (verbosity === 'standard') return formatQuickScreenStandard(screenResponse);
+      return screenResponse;
     },
 
     // ─── Betting ────────────────────────────────────────────────────
@@ -2256,7 +2284,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         markets: [market],
         limit: 20,
         includeResearch: false,
-        verbosity: 'standard'
+        verbosity: 'full'
       });
 
       // Step 2: Find the matching candidate — track which league/market entry it came from
