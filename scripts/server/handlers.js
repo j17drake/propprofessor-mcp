@@ -592,6 +592,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // as runScreenRankedImpl (shipped 2026-06-14).
     const focusBook = requestedBooks.length ? requestedBooks[0] : '';
 
+    // Auto-augment the backend query with the league's sharp-book set so
+    // consensus data populates. Same logic as runScreenRankedImpl.
+    const sharpBookSetDetail = getSharpBookComparisonSet({ league, market });
+    const leagueUpperDetail = (league || '').toUpperCase();
+    const augmentedBooks = !['NBA', 'NFL', 'MLB'].includes(leagueUpperDetail)
+      ? ALL_SCREEN_BOOKS
+      : uniqueBooks([...requestedBooks, ...sharpBookSetDetail]);
+
     // Fetch full screen data (with history hydration — this is the detailed view)
     let payload;
     try {
@@ -600,13 +608,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         league,
         games: gameIds,
         participants: [],
-        // BUGFIX (2026-06-21): when no books are specified, omit the books
-        // param entirely so queryScreenOddsBestComps falls back to its own
-        // default set (ALL_SCREEN_BOOKS for non-NA leagues). Passing books: []
-        // sets hasExplicitBooks=true which bypasses the ALL_SCREEN_BOOKS
-        // fallback and returns 0 rows for UFC, Tennis, Soccer — leagues
-        // where Pinnacle doesn't price Moneyline markets.
-        books: requestedBooks.length ? requestedBooks : undefined,
+        books: augmentedBooks,
         is_live: false
       });
     } catch (err) {
@@ -630,7 +632,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       response = await buildRankedScreenResponseShared({
         client,
         payloads: [payload],
-        args: { ...args, compact: false, skipHistory: false },
+        args: { ...args, compact: false, skipHistory: false, historySportsbooks: augmentedBooks },
         league,
         focusBook,
         rankRows: (hydratedRows, { debug } = {}) =>
@@ -638,7 +640,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             league,
             market,
             limit: gameIds.length * 4,
-            books: requestedBooks.length ? requestedBooks : undefined,
+            books: augmentedBooks,
             includeAll: true,
             debug
           })
@@ -718,6 +720,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const books = normalizeBookList(args.books);
     const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
     const skipResearch = args.skipResearch === true;
+    const skipGameContext = args.skipGameContext === true;
 
     // Steps 1 + 2 in parallel: re-fetch the screen for this game AND run
     // player_context research concurrently. The two calls are independent —
@@ -779,7 +782,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       gameIdParts[4] && /^\d{10}$/.test(gameIdParts[4])
         ? new Date(Number(gameIdParts[4]) * 1000).toISOString().slice(0, 10)
         : '';
-    const gameContextPromise = skipResearch
+    const gameContextPromise = skipGameContext
       ? Promise.resolve(null)
       : isMlb
         ? (async () => {
@@ -1127,7 +1130,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               : {})
           }
         : isMlb
-          ? skipResearch
+          ? skipGameContext
             ? { skipped: true }
             : gameContextError
               ? typeof gameContextError === 'string'
