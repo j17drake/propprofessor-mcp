@@ -1169,8 +1169,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // We always query with the league's sharp book set included, so consensus
     // and movement data populate. The focus book (user's execution book) is
     // preserved for display via focusPlays in extractScreenRows.
+    // Non-major leagues (Tennis, Soccer, UFC, WNBA, etc.) need
+    // ALL_SCREEN_BOOKS for the backend to return multi-book data.
+    // The default sharp-book set (5 books) is too narrow — Total Goals on
+    // Soccer, for example, returns insufficient_history without the full set.
+    // Same logic as runScreenRankedImpl (lines 468-471).
+    const nonMajorLeagues = ['TENNIS', 'SOCCER', 'UFC', 'WNBA', 'NCAAB', 'NCAAF'];
+    const leagueUpper = (league || '').toUpperCase();
     const sharpBookSet = getSharpBookComparisonSet({ league, market });
-    const augmentedBooks = uniqueBooks([...requestedBooks, ...sharpBookSet]);
+    const augmentedBooks = nonMajorLeagues.includes(leagueUpper)
+      ? ALL_SCREEN_BOOKS
+      : uniqueBooks([...requestedBooks, ...sharpBookSet]);
 
     // Check cache first (only cache full responses, not compact/fields-filtered)
     // Use augmented books in cache key so different book combos don't collide

@@ -740,44 +740,18 @@ describe('propprofessor MCP server stdio contract', () => {
     });
 
     assert.equal(calls.queryScreenOddsBestComps.length, 2);
-    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, [
-      'NoVigApp',
-      'Pinnacle',
-      'Polymarket',
-      'Kalshi',
-      'BetOnline',
-      'Circa'
-    ]);
+    // UFC is a non-major league, so the book augmentation sends ALL_SCREEN_BOOKS
+    // to ensure the backend returns multi-book consensus data.
+    assert.deepEqual(calls.queryScreenOddsBestComps[0].books, ALL_SCREEN_BOOKS);
     assert.equal(calls.queryScreenOddsBestComps[0].market, 'Moneyline');
     assert.equal(bookResult.resultMeta.focusBook, 'NoVigApp');
-    assert.deepEqual(bookResult.resultMeta.historySportsbooksRequested, [
-      'NoVigApp',
-      'Pinnacle',
-      'Polymarket',
-      'Kalshi',
-      'BetOnline',
-      'Circa'
-    ]);
+    assert.deepEqual(bookResult.resultMeta.historySportsbooksRequested, ALL_SCREEN_BOOKS);
 
-    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, [
-      'DraftKings',
-      'Pinnacle',
-      'Polymarket',
-      'Kalshi',
-      'BetOnline',
-      'Circa'
-    ]);
+    assert.deepEqual(calls.queryScreenOddsBestComps[1].books, ALL_SCREEN_BOOKS);
     // 'Total' is resolved to 'Total Rounds' for UFC via market alias
     assert.equal(calls.queryScreenOddsBestComps[1].market, 'Total Rounds');
     assert.equal(targetBookResult.resultMeta.focusBook, 'DraftKings');
-    assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, [
-      'DraftKings',
-      'Pinnacle',
-      'Polymarket',
-      'Kalshi',
-      'BetOnline',
-      'Circa'
-    ]);
+    assert.deepEqual(targetBookResult.resultMeta.historySportsbooksRequested, ALL_SCREEN_BOOKS);
   });
 
   const screenLeagueExpectedBooks = {
