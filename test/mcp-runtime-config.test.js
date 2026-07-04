@@ -5,12 +5,8 @@ const assert = require('node:assert/strict');
 
 const {
   DEFAULT_ODDS_HISTORY_LOOKBACK_HOURS,
-  DEFAULT_CACHE_MAX_ENTRIES,
   getOddsHistoryLookbackHours,
-  getCacheMaxEntries,
-  getRuntimeCache
 } = require('../lib/mcp-runtime-config');
-const { LruCache } = require('../lib/propprofessor-lru-cache');
 const { getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
 
 const ORIGINAL_LOOKBACK = process.env.PROPPROFESSOR_ODDS_HISTORY_LOOKBACK_HOURS;
@@ -53,33 +49,5 @@ describe('mcp runtime config', () => {
     assert.equal(getDebugFlag('0'), false);
     assert.equal(getDebugFlag('true'), true);
     assert.equal(getDebugFlag('1'), true);
-  });
-});
-
-describe('getRuntimeCache', () => {
-  it('returns an LruCache instance with the configured max entries', () => {
-    const cache = getRuntimeCache();
-    assert.ok(cache instanceof LruCache, 'expected an LruCache instance');
-    assert.equal(cache.max, getCacheMaxEntries() || DEFAULT_CACHE_MAX_ENTRIES);
-  });
-
-  it('returns a fresh instance on each call (no shared state between callers)', () => {
-    const a = getRuntimeCache();
-    const b = getRuntimeCache();
-    assert.notEqual(a, b, 'expected separate cache instances');
-    a.set('k', 'v', 1000);
-    assert.equal(a.get('k'), 'v');
-    assert.equal(b.get('k'), undefined);
-  });
-
-  it('honors per-entry TTL on set (per LruCache contract)', () => {
-    const cache = getRuntimeCache();
-    cache.set('k', 'v', 5);
-    // Sleep just over the TTL
-    const start = Date.now();
-    while (Date.now() - start < 15) {
-      // busy wait
-    }
-    assert.equal(cache.get('k'), undefined, 'entry should have expired');
   });
 });

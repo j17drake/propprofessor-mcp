@@ -415,13 +415,12 @@ function applyValidatedFields(target, validationResult) {
 }
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
-  const { getRuntimeCache, getCacheTtlMs } = require('../../lib/mcp-runtime-config');
+  const { getCacheTtlMs, getCacheMaxEntries } = require('../../lib/mcp-runtime-config');
+  const { LruCache } = require('../../lib/propprofessor-lru-cache');
 
-  // Shared response cache — keyed by query params, TTL-based expiration.
-  // Backed by the canonical LruCache (lib/propprofessor-lru-cache.js) so all
-  // caching in the project shares one implementation; the TTL is applied
-  // per-set since LruCache supports per-entry TTL.
-  const responseCache = getRuntimeCache();
+  // Single shared response cache — backed directly by LruCache (lib/propprofessor-lru-cache.js).
+  // TTL is applied per-set since LruCache supports per-entry TTL.
+  const responseCache = new LruCache(getCacheMaxEntries());
   const responseCacheTtlMs = getCacheTtlMs();
 
   // Canonical screen cache for stable (gameId, market, book) tuples.
