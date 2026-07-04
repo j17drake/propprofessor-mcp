@@ -108,6 +108,8 @@ const {
   formatQuickScreenMinimal,
   formatQuickScreenStandard
 } = require('../../lib/propprofessor-formatter');
+const { filterRowsByKaiCall } = require('../../lib/propprofessor-row-filter');
+const { sortRows } = require('../../lib/propprofessor-sort-utils');
 const {
   getPickHistory,
   getPickStats,
@@ -545,6 +547,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         };
       }
     }
+
+    // === kaiCall filter + sortBy (agent ergonomics) ===
+    // Apply before verbosity formatting so the formatter sees the final shape.
+    // Both are no-ops when the params are missing.
+    if (Array.isArray(response.result)) {
+      response.result = sortRows(filterRowsByKaiCall(response.result, args.kaiCall), {
+        sortBy: args.sortBy,
+        sortDir: args.sortDir
+      });
+    }
+
     const verbosity = String(args.verbosity || 'full').toLowerCase();
     if (verbosity === 'minimal') return formatScreenRankedMinimal(response);
     if (verbosity === 'standard') return formatScreenRankedStandard(response);
@@ -1611,6 +1624,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           };
         }
       }
+
+      // === kaiCall filter + sortBy (agent ergonomics) ===
+      // Apply after research/riskDowngrade so the filter operates on the
+      // final result set. Both are no-ops when the params are missing.
+      if (Array.isArray(response.result)) {
+        response.result = sortRows(filterRowsByKaiCall(response.result, args.kaiCall), {
+          sortBy: args.sortBy,
+          sortDir: args.sortDir
+        });
+      }
+
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
       if (verbosity === 'minimal') return formatSharpPlaysMinimal(response);
@@ -1824,17 +1848,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             for (const nc of nextCandidates) {
               // Avoid duplicate entries: if the same league+market already
               // exists from today, append tomorrow's candidates to it.
-              const existing = allCandidates.find(
-                (e) => e.league === nc.league && e.market === nc.market
-              );
+              const existing = allCandidates.find((e) => e.league === nc.league && e.market === nc.market);
               if (existing) {
                 // Filter out duplicates (same gameId + selection already in today)
-                const todayKeys = new Set(
-                  existing.candidates.map((c) => `${c.gameId || ''}:${c.selection || ''}`)
-                );
-                const newRows = nc.candidates.filter(
-                  (c) => !todayKeys.has(`${c.gameId || ''}:${c.selection || ''}`)
-                );
+                const todayKeys = new Set(existing.candidates.map((c) => `${c.gameId || ''}:${c.selection || ''}`));
+                const newRows = nc.candidates.filter((c) => !todayKeys.has(`${c.gameId || ''}:${c.selection || ''}`));
                 existing.candidates.push(...newRows);
               } else {
                 allCandidates.push(nc);
@@ -1946,6 +1964,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         (sum, entry) => sum + (entry.candidates || []).filter((c) => c._validated).length,
         0
       );
+
+      // === kaiCall filter + sortBy (agent ergonomics) ===
+      // Apply per-entry so each league/market bucket stays in its slot.
+      // Filter first, sort second. Both are no-ops when the params are missing.
+      for (const entry of allCandidates) {
+        if (!entry.candidates || !entry.candidates.length) continue;
+        entry.candidates = sortRows(filterRowsByKaiCall(entry.candidates, args.kaiCall), {
+          sortBy: args.sortBy,
+          sortDir: args.sortDir
+        });
+      }
 
       const screenResponse = {
         ok: true,
@@ -2070,6 +2099,23 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 return (Number(b.screenScore ?? 0) || 0) - (Number(a.screenScore ?? 0) || 0);
               })
               .slice(0, limit);
+
+            // === kaiCall filter + sortBy (agent ergonomics) ===
+            // When args.sortBy is set, override the default tier-then-screenScore order.
+            // When args.kaiCall is set, drop rows that don't match the display tier.
+            // Both are no-ops when the params are missing. We always copy into
+            // a new array so clearing `recommended` doesn't also clear our
+            // source when filterRowsByKaiCall/sortRows return the input as-is.
+            {
+              const filtered =
+                args.kaiCall != null ? filterRowsByKaiCall(recommended, args.kaiCall) : recommended.slice();
+              const sorted = args.sortBy
+                ? sortRows(filtered, { sortBy: args.sortBy, sortDir: args.sortDir })
+                : filtered;
+              recommended.length = 0;
+              for (const r of sorted) recommended.push(r);
+            }
+
             if (recommended.length) {
               // Pre-flight research (v2.1.8): when includeResearch=true, attach
               // risk flags to each play. When riskDowngrade=true, drop plays
@@ -2989,7 +3035,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         casual: {
           summary: 'For casual bettors who just want top picks.',
           steps: [
-            'Call quick_screen with verbosity="minimal" to get plain English picks — includes sharp consensus, book price, and research in one call.',
+            'Call quick_screen with kaiCall=["BET"] and sortBy="start" to get only Bet-tier plays ordered by soonest game. Use verbosity="minimal" for plain English.',
             'Present the top 3-5 plays to the user.',
             'If they want more detail on a specific play, call player_context to check injury risk.'
           ],
@@ -2999,7 +3045,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             {
               name: 'quick_screen',
               one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
-              when_to_call: 'Default starting point. Use verbosity="minimal" for quick English picks.'
+              when_to_call:
+                'Default starting point. Use kaiCall=["BET"] to filter to strong plays, sortBy="start" to order by game time, verbosity="minimal" for quick English picks.'
             },
             {
               name: 'player_context',
@@ -3011,9 +3058,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         intermediate: {
           summary: 'For bettors who understand edge and tier but want guidance.',
           steps: [
-            'Call quick_screen with verbosity="standard" to get structured plays with edge, tier, risk, and research — one call.',
+            'Call quick_screen with kaiCall=["BET", "CONSIDER"] and sortBy="start" to get structured plays ordered by soonest game. Use verbosity="standard" for edge, tier, risk, and research in one call.',
             'If riskScore >= 7, warn the user.',
-            'Filter by tier (TIER 1, TIER 2) for highest confidence.',
+            'For largest edge regardless of game time, use sortBy="edge" (default direction: desc).',
             'Optionally call find_best_price to line shop.',
             'For each top play, call player_context to check injury risk.'
           ],
@@ -3024,7 +3071,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               name: 'quick_screen',
               one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
               when_to_call:
-                'Default starting point. Use verbosity="standard" to get structured plays with edge, tier, risk, and research.'
+                'Default starting point. Use verbosity="standard" for structured plays with edge, tier, risk, and research. Use kaiCall=["BET"] to filter to strong plays. Use sortBy="start" to order by game time, or sortBy="edge" for largest edge first.'
             },
             {
               name: 'validate_play',
@@ -3048,7 +3095,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         sharp: {
           summary: 'For sharp bettors who want full control and movement data.',
           steps: [
-            'Call quick_screen with verbosity="full" to get complete data — edge, tier, risk, line history, and research all at once.',
+            'Call quick_screen with kaiCall=["BET"] and sortBy="start" to get Bet-only plays ordered by soonest game. Use verbosity="full" for complete data — edge, tier, risk, line history, and research.',
+            'For lowest risk first, use sortBy="riskScore" (default: asc).',
             'Use sharp_consensus to check multi-window movement.',
             'Use sharp_plays to find plays with independent sharp support.',
             'Call get_play_details for line history on specific plays.',
@@ -3070,7 +3118,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               name: 'quick_screen',
               one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
               when_to_call:
-                'Default starting point. Use verbosity="full" for complete edge, tier, risk, line history, and research in one call.'
+                'Default starting point. Use verbosity="full" for complete edge, tier, risk, line history, and research in one call. kaiCall=["BET"] filters to strong plays. sortBy supports: start, edge, tier, consensusBookCount, riskScore.'
             },
             {
               name: 'all_slates',

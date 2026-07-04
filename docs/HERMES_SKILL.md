@@ -20,39 +20,77 @@ Pick the workflow that matches the user's sophistication.
 
 ```
 get_started
-  → recommended_bets(leagues=[...], limit=3, compact=true, fields=["game","selection","odds","tier","kai"])
-  → player_context(player=...)   # only if tier ≤ 2
+  → quick_screen(books=[X], kaiCall=["BET"], sortBy="start", verbosity="minimal")
+  → player_context(player=...)   # only if riskScore ≥ 7
 ```
 
-Keep output to 2-3 sentences. Lead with the pick and odds.
+Keep output to 2-3 sentences. Lead with the pick and odds. The `kaiCall` filter drops CONSIDER/PASS rows so the user only sees strong plays. `sortBy="start"` orders by game time (soonest first).
 
 ### Intermediate bettor
 
 ```
 get_started
-  → recommended_bets(leagues=[...], limit=5)
+  → quick_screen(books=[X], kaiCall=["BET","CONSIDER"], sortBy="start", verbosity="standard")
   → player_context(player=...)   # for every TIER 1-2 candidate
   → find_best_price(league, market, game, selection)
 ```
 
-Explain edge, movement grade, and where to shop the line.
+Explain edge, movement grade, and where to shop the line. The two-tier filter drops PASS but keeps CONSIDER for users who want to see what sharp money is leaning toward.
 
 ### Sharp bettor
 
 ```
 get_started
-  → screen_ranked(league, market, fields=full)
+  → quick_screen(books=[X], kaiCall=["BET"], sortBy="riskScore", verbosity="full")
   → sharp_consensus(league, market, windows=[1,2,6,12,24,48])
-  → sharp_plays(leagues=[...], targetBooks=[...])
+  → sharp_plays(leagues=[...], targetBooks=[...], kaiCall=["BET"], sortBy="edge", sortDir="desc")
   → staking_plan(bankroll=N, leagues=[...])
 ```
 
-Surface line-history detail, per-window consensus counts, and Kelly fractions.
+Surface line-history detail, per-window consensus counts, and Kelly fractions. `sortBy="riskScore"` (default asc) orders by cleanest signal first. `sortBy="edge"` with `sortDir="desc"` ranks by largest consensus edge.
+
+## Quick Recipes
+
+**Today's plays on a specific book, soonest first (most common):**
+
+```
+quick_screen(books=["NoVigApp"], kaiCall=["BET"], sortBy="start", verbosity="minimal")
+```
+
+**Only the strongest, soonest games (TIGHTEST list):**
+
+```
+quick_screen(books=["Fliff"], kaiCall=["BET"], targetTiers=["TIER 1", "TIER 2"], sortBy="start", limit=10, verbosity="standard")
+```
+
+**Largest edge across all books, no PASS rows:**
+
+```
+quick_screen(kaiCall=["BET","CONSIDER"], sortBy="edge", sortDir="desc", verbosity="standard")
+```
+
+**Lowest-risk plays on a single book:**
+
+```
+quick_screen(books=["NovigApp"], kaiCall=["BET"], sortBy="riskScore", verbosity="standard")
+```
+
+**Validate one play before betting (drill-down):**
+
+```
+validate_play(league="NBA", gameId="...", selection="...", book="Fliff")
+```
 
 ## Key Concepts
 
 **Tier System (TIER 1–4)**
 Confidence bucket combining edge, movement, and consensus. TIER 1 = lock-grade, TIER 2 = strong, TIER 3 = speculative, TIER 4 = pass. Never recommend TIER 4 as a bet.
+
+**KaiCall (BET | CONSIDER | PASS)**
+Layered action label derived from tier + risk + edge. BET = place it, CONSIDER = strong but monitor, PASS = skip. Use `kaiCall: ["BET"]` on any screen tool to filter out CONSIDER/PASS rows.
+
+**`sortBy` Field**
+Available on every screen-family tool. Accepts `start` (game time), `edge` (consensus edge), `tier` (TIER 1 first), `consensusBookCount` (most books first), `riskScore` (lowest first). Each has a sensible default direction. Missing-field rows always go to the end.
 
 **Risk Score (1–10)**
 Player/injury/news risk from `player_context`. 1-3 = clean, 4-6 = monitor, 7-10 = downgrade or skip. Always surface scores ≥ 7.

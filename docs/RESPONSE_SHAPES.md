@@ -15,6 +15,22 @@ Most tools return at least:
 | `freshness`  | `object \| undefined`   | `{ fetchedAt, ageMs, stale }` when the response includes time-sensitive data.        |
 | `warnings`   | `string[] \| undefined` | Non-fatal advisories (e.g. degraded line history, missing sharp book).               |
 
+## Filtering & sorting (screen-family tools)
+
+The screen-family tools (`quick_screen`, `screen_ranked`, `sharp_plays`, `recommended_bets`) accept two optional input params that operate on the final result set before verbosity formatting:
+
+| Param     | Type            | Effect                                                                                         |
+| --------- | --------------- | ---------------------------------------------------------------------------------------------- |
+| `kaiCall` | `string[]`      | Keep only rows whose `kaiCall` is in the list. Default: no filter. Example: `["BET"]`.         |
+| `sortBy`  | `string` (enum) | Sort by `start` / `edge` / `tier` / `consensusBookCount` / `riskScore`. Default: server order. |
+| `sortDir` | `string` (enum) | `asc` / `desc`. Overrides per-field default.                                                   |
+
+**Field-specific default direction:** `start` asc (soonest first), `edge` desc (largest first), `tier` asc (TIER 1 first), `consensusBookCount` desc (most books first), `riskScore` asc (lowest risk first).
+
+**Missing-field rows always sort to the end**, regardless of direction. A row with no `start` value won't get stuck at position 1 of a `sortBy: "start", sortDir: "desc"` call.
+
+**Missing/garbage `kaiCall` is treated as `PASS`.** A row with no kaiCall field, or `kaiCall: "unknown"`, will only be returned when you explicitly include `"PASS"` in the filter.
+
 ## Tier-bearing fields (signal-quality, NOT win-probability)
 
 When a tool returns ranked rows, each row may include:

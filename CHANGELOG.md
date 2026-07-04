@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.5.0
+
+**Agent-facing ergonomics: filter to Bet-tier only, sort by game time, on every screen tool.**
+
+### What changed
+
+- **Three new optional params on every screen-family tool** (`quick_screen`, `screen_ranked`, `sharp_plays`, `recommended_bets`):
+  - `kaiCall: ["BET" | "CONSIDER" | "PASS"]` — keep only rows matching the listed display tiers. Default: no filter. `["BET"]` returns only strong plays.
+  - `sortBy: "start" | "edge" | "tier" | "consensusBookCount" | "riskScore"` — sort the response by a single field. Default: server order (tier then screenScore).
+  - `sortDir: "asc" | "desc"` — override the per-field default direction. Optional.
+- **Field-specific default directions:** `start` asc (soonest first), `edge` desc (largest first), `tier` asc (TIER 1 first), `consensusBookCount` desc (most books first), `riskScore` asc (lowest first).
+- **Missing-field rows always sort to the end**, regardless of `sortDir`. A row with no `start` value never gets stuck at position 1 of a `desc` list — agents asking "what's coming up first?" always get a useful answer.
+- **ISO date strings auto-coerced** in sort — real data has both unix timestamps and ISO 8601 strings; the new `toNumberOrEpoch` helper handles both.
+- **Missing/garbage `kaiCall` is treated as PASS** — explicit `"PASS"` filter required to see them.
+- **`get_started` recipes updated** for all three workflows (casual / intermediate / sharp) to use the canonical `kaiCall=["BET"], sortBy="start"` pattern.
+- **Tool descriptions updated** in plain language so agents know the new params exist.
+- **Docs updated**: new "Filtering & sorting" section in `RESPONSE_SHAPES.md`; new "Quick Recipes" section in `HERMES_SKILL.md` with 5 copy-paste patterns.
+
+### Migration notes
+
+Zero. All new params are optional with sensible defaults. Existing callers see no behavior change.
+
+### Tests
+
+- 1390/1390 passing (up from 1341)
+- New: `test/propprofessor-row-filter.test.js` (19 tests)
+- New: `test/propprofessor-sort-utils.test.js` (30 tests, including `toNumberOrEpoch` helper coverage)
+- New: regression coverage for in-place mutation aliasing bug (caught by `staking_plan` integration test)
+
+### Files
+
+- New: `lib/propprofessor-row-filter.js`, `lib/propprofessor-sort-utils.js`
+- Modified: `lib/tool-definitions/screen.js`, `scripts/server/handlers.js`, `scripts/check-claims.js`, `docs/RESPONSE_SHAPES.md`, `docs/HERMES_SKILL.md`, `README.md`, `package.json`
+
 ## 2.4.0
 
 **Major validate_play reliability overhaul: canonical play identity, honest degradation, and freshness metadata.**

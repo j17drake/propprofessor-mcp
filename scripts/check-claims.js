@@ -36,13 +36,23 @@ const { execSync } = require('child_process');
 
 const repoRoot = process.cwd();
 const readmePath = path.join(repoRoot, 'README.md');
-const toolDefsPath = path.join(repoRoot, 'lib/propprofessor-tool-definitions.js');
+// Tool definitions are split across lib/tool-definitions/{screen,validation,context,picks,meta}.js
+// and re-exported from lib/propprofessor-tool-definitions.js. Read the actual
+// tool list via the buildToolDefinitions factory so claims stay in sync with
+// the real source.
+const toolDefsEntry = path.join(repoRoot, 'lib/propprofessor-tool-definitions.js');
 const openapiPath = path.join(repoRoot, 'docs/openapi.json');
 const backtestPath = path.join(repoRoot, 'scripts/backtest-synthetic.js');
 
 const readme = fs.readFileSync(readmePath, 'utf8');
-const toolDefsSrc = fs.readFileSync(toolDefsPath, 'utf8');
 const openapi = JSON.parse(fs.readFileSync(openapiPath, 'utf8'));
+
+// Load the real tool list. The shim at lib/propprofessor-tool-definitions.js
+// re-exports buildToolDefinitions, so we can use it as a single source of truth.
+const { buildToolDefinitions } = require(toolDefsEntry);
+const allToolDefs = buildToolDefinitions();
+const toolDefNames = allToolDefs.map((t) => t.name).sort();
+const toolDefCount = toolDefNames.length;
 
 let failures = 0;
 let warnings = 0;
@@ -66,10 +76,8 @@ function ok(msg) {
 console.log('Tool claims:');
 
 // Count tool definitions: every "name: 'foo'" entry in the file
-const toolDefNames = [...new Set([...toolDefsSrc.matchAll(/name:\s*'([a-z_][a-z0-9_]*)'/g)].map((m) => m[1]))];
-const toolDefCount = toolDefNames.length;
-
-// Count OpenAPI paths
+// (Tool defs are now loaded from the live factory above; this section
+// only keeps the openapi/README comparisons below.)
 const openapiPaths = openapi.paths || {};
 const openapiCount = Object.keys(openapiPaths).length;
 
