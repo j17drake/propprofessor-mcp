@@ -91,11 +91,13 @@ describe('propprofessor-prewarm', () => {
       assert.equal(result.errors, 0);
     });
 
-    it('runs within timeout and populates cache', async () => {
+    it('runs within timeout and warms screen cache (skipHistory)', async () => {
       const { prewarmOddsHistoryCache } = require('../lib/propprofessor-prewarm');
 
+      let screenCallCount = 0;
       const mockClient = {
         queryScreenOddsBestComps: async ({ league }) => {
+          screenCallCount += 1;
           // Return mock game data for each league
           return {
             game_data: [
@@ -104,7 +106,9 @@ describe('propprofessor-prewarm', () => {
             ]
           };
         },
-        queryOddsHistory: async () => ({ history: 'data' })
+        queryOddsHistory: async () => {
+          throw new Error('Should not be called when skipHistory is true');
+        }
       };
 
       const config = { enabled: true, leagues: ['NBA'], timeoutMs: 10000 };
@@ -115,7 +119,10 @@ describe('propprofessor-prewarm', () => {
       });
 
       assert.equal(result.leaguesProcessed, 1);
-      assert.equal(result.gamesProcessed, 2);
+      // With skipHistory=true (default in prewarm), gamesProcessed stays 0
+      // because odds history is not fetched — only screen data is warmed.
+      assert.equal(result.gamesProcessed, 0);
+      assert.equal(screenCallCount, 1);
     });
 
     it('handles client errors gracefully', async () => {
@@ -178,7 +185,7 @@ describe('propprofessor-prewarm', () => {
       const { prewarmOddsHistoryCache } = require('../lib/propprofessor-prewarm');
 
       const callOrder = [];
-      const nbaDelayMs = 200; // NBA will be artificially delayed
+      const nbaDelayMs = 150; // NBA will be artificially delayed
 
       const mockClient = {
         queryScreenOddsBestComps: async ({ league }) => {
@@ -198,7 +205,7 @@ describe('propprofessor-prewarm', () => {
         queryOddsHistory: async () => ({})
       };
 
-      const config = { enabled: true, leagues: ['NBA', 'MLB'], timeoutMs: 10000 };
+      const config = { enabled: true, leagues: ['NBA', 'MLB', 'NHL'], timeoutMs: 10000 };
       await prewarmOddsHistoryCache({
         client: mockClient,
         runtimeConfig: config,
@@ -215,6 +222,35 @@ describe('propprofessor-prewarm', () => {
 
       // MLB screen should start before NBA screen ends (proving parallel execution)
       assert.ok(mlbStartIdx < nbaEndIdx, 'MLB screen should start before NBA screen ends - proving parallel execution');
+    });
+
+    it('respects MAX_CONCURRENT_LEAGUES=3 - no more than 3 leagues run at once', async () => {
+      const { prewarmOddsHistoryCache } = require('../lib/propprofessor-prewarm');
+
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+
+      const mockClient = {
+        queryScreenOddsBestComps: async ({ league }) => {
+          currentConcurrent += 1;
+          if (currentConcurrent > maxConcurrent) maxConcurrent = currentConcurrent;
+          // Stagger delays so we can observe concurrency
+          await new Promise((r) => setTimeout(r, 50));
+          currentConcurrent -= 1;
+          return { game_data: [] };
+        },
+        queryOddsHistory: async () => ({})
+      };
+
+      const config = { enabled: true, leagues: ['NBA', 'MLB', 'NHL', 'NFL', 'WNBA'], timeoutMs: 10000 };
+      const result = await prewarmOddsHistoryCache({
+        client: mockClient,
+        runtimeConfig: config,
+        logger: null
+      });
+
+      assert.equal(result.leaguesProcessed, 5);
+      assert.ok(maxConcurrent <= 3, `Expected max concurrency <= 3, got ${maxConcurrent}`);
     });
   });
 });
