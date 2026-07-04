@@ -678,12 +678,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     }
 
-    // Filter to only the requested game IDs. Guard against response.result
-    // being undefined (can happen when the upstream screen query returns no
-    // matching rows for the requested gameIds).
-    const gameIdSet = new Set(gameIds);
+    // Normalize gameIds by stripping trailing unix timestamp suffix.
+    // The upstream screen endpoint sometimes returns gameIds with a
+    // timestamp segment (e.g. "Tennis:PREMATCH:Jovic:Pegula:1783252800")
+    // and sometimes without. If the two API calls disagree on format,
+    // strict Set.has() comparison would return zero matching rows.
+    const normalizeGameId = (id) => String(id || '').replace(/:\d{10,}$/, '').trim();
+    const normalizedRequested = gameIds.map(normalizeGameId);
+    const gameIdSet = new Set(normalizedRequested);
     const safeResult = Array.isArray(response.result) ? response.result : [];
-    const filtered = safeResult.filter((row) => gameIdSet.has(row && row.gameId));
+    const filtered = safeResult.filter((row) => gameIdSet.has(normalizeGameId(row && row.gameId)));
     // BUGFIX (2026-06-21): when the ranker's preferred book (Pinnacle for most
     // leagues) has no odds for a match — e.g. Pinnacle doesn't post UFC/Tennis
     // moneylines — all rows land in `focusBookMissingRows` instead of `result`.
@@ -692,7 +696,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const fallbackRows = Array.isArray(response.focusBookMissingRows) ? response.focusBookMissingRows : [];
     const merged = [...filtered];
     for (const fbRow of fallbackRows) {
-      if (gameIdSet.has(fbRow && fbRow.gameId)) {
+      if (gameIdSet.has(normalizeGameId(fbRow && fbRow.gameId))) {
         // Set the focusBookMissing flag so callers know this is a fallback row
         merged.push({ ...fbRow, __focusBookMissing: true });
       }
@@ -1964,6 +1968,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         (sum, entry) => sum + (entry.candidates || []).filter((c) => c._validated).length,
         0
       );
+
+      // === targetTiers filter (agent ergonomics) ===
+      // Apply before kaiCall/sort so the sequence is: execute -> validateTop -> tier filter -> kaiCall filter -> sort.
+      // When omitted, passes through unchanged (same no-op pattern as filterRowsByKaiCall).
+      if (Array.isArray(args.targetTiers) && args.targetTiers.length) {
+        for (const entry of allCandidates) {
+          if (!entry.candidates || !entry.candidates.length) continue;
+          entry.candidates = entry.candidates.filter((c) => {
+            const liveTier = c.confidenceTierLive || c.confidenceTier || 'TIER 4';
+            return args.targetTiers.includes(liveTier);
+          });
+        }
+      }
 
       // === kaiCall filter + sortBy (agent ergonomics) ===
       // Apply per-entry so each league/market bucket stays in its slot.
