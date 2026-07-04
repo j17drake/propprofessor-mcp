@@ -21,26 +21,7 @@ const RESPONSE_SCHEMAS = {
       resultMeta: { type: 'object' }
     }
   },
-  screen_raw: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      result: { type: 'object', description: 'Raw API response payload' },
-      comparisonBooks: { type: 'array', items: { type: 'string' } },
-      sharpBookResearch: { type: 'object' }
-    }
-  },
   screen_ranked: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      count: { type: 'integer' },
-      result: { type: 'array', items: { type: 'object' } },
-      freshness: { type: 'object' },
-      resultMeta: { type: 'object' }
-    }
-  },
-  screen: {
     type: 'object',
     properties: {
       ok: { type: 'boolean' },
@@ -155,34 +136,6 @@ const RESPONSE_SCHEMAS = {
       ok: { type: 'boolean' },
       selection: { type: 'string' },
       books: { type: 'array', items: { type: 'object' } }
-    }
-  },
-  get_hidden_bets: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      result: { type: 'array', items: { type: 'object' } }
-    }
-  },
-  hide_bet: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      result: { type: 'object' }
-    }
-  },
-  unhide_bet: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      result: { type: 'object' }
-    }
-  },
-  clear_hidden_bets: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      result: { type: 'object' }
     }
   },
   clear_score_timeline: {
