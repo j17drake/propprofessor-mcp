@@ -108,7 +108,7 @@ const {
   formatQuickScreenMinimal,
   formatQuickScreenStandard
 } = require('../../lib/propprofessor-formatter');
-const { filterRowsByKaiCall } = require('../../lib/propprofessor-row-filter');
+const { filterRowsByKaiCall, filterRowsByMinEV } = require('../../lib/propprofessor-row-filter');
 const { sortRows } = require('../../lib/propprofessor-sort-utils');
 const {
   getPickHistory,
@@ -552,10 +552,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // Apply before verbosity formatting so the formatter sees the final shape.
     // Both are no-ops when the params are missing.
     if (Array.isArray(response.result)) {
-      response.result = sortRows(filterRowsByKaiCall(response.result, args.kaiCall), {
-        sortBy: args.sortBy,
-        sortDir: args.sortDir
-      });
+      response.result = sortRows(
+        filterRowsByMinEV(filterRowsByKaiCall(response.result, args.kaiCall), args.minEV),
+        {
+          sortBy: args.sortBy,
+          sortDir: args.sortDir
+        }
+      );
     }
 
     const verbosity = String(args.verbosity || 'full').toLowerCase();
@@ -1633,10 +1636,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Apply after research/riskDowngrade so the filter operates on the
       // final result set. Both are no-ops when the params are missing.
       if (Array.isArray(response.result)) {
-        response.result = sortRows(filterRowsByKaiCall(response.result, args.kaiCall), {
-          sortBy: args.sortBy,
-          sortDir: args.sortDir
-        });
+        response.result = sortRows(
+          filterRowsByMinEV(filterRowsByKaiCall(response.result, args.kaiCall), args.minEV),
+          {
+            sortBy: args.sortBy,
+            sortDir: args.sortDir
+          }
+        );
       }
 
       // Apply verbosity formatting
@@ -1987,8 +1993,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Filter first, sort second. Both are no-ops when the params are missing.
       for (const entry of allCandidates) {
         if (!entry.candidates || !entry.candidates.length) continue;
-        entry.candidates = sortRows(filterRowsByKaiCall(entry.candidates, args.kaiCall), {
-          sortBy: args.sortBy,
+        entry.candidates = sortRows(
+          filterRowsByMinEV(filterRowsByKaiCall(entry.candidates, args.kaiCall), args.minEV),
+          {
+            sortBy: args.sortBy,
           sortDir: args.sortDir
         });
       }
@@ -2124,8 +2132,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             // a new array so clearing `recommended` doesn't also clear our
             // source when filterRowsByKaiCall/sortRows return the input as-is.
             {
-              const filtered =
+              const kaiFiltered =
                 args.kaiCall != null ? filterRowsByKaiCall(recommended, args.kaiCall) : recommended.slice();
+              const filtered = args.minEV != null ? filterRowsByMinEV(kaiFiltered, args.minEV) : kaiFiltered;
               const sorted = args.sortBy
                 ? sortRows(filtered, { sortBy: args.sortBy, sortDir: args.sortDir })
                 : filtered;
