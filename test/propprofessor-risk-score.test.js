@@ -297,3 +297,97 @@ describe('Novig 2026-06-27 regression — yellow/risk 5+ rows are not TIER 1', (
     assert.ok(score <= 4, `Expected <=4 but got ${score}`);
   });
 });
+
+// ─── Recency weighting ────────────────────────────────────────────────────────
+// Recent movement is more predictive than stale movement. A play that moved
+// 30 minutes ago should score lower risk than the same play that moved 10 hours ago.
+
+describe('recency weighting — recent movement scores lower risk', () => {
+  // Use yellow-grade items so the base score is higher (5-6), giving room for bonuses to differentiate.
+  function baseItem(overrides = {}) {
+    return {
+      movementLabel: 'neutral',      // yellow grade, not green
+      movementQuality: 'medium',
+      movementQualityScore: 0.5,
+      executionQuality: 'playable',
+      consensusBookCount: 5,
+      steamMove: false,
+      clvProxyPct: 0,
+      consensusEdge: 1.0,
+      multiWindowScore: null,
+      multiWindowInsufficientData: true,
+      peakAdverseClvPct: 0,
+      ...overrides
+    };
+  }
+
+  it('movement <1h ago scores lower risk than >8h ago', () => {
+    const recent = baseItem({ lastMoveAgeMs: 30 * 60 * 1000 }); // 30 min
+    const stale = baseItem({ lastMoveAgeMs: 10 * 60 * 60 * 1000 }); // 10 hours
+    const recentScore = calculateRiskScore(recent);
+    const staleScore = calculateRiskScore(stale);
+    assert.ok(recentScore < staleScore, `Expected ${recentScore} < ${staleScore}`);
+  });
+
+  it('movement 1-3h ago gets moderate bonus', () => {
+    const moderate = baseItem({ lastMoveAgeMs: 2 * 60 * 60 * 1000 }); // 2 hours
+    const stale = baseItem({ lastMoveAgeMs: 10 * 60 * 60 * 1000 }); // 10 hours
+    const moderateScore = calculateRiskScore(moderate);
+    const staleScore = calculateRiskScore(stale);
+    assert.ok(moderateScore < staleScore, `Expected ${moderateScore} < ${staleScore}`);
+  });
+
+  it('no lastMoveAgeMs is neutral (no modifier)', () => {
+    const noAge = baseItem();
+    const withAge = baseItem({ lastMoveAgeMs: 30 * 60 * 1000 });
+    const noAgeScore = calculateRiskScore(noAge);
+    const withAgeScore = calculateRiskScore(withAge);
+    assert.ok(noAgeScore > withAgeScore, `Expected ${noAgeScore} > ${withAgeScore}`);
+  });
+});
+
+// ─── CLV weight increase ──────────────────────────────────────────────────────
+// CLV is a primary signal — strong positive CLV should significantly reduce risk.
+
+describe('CLV weight — strong positive CLV scores significantly lower risk', () => {
+  // Use yellow-grade items so the base score is higher (5-6), giving room for CLV to differentiate.
+  function baseItem(overrides = {}) {
+    return {
+      movementLabel: 'neutral',      // yellow grade, not green
+      movementQuality: 'medium',
+      movementQualityScore: 0.5,
+      executionQuality: 'playable',
+      consensusBookCount: 5,
+      steamMove: false,
+      consensusEdge: 1.0,
+      multiWindowScore: null,
+      multiWindowInsufficientData: true,
+      peakAdverseClvPct: 0,
+      ...overrides
+    };
+  }
+
+  it('strong positive CLV (3.5%) scores 2+ points lower than zero CLV', () => {
+    const strongCLV = baseItem({ clvProxyPct: 3.5 });
+    const noCLV = baseItem({ clvProxyPct: 0 });
+    const strongScore = calculateRiskScore(strongCLV);
+    const noScore = calculateRiskScore(noCLV);
+    assert.ok(strongScore <= noScore - 2, `Expected ${strongScore} <= ${noScore - 2}`);
+  });
+
+  it('strong negative CLV (-4%) scores 3+ points higher than zero CLV', () => {
+    const badCLV = baseItem({ clvProxyPct: -4 });
+    const noCLV = baseItem({ clvProxyPct: 0 });
+    const badScore = calculateRiskScore(badCLV);
+    const noScore = calculateRiskScore(noCLV);
+    assert.ok(badScore >= noScore + 3, `Expected ${badScore} >= ${noScore + 3}`);
+  });
+
+  it('moderate positive CLV (1%) still gives meaningful bonus', () => {
+    const modCLV = baseItem({ clvProxyPct: 1 });
+    const noCLV = baseItem({ clvProxyPct: 0 });
+    const modScore = calculateRiskScore(modCLV);
+    const noScore = calculateRiskScore(noCLV);
+    assert.ok(modScore < noScore, `Expected ${modScore} < ${noScore}`);
+  });
+});
