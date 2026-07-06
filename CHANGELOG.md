@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.7.0
+
+**Agent UX improvements: npm publish, cookie-based auth, agent examples, minEV filter.**
+
+### What changed
+
+- **Published to npm** — `npx -y propprofessor-mcp` now works. Package is public on npmjs.com.
+- **Cookie-based auth alternative** — `PROPPROFESSOR_COOKIES` env var lets agents authenticate without Chrome/CDP. Export cookies from a logged-in browser session and set the env var.
+- **Agent examples** — `examples/` directory with pre-configured MCP configs for Claude Desktop, Cursor, and Hermes.
+- **minEV filter** — `quick_screen`, `recommended_bets`, `screen_ranked` now accept `minEV` parameter to filter to +EV plays only.
+
+### Migration notes
+
+All changes are additive. Existing callers see no behavior change.
+
 ## 2.6.0
 
 **Algorithm improvements, new tonight_bets tool, npm publish pipeline, tennis context fixes.**
