@@ -145,7 +145,25 @@ Replace `/path/to/` with your actual install path (e.g. `/Users/you/projects/pro
 { "command": "npx", "args": ["-y", "propprofessor-mcp"] }
 ```
 
-Requires publishing (not yet — coming soon).
+Works out of the box — no git clone needed. Requires a PropProfessor account.
+
+**For headless/CI environments (no Chrome):**
+
+Set the `PROPPROFESSOR_COOKIES` env var with your PropProfessor cookies exported as JSON. This bypasses the CDP/Chrome auth path entirely:
+
+```json
+{
+  "mcpServers": {
+    "propprofessor": {
+      "command": "npx",
+      "args": ["-y", "propprofessor-mcp"],
+      "env": {
+        "PROPPROFESSOR_COOKIES": "[{\"name\":\"__Secure-next-auth.session-token\",\"value\":\"...\",\"domain\":\".propprofessor.com\"}]"
+      }
+    }
+  }
+}
+```
 
 ### CLI Commands
 
@@ -382,7 +400,7 @@ No paid tier. No upsell. The whole codebase is open and the priority is making i
 ## 🔧 For Maintainers
 
 ```bash
-npm test              # 1390 tests, 0 failures
+npm test              # 1396 tests, 0 failures
 npm run test:coverage # ~82% statements
 npm run lint          # clean
 npm run format:check  # clean (npm run format to fix)
