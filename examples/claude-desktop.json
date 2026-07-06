@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "propprofessor": {
+      "command": "npx",
+      "args": ["-y", "propprofessor-mcp"],
+      "env": {
+        "AUTH_FILE": "~/.propprofessor/auth.json"
+      }
+    }
+  }
+}
