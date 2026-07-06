@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-1390%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-1396%20passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 28 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 29 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -53,7 +53,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **28 tools** — organized into situational, analytical, and research tiers
+- **29 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 
@@ -80,7 +80,7 @@ flowchart LR
         T[Tier + risk score]
     end
 
-    subgraph OUTPUT["28 MCP Tools"];
+    subgraph OUTPUT["29 MCP Tools"];
         RB[recommended_bets]
         SP[sharp_plays]
         SC[sharp_consensus]
@@ -265,28 +265,28 @@ Set `PROPPROFESSOR_MCP_MODE` at server boot to control how many tools the agent 
 
 | Mode   | Default | Tools exposed | Best for                                                                                                                                 |
 | ------ | ------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `full` | ✅ yes  | 28            | Sharp users — every discovery, screen, research tool                                                                                     |
+| `full` | ✅ yes  | 29            | Sharp users — every discovery, screen, research tool                                                                                     |
 | `lite` | no      | 13            | Casual / intermediate agents — covers the full workflow (discover → drill-down → validate → track) without overwhelming the tool catalog |
 
-Lite mode exposes: `ask`, `smart_bet`, `recommended_bets`, `quick_screen`, `find_best_price`, `validate_play`, `get_play_details`, `player_context`, `log_pick`, `get_pick_history`, `resolve_pick`.
+Lite mode exposes: `ask`, `smart_bet`, `tonight_bets`, `recommended_bets`, `quick_screen`, `find_best_price`, `validate_play`, `get_play_details`, `player_context`, `log_pick`, `get_pick_history`, `resolve_pick`, `get_market_registry`.
 
 The `tools/list` response always includes a `_meta` block so agents can tell which mode is active:
 
 ```json
 {
   "tools": [...],
-  "_meta": { "mode": "full", "toolCount": 28, "liteToolCount": 13, "fullToolCount": 28 }
+  "_meta": { "mode": "full", "toolCount": 29, "liteToolCount": 13, "fullToolCount": 29 }
 }
 ```
 
 ### Tool Categories
 
-Every tool carries a `category` field that groups it by purpose — agents can use this to mentally cluster the surface rather than reading 28 individual descriptions:
+Every tool carries a `category` field that groups it by purpose — agents can use this to mentally cluster the surface rather than reading 29 individual descriptions:
 
 | Category     | Count | Purpose                                          | Tools                                                                                                       |
 | ------------ | ----- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `discovery`  | 5     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `sharp_consensus`                                |
-| `screen`     | 7     | Score / rank plays for a target book             | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `smart_bet`, `staking_plan`, `ufc_card` |
+| `discovery`  | 6     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `get_market_registry`, `sharp_consensus`  |
+| `screen`     | 8     | Score / rank plays for a target book             | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `smart_bet`, `staking_plan`, `tonight_bets`, `ufc_card` |
 | `drill_down` | 3     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `validate_play`                                                      |
 | `research`   | 3     | Context data (player news, game weather, alerts) | `get_alerts`, `mlb_game_context`, `player_context`                                                          |
 | `tracking`   | 4     | Personal bet log                                 | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                                            |

@@ -6,14 +6,14 @@ const { buildToolDefinitions, LITE_MODE_TOOLS, TOOL_CATEGORIES } = require('../l
 
 describe('propprofessor-tool-definitions', () => {
   describe('default (full) mode', () => {
-    it('returns all 28 tools by default', () => {
+    it('returns all 29 tools by default', () => {
       const tools = buildToolDefinitions();
-      assert.equal(tools.length, 28);
+      assert.equal(tools.length, 29);
     });
 
-    it('returns all 28 tools when mode is explicitly "full"', () => {
+    it('returns all 29 tools when mode is explicitly "full"', () => {
       const tools = buildToolDefinitions({ mode: 'full' });
-      assert.equal(tools.length, 28);
+      assert.equal(tools.length, 29);
       for (const tool of tools) {
         assert.equal(typeof tool.name, 'string', `${tool.name}: name missing`);
         assert.equal(typeof tool.description, 'string', `${tool.name}: description missing`);
@@ -25,9 +25,9 @@ describe('propprofessor-tool-definitions', () => {
   });
 
   describe('lite mode', () => {
-    it('returns only the 12 lite tools when mode is "lite"', () => {
+    it('returns only the 13 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 12);
+      assert.equal(tools.length, 13);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {

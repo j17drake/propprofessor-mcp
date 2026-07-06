@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.6.0
+
+**Algorithm improvements, new tonight_bets tool, npm publish pipeline, tennis context fixes.**
+
+### What changed
+
+- **Recency weighting in risk score** — recent movement (<1h) now scores -1 risk, moderate (<3h) -0.5, stale (>8h) +0.5. Plays that moved recently are stronger signals.
+- **CLV weight increased** — CLV >3% now gives -1.5 risk (was -1), CLV <-3% gives +2 (was +1). CLV is a more reliable signal than before.
+- **Dead row filtering** — rows with `consensusBookCount: 0` and `movementLabel: 'insufficient_history'` are now dropped from results. Total Games and other thin markets no longer return 7 PASS rows with zero data.
+- **Tennis game_context fix** — Added Cobolli and Minaur to PLAYER_CIRCUIT map so Wimbledon matches resolve to Grass/Grand Slam instead of "unknown".
+- **New `tonight_bets` tool** — One-call bundle: screen + sort by game time + filter to BET/CONSIDER tier. Use when you want actionable bets for tonight without chaining multiple calls.
+- **npm publish pipeline** — Release workflow now publishes to npm on tag push. `npx -y propprofessor-mcp` will work after first publish.
+- **Tool count** — 29 tools (was 28). `tonight_bets` added to screen category and lite mode.
+
+### Migration notes
+
+Zero. All changes are additive or improve existing behavior. `tonight_bets` is a new tool; existing tools are unchanged.
+
+### Tests
+
+- 1396 tests passing (was 1390)
+- New: recency weighting tests, CLV weight tests, tonight_bets tool count tests
+- Full backwards compatibility
+
 ## 2.5.0
 
 **Agent-facing ergonomics: filter to Bet-tier only, sort by game time, on every screen tool.**
