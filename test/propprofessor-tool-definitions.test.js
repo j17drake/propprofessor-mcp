@@ -99,7 +99,7 @@ describe('propprofessor-tool-definitions', () => {
       // bump the count or leave it stale.
       const expected = {
         discovery: 6,
-        screen: 7,
+        screen: 8,
         drill_down: 3,
         research: 3,
         tracking: 4,

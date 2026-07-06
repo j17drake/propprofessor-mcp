@@ -2471,6 +2471,81 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // tonight_bets: One-call bundle — screen + sort by game time + filter to BET/CONSIDER.
+    // The "give me actionable bets for tonight" shortcut.
+    async tonight_bets(args = {}) {
+      const book = String(args.book || '').trim();
+      if (!book) {
+        const error = new Error('book is required');
+        error.code = 'MISSING_PARAMS';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+
+      const leagues = Array.isArray(args.leagues) && args.leagues.length
+        ? args.leagues
+        : args.league
+          ? [args.league]
+          : undefined;
+      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 5;
+      const verbosity = String(args.verbosity || 'standard').trim();
+
+      // Step 1: Screen with the target book, sorted by game time, BET/CONSIDER only
+      const screenResult = await handlers.quick_screen({
+        books: [book],
+        leagues,
+        kaiCall: ['BET', 'CONSIDER'],
+        sortBy: 'start',
+        sortDir: 'asc',
+        limit,
+        includeResearch: true,
+        verbosity: 'full'
+      });
+
+      // Step 2: Flatten results into a single sorted list
+      const plays = [];
+      for (const entry of screenResult.results || []) {
+        for (const candidate of entry.candidates || []) {
+          plays.push({
+            selection: candidate.selection,
+            game: candidate.game,
+            league: entry.league,
+            market: entry.market,
+            start: candidate.start,
+            startDisplay: candidate.startDisplay,
+            odds: candidate.odds,
+            edge: candidate.edge,
+            executionQuality: candidate.executionQuality,
+            movementDisposition: candidate.movementDisposition,
+            displayTier: candidate.displayTier,
+            kaiCall: candidate.kaiCall,
+            confidenceTier: candidate.confidenceTier,
+            riskScore: candidate.riskScore,
+            consensusBookCount: candidate.consensusBookCount,
+            research: candidate.research || null
+          });
+        }
+      }
+
+      // Step 3: Sort by start time (soonest first), missing start at end
+      plays.sort((a, b) => {
+        const aTime = a.start ? new Date(a.start).getTime() : Infinity;
+        const bTime = b.start ? new Date(b.start).getTime() : Infinity;
+        return aTime - bTime;
+      });
+
+      return {
+        ok: true,
+        book,
+        count: plays.length,
+        plays: plays.slice(0, limit),
+        activeSlate: screenResult.activeSlate || [],
+        warnings: screenResult.warnings || [],
+        verbosity
+      };
+    },
+
     async staking_plan(args = {}) {
       const bankroll = Number.isFinite(Number(args.bankroll)) ? Number(args.bankroll) : 1000;
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;
