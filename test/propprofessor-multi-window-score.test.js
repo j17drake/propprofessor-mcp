@@ -246,9 +246,22 @@ describe('multi-window score integration with risk grade and score', () => {
   });
 
   it('multiWindowScore >= 0.66 reduces risk score by 1', () => {
-    const baseline = calculateRiskScore(makeRow({ multiWindowInsufficientData: true, multiWindowScore: 0 }));
-    const sustained = calculateRiskScore(makeRow({ multiWindowScore: 0.7, multiWindowInsufficientData: false }));
-    assert.equal(baseline - sustained, 1, 'sustained agreement should reduce risk by 1');
+    // Use yellow-grade items (neutral movement, playable exec, no steam/CLV)
+    // so the baseline scores above the floor and the multi-window modifier
+    // has room to reduce it. A score of 0.85 gives the -1 bracket.
+    const yellowBase = {
+      movementLabel: 'neutral',
+      movementQuality: 'medium',
+      movementQualityScore: 0.5,
+      executionQuality: 'playable',
+      consensusBookCount: 5,
+      consensusEdge: 1.0,
+      clvProxyPct: 0,
+      steamMove: false
+    };
+    const baseline = calculateRiskScore({ ...yellowBase, multiWindowInsufficientData: true, multiWindowScore: 0 });
+    const sustained = calculateRiskScore({ ...yellowBase, multiWindowScore: 0.85, multiWindowInsufficientData: false });
+    assert.equal(baseline - sustained, 1, `expected 1, got ${baseline - sustained} (baseline=${baseline}, sustained=${sustained})`);
   });
 
   it('multiWindowScore <= 0.33 increases risk score (via grade demotion + penalty)', () => {
