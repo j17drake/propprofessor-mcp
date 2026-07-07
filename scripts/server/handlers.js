@@ -731,8 +731,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     if (!gameId) {
       return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gameId is required' } };
     }
-    if (!selection) {
-      return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'selection is required' } };
+    if (!selection && !requestedPlayId) {
+      return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'selection or playId is required' } };
     }
     const market = String(args.market || 'Moneyline').trim() || 'Moneyline';
     const books = normalizeBookList(args.books);
@@ -902,7 +902,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // then layer on the risk-flag downgrade from research.
     let verdict = 'PASS';
     const reasons = [];
-    let tier = matchingRow?.confidenceTier || 'TIER 4';
+    const screenTier = args.screenTier || (matchingRow && matchingRow.screenTier);
+    const screenKaiCall = args.screenKaiCall || (matchingRow && matchingRow.screenKaiCall);
+    // Prefer the agent's already-returned tier for consistency, unless research/exec downgrades.
+    let tier = screenTier || matchingRow?.confidenceTier || 'TIER 4';
     let lookupStatus = 'resolved';
     let reasonType = 'signal';
 
@@ -962,6 +965,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           ? `screen lookup failed: ${detailError}`
           : `no row matched selection "${selection}" on gameId ${gameId}`
       );
+    }
+
+    // Consistency guard: if the caller supplied a lower screen snapshot tier/kaiCall
+    // (the row the agent already returned), refuse a fresh re-fetch upgrade to BET.
+    if (screenKaiCall && screenKaiCall !== 'BET' && verdict === 'BET') {
+      verdict = 'CONSIDER';
+      reasons.push(`downgraded to match screen snapshot (${screenKaiCall})`);
     }
 
     // Risk-flag override.
@@ -1956,7 +1966,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     selection: candidate.selection,
                     market: entry.market,
                     skipResearch: true,
-                    lookbackHours: 6
+                    lookbackHours: 6,
+                    screenTier: candidate.confidenceTier,
+                    screenKaiCall: candidate.kaiCall
                   });
                   if (candidate.gameId && result && result.ok) {
                     validationCache.set(candidate.gameId, result);
@@ -2276,7 +2288,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     selection: play.selection,
                     market: play.market || 'Moneyline',
                     skipResearch: true,
-                    lookbackHours: 6
+                    lookbackHours: 6,
+                    screenTier: play.confidenceTier,
+                    screenKaiCall: play.kaiCall
                   });
                   if (play.gameId && result && result.ok) {
                     validationCache.set(play.gameId, result);
