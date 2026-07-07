@@ -700,3 +700,95 @@ describe('isEdgePlausible', () => {
     assert.equal(isEdgePlausible({ consensusEdge: null }), true);
   });
 });
+
+describe('expandScreenRow edge sanity', () => {
+  it('nulls a phantom consensus edge from a single stale off-market book and tags the row implausible', () => {
+    // Preferred book -185, only one other book at -4900 (off-market/stale).
+    // That single off-market comp produces a +33% "edge" that is not real.
+    const row = {
+      book: 'NoVigApp',
+      homeTeam: 'Lakers',
+      awayTeam: 'Warriors',
+      participant: 'Lakers',
+      selection: 'Lakers',
+      market: 'Moneyline',
+      selection1: 'Lakers',
+      participant1: 'Lakers',
+      selection1Id: 'Moneyline:Lakers',
+      selection2: 'Warriors',
+      participant2: 'Warriors',
+      selection2Id: 'Moneyline:Warriors',
+      selections: {
+        null: {
+          selection1: 'Lakers',
+          participant1: 'Lakers',
+          selectionType1: 'team',
+          selection1Id: 'Moneyline:Lakers',
+          line1: null,
+          selection2: 'Warriors',
+          participant2: 'Warriors',
+          selectionType2: 'team',
+          selection2Id: 'Moneyline:Warriors',
+          line2: null,
+          odds: {
+            NoVigApp: { odds1: -185, odds2: 175 },
+            OffMarket: { odds1: -4900, odds2: 4800 }
+          }
+        }
+      },
+      allBookOdds: {
+        NoVigApp: { odds1: -185, odds2: 175 },
+        OffMarket: { odds1: -4900, odds2: 4800 }
+      }
+    };
+    const [out] = expandScreenRow(row, { preferredBook: 'NoVigApp' });
+    assert.equal(out.consensusEdge, null, 'phantom edge should be nulled');
+    assert.equal(out.edgeSanityFlag, 'implausible', 'row should be tagged implausible');
+    assert.equal(out.consensusBookCount, 1);
+  });
+
+  it('keeps a real edge from on-market consensus and tags the row ok', () => {
+    // target -110, comps at -112 / -108 — a genuine thin sharp edge.
+    const row = {
+      book: 'NoVigApp',
+      homeTeam: 'Lakers',
+      awayTeam: 'Warriors',
+      participant: 'Lakers',
+      selection: 'Lakers',
+      market: 'Moneyline',
+      selection1: 'Lakers',
+      participant1: 'Lakers',
+      selection1Id: 'Moneyline:Lakers',
+      selection2: 'Warriors',
+      participant2: 'Warriors',
+      selection2Id: 'Moneyline:Warriors',
+      selections: {
+        null: {
+          selection1: 'Lakers',
+          participant1: 'Lakers',
+          selectionType1: 'team',
+          selection1Id: 'Moneyline:Lakers',
+          line1: null,
+          selection2: 'Warriors',
+          participant2: 'Warriors',
+          selectionType2: 'team',
+          selection2Id: 'Moneyline:Warriors',
+          line2: null,
+          odds: {
+            NoVigApp: { odds1: -110, odds2: 104 },
+            Pinnacle: { odds1: -112, odds2: 106 },
+            DraftKings: { odds1: -108, odds2: 100 }
+          }
+        }
+      },
+      allBookOdds: {
+        NoVigApp: { odds1: -110, odds2: 104 },
+        Pinnacle: { odds1: -112, odds2: 106 },
+        DraftKings: { odds1: -108, odds2: 100 }
+      }
+    };
+    const [out] = expandScreenRow(row, { preferredBook: 'NoVigApp' });
+    assert.ok(Number.isFinite(out.consensusEdge), 'on-market edge should be a finite number');
+    assert.equal(out.edgeSanityFlag, 'ok', 'row should be tagged ok');
+  });
+});
