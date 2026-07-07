@@ -2,7 +2,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { expandScreenRow, rankScreenRows } = require('../lib/screen-ranker');
+const { expandScreenRow, rankScreenRows, isEdgePlausible } = require('../lib/screen-ranker');
 
 describe('screen-ranker (direct unit tests)', () => {
   describe('expandScreenRow', () => {
@@ -686,5 +686,17 @@ describe('getKaiCall (Bug #2, 2026-06-17)', () => {
       steamBooks: ['Pinnacle', 'BetOnline', 'Circa']
     };
     assert.equal(getKaiCall(item), 'BET');
+  });
+});
+
+describe('isEdgePlausible', () => {
+  it('rejects phantom edge from single off-market book', () => {
+    assert.equal(isEdgePlausible({ consensusEdge: 33, consensusBookCount: 1, targetOdds: -185, bestAvailableOdds: -4900 }), false);
+  });
+  it('allows small edge from deep consensus', () => {
+    assert.equal(isEdgePlausible({ consensusEdge: 2.0, consensusBookCount: 11, targetOdds: -110, bestAvailableOdds: -112 }), true);
+  });
+  it('allows null edge (nothing to judge)', () => {
+    assert.equal(isEdgePlausible({ consensusEdge: null }), true);
   });
 });
