@@ -88,7 +88,6 @@ const {
   getConfidenceTier,
   getConfidenceTierStable,
   clearScoreTimeline,
-  buildRationale,
   suggestStakes
 } = require('../../lib/propprofessor-risk-score');
 const { getPlayerContext } = require('../../lib/propprofessor-player-context');
@@ -1671,6 +1670,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
       const includeResearch = args.includeResearch !== undefined ? Boolean(args.includeResearch) : true;
       const debug = Boolean(args.debug);
+      const topPick = Boolean(args.topPick);
+      // lite: token-light mode. Implies compact + a fixed essential field set.
+      const lite = Boolean(args.lite);
+      if (lite) {
+        args.compact = true;
+        args.fields = [
+          'game', 'selection', 'odds', 'edge', 'clv', 'confidenceTier',
+          'kaiCall', 'startCST', 'movementDisposition', 'riskFlag', 'screenScore'
+        ];
+      }
 
       const allAliasesUsed = [];
 
@@ -1961,7 +1970,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           }
         }
 
-        const validationResults = await Promise.all(validationPromises);
+        const validationResults = await mapWithConcurrency(
+          validationPromises,
+          async (p) => p,
+          { concurrency: 5 }
+        );
 
         for (const vr of validationResults) {
           if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
@@ -1999,6 +2012,23 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             sortBy: args.sortBy,
           sortDir: args.sortDir
         });
+      }
+
+      // === topPick: collapse to the single best BET-tier play (one-call all-in) ===
+      if (topPick) {
+        const pool = [];
+        for (const entry of allCandidates) {
+          for (const c of entry.candidates || []) pool.push(c);
+        }
+        const betTier = pool.filter((c) => c.kaiCall === 'BET' || c.displayTier === 'BET');
+        const source = betTier.length ? betTier : pool;
+        source.sort((a, b) => (Number(b.screenScore) || 0) - (Number(a.screenScore) || 0));
+        const top = source[0];
+        for (const entry of allCandidates) entry.candidates = [];
+        if (top) {
+          top.why = `Top pick: ${top.selection} (${top.game}) — ${top.rationale}. Edge ${Number(top.edge || 0).toFixed(2)}%, CLV ${Number(top.clv || 0).toFixed(2)}%, ${top.consensusBookCount} books, movement ${top.movementDisposition}.`;
+          allCandidates.push({ league: top.league || 'TOP', market: top.market, candidates: [top] });
+        }
       }
 
       const screenResponse = {
@@ -2152,7 +2182,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 const research = await runResearchOnTopRows({
                   rows: recommended,
                   limit: recommended.length,
-                  playerContextFn: handlers.player_context
+                  playerContextFn: handlers.player_context,
+                  gameContextFn: getGameContext
                 });
                 researchResults = research.results;
                 if (args.riskDowngrade === true) {
@@ -2181,39 +2212,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                   const research = researchResults.find(
                     (r) => String(r.player || '').toLowerCase() === playerName.toLowerCase()
                   );
-                  // Resolve which book this play is executable on. If the user
-                  // passed an explicit books list, use the focus book from that
-                  // list (screen_ranked routes it as preferredBook). Otherwise
-                  // fall back to the row's book field or oddsSource.
-                  const leagueBooks = Array.isArray(args.books) && args.books.length ? args.books : [];
-                  const focusBook = leagueBooks[0] || row.book || row.oddsSource || null;
-                  return {
-                    gameId: row.gameId || null,
-                    game: row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`,
-                    selection: row.selection || row.participant || null,
-                    market: row._market || row.market || null,
-                    start: row.start || null,
-                    book: focusBook,
-                    odds: row.targetBookOdds ?? null,
-                    edge: row.consensusEdge,
-                    clv: row.clvProxyPct,
-                    consensusBookCount: row.consensusBookCount,
-                    executionQuality: row.executionQuality,
-                    movementGrade: row.movementGrade,
-                    riskScore: row.riskScore,
-                    kaiCall: row.kaiCall,
-                    confidenceTier: row.confidenceTier,
-                    confidenceTierLive: row.confidenceTierLive,
-                    rationale: row.rationale || buildRationale(row),
-                    screenScore: row.screenScore,
-                    ...(research
-                      ? {
-                          riskFlag: research.riskFlag,
-                          riskSummary: research.riskSummary,
-                          topTweet: research.topTweet
-                        }
-                      : {})
-                  };
+                  // Route every play through mapCandidateRow so recommended_bets
+                  // matches quick_screen's field shape (startCST, hoursUntilStart,
+                  // consistent odds/edge/clv). Keeps research flags as overlay.
+                  const mapped = mapCandidateRow(row);
+                  if (row._market) mapped.market = row._market;
+                  if (research) {
+                    mapped.riskFlag = research.riskFlag;
+                    mapped.riskSummary = research.riskSummary;
+                    mapped.topTweet = research.topTweet;
+                  }
+                  return mapped;
                 })
               });
             }
@@ -2281,7 +2290,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           }
         }
 
-        const validationResults = await Promise.all(validationPromises);
+        const validationResults = await mapWithConcurrency(
+          validationPromises,
+          async (p) => p,
+          { concurrency: 5 }
+        );
 
         for (const vr of validationResults) {
           if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
