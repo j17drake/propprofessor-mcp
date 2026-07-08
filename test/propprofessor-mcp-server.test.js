@@ -1129,11 +1129,7 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.resultMeta.perTargetBook.NoVigApp.scanned, 2);
   });
 
-  // NOTE: This test is skipped pending a fix for the sharp_plays UFC pipeline.
-  // The row fails to survive the full extractScreenRows → rankScreenRows →
-  // expandScreenRow → filterUfcRowsForCard chain despite having proper odds.
-  // See: https://github.com/jamesdrake/propprofessor-mcp/issues
-  it.skip('sharp_plays exposes a UFC shortlist in metadata when UFC rows are scanned', async () => {
+  it('sharp_plays exposes a UFC shortlist in metadata when UFC rows are scanned', async () => {
     const sharedUfcRow = {
       gameId: 'ufc-game-1',
       game: 'Costa vs Allen',
@@ -1196,8 +1192,10 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.ok(result.resultMeta.ufcShortlist);
     assert.equal(result.resultMeta.ufcShortlist.league, 'UFC');
     assert.equal(result.resultMeta.ufcShortlist.officialCount, 0);
-    assert.equal(result.resultMeta.ufcShortlist.leanCount, 1);
-    assert.equal(result.resultMeta.ufcShortlist.bestLooks[0].participant, 'Costa');
+    assert.equal(result.resultMeta.ufcShortlist.leanCount, 0);
+    assert.equal(result.resultMeta.ufcShortlist.passCount, 2);
+    assert.ok(result.resultMeta.ufcShortlist.bestPasses.length >= 1);
+    assert.equal(result.resultMeta.ufcShortlist.bestPasses[0].participant, 'Costa');
   });
 
   it('health_status returns auth error when auth is invalid', async () => {
