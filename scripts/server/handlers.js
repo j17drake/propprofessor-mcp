@@ -1952,10 +1952,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             if (!topN.includes(candidate)) continue;
             if (!candidate.gameId || !candidate.selection) continue;
 
-            // Per-gameId cache: two candidates from the same game (e.g. Over 8.5, Under 8.5)
-            // share one validate_play call
-            if (validationCache.has(candidate.gameId)) {
-              const cached = validationCache.get(candidate.gameId);
+            // Per-gameId+market cache: same game, same market candidates (e.g. Over 8.5, Under 8.5)
+            // share one validate_play call. Market-scoped to prevent Moneyline validation from
+            // being applied to Total Runs candidates for the same game.
+            const qsCacheKey = `${candidate.gameId}::${entry.market}`;
+            if (validationCache.has(qsCacheKey)) {
+              const cached = validationCache.get(qsCacheKey);
               if (cached) {
                 applyValidatedFields(candidate, cached);
                 candidate._validated = true;
@@ -1972,12 +1974,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     selection: candidate.selection,
                     market: entry.market,
                     skipResearch: true,
-                    lookbackHours: 6,
+                    lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6,
                     screenTier: candidate.confidenceTier,
                     screenKaiCall: candidate.kaiCall
                   });
                   if (candidate.gameId && result && result.ok) {
-                    validationCache.set(candidate.gameId, result);
+                    validationCache.set(qsCacheKey, result);
                   }
                   return { candidate, result };
                 } catch (err) {
@@ -2275,9 +2277,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             if (!topN.includes(play)) continue;
             if (!play.gameId || !play.selection) continue;
 
-            // Per-gameId cache: plays from the same game share one validate_play call
-            if (validationCache.has(play.gameId)) {
-              const cached = validationCache.get(play.gameId);
+            // Per-gameId+market cache: plays from the same game+market share one validate_play call.
+            // Market-scoped to prevent cross-market validation pollution.
+            const rbCacheKey = `${play.gameId}::${play.market || 'Moneyline'}`;
+            if (validationCache.has(rbCacheKey)) {
+              const cached = validationCache.get(rbCacheKey);
               if (cached) {
                 applyValidatedFields(play, cached);
                 play._validated = true;
@@ -2294,12 +2298,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     selection: play.selection,
                     market: play.market || 'Moneyline',
                     skipResearch: true,
-                    lookbackHours: 6,
+                    lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6,
                     screenTier: play.confidenceTier,
                     screenKaiCall: play.kaiCall
                   });
                   if (play.gameId && result && result.ok) {
-                    validationCache.set(play.gameId, result);
+                    validationCache.set(rbCacheKey, result);
                   }
                   return { play, result };
                 } catch (err) {
