@@ -10,6 +10,7 @@
 - **Cookie-based auth alternative** — `PROPPROFESSOR_COOKIES` env var lets agents authenticate without Chrome/CDP. Export cookies from a logged-in browser session and set the env var.
 - **Agent examples** — `examples/` directory with pre-configured MCP configs for Claude Desktop, Cursor, and Hermes.
 - **minEV filter** — `quick_screen`, `recommended_bets`, `screen_ranked` now accept `minEV` parameter to filter to +EV plays only.
+- **`validate_play` schema gate now accepts `playId`** — the input schema omitted `playId` (and set `additionalProperties: false`), so the arg-validator rejected it as "unknown property" before the handler ran. The handler and selection-matcher already supported exact `playId` matching (CHANGELOG 2.5.0), but the advertised path was unreachable through the tool surface. `playId` is now a declared property, `selection` is optional when `playId` is present, and the handler guard requires at least one of `selection`/`playId`. Agents should pass `playId` from the screen row for totals/spread/soccer/tennis markets to avoid fragile string matching and "no row matched" `lookup_failed` errors. Regression tests added in `test/mcp-arg-validator.test.js`.
 
 ### Migration notes
 

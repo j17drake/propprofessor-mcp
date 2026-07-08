@@ -31,7 +31,8 @@ const {
   mapWithConcurrency,
   createCrossCallMemoizedQuery,
   canonicalizeScreenArgs,
-  createCanonicalScreenCache
+  createCanonicalScreenCache,
+  parseGameStartMs
 } = require('../../lib/propprofessor-shared-utils');
 
 /**
@@ -1366,8 +1367,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           const todayKey = new Date(nowMs).toISOString().slice(0, 10);
           const nextKey = new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
           screenResult.result = screenResult.result.filter((row) => {
-            if (!row || !row.start) return true; // keep rows without start time
-            const startDateKey = new Date(row.start).toISOString().slice(0, 10);
+            if (!row) return true; // keep rows without row data
+            const startMs = parseGameStartMs(row.start);
+            if (!startMs) return true; // keep rows without parseable start time
+            const startDateKey = new Date(startMs).toISOString().slice(0, 10);
             return cardWindow === 'today' ? startDateKey === todayKey : startDateKey === nextKey;
           });
         }
@@ -1820,8 +1823,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           for (const entry of allCandidates) {
             if (!entry.candidates || !entry.candidates.length) continue;
             entry.candidates = entry.candidates.filter((row) => {
-              if (!row.start) return true; // keep rows without start time
-              return new Date(row.start).toISOString().slice(0, 10) === key;
+              const startMs = parseGameStartMs(row.start);
+              if (!startMs) return true; // keep rows without parseable start time
+              return new Date(startMs).toISOString().slice(0, 10) === key;
             });
           }
         };
@@ -1851,8 +1855,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           for (const entry of fullCandidatesSnapshot) {
             if (!entry.candidates || !entry.candidates.length) continue;
             const nextRows = entry.candidates.filter((row) => {
-              if (!row.start) return true;
-              return new Date(row.start).toISOString().slice(0, 10) === nextKey;
+              const startMs = parseGameStartMs(row.start);
+              if (!startMs) return true;
+              return new Date(startMs).toISOString().slice(0, 10) === nextKey;
             });
             if (nextRows.length > 0) {
               nextCandidates.push({
@@ -1907,8 +1912,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       for (const entry of allCandidates) {
         if (!entry.candidates) continue;
         for (const row of entry.candidates) {
-          if (row.start) {
-            row.hoursUntilStart = Math.round(((new Date(row.start).getTime() - Date.now()) / 3600000) * 10) / 10;
+          const startMs = parseGameStartMs(row.start);
+          if (startMs) {
+            row.hoursUntilStart = Math.round(((startMs - Date.now()) / 3600000) * 10) / 10;
           }
         }
       }
@@ -2566,8 +2572,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       // Step 3: Sort by start time (soonest first), missing start at end
       plays.sort((a, b) => {
-        const aTime = a.start ? new Date(a.start).getTime() : Infinity;
-        const bTime = b.start ? new Date(b.start).getTime() : Infinity;
+        const aTime = parseGameStartMs(a.start) ?? Infinity;
+        const bTime = parseGameStartMs(b.start) ?? Infinity;
         return aTime - bTime;
       });
 

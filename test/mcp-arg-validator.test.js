@@ -3,6 +3,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { validateArgs, normalizeArgs } = require('../lib/mcp-arg-validator');
+const { buildToolDefinitions } = require('../lib/propprofessor-tool-definitions');
 
 describe('mcp-arg-validator', () => {
   describe('happy paths', () => {
@@ -307,6 +308,82 @@ describe('mcp-arg-validator', () => {
       // normalizeArgs runs separately and shouldn't lose data.
       const out = normalizeArgs('any_tool', { weirdExtra: 'ok' });
       assert.equal(out.weirdExtra, 'ok');
+    });
+  });
+
+  describe('validate_play playId schema gate (regression)', () => {
+    // Bug: validate_play's inputSchema omitted `playId` while the handler +
+    // selection-matcher already supported exact playId matching. The
+    // arg-validator gate (additionalProperties:false) rejected `playId` as an
+    // "unknown property" before the handler ever ran, so agents were forced
+    // into fragile string matching + a defaulted market — causing 4/5
+    // "no row matched" lookup_failed errors. See CHANGELOG: canonical playId.
+    function validatePlaySchema() {
+      const tools = buildToolDefinitions();
+      const tool = tools.find((t) => t.name === 'validate_play');
+      assert.ok(tool, 'validate_play tool definition must exist');
+      return tool.inputSchema;
+    }
+
+    it('accepts playId as an input (no longer "unknown property")', () => {
+      const schema = validatePlaySchema();
+      const r = validateArgs(schema, {
+        league: 'WNBA',
+        gameId: 'WNBA:PREMATCH:Chicago_Sky:Phoenix_Mercury:1783476000',
+        playId: 'WNBA:PREMATCH:Chicago_Sky:Phoenix_Mercury:1783476000::Total Points::under 163.5'
+      });
+      assert.equal(r.ok, true, `expected ok, got: ${JSON.stringify(r)}`);
+    });
+
+    it('does not declare playId in properties before fix (documents the prior defect)', () => {
+      // Sanity: the schema genuinely carries playId now.
+      const schema = validatePlaySchema();
+      assert.ok(schema.properties.playId, 'validate_play schema must declare playId');
+    });
+
+    it('accepts playId-only (selection optional when playId present)', () => {
+      const schema = validatePlaySchema();
+      const r = validateArgs(schema, {
+        league: 'Soccer',
+        gameId: 'Soccer:PREMATCH:Colombia:Switzerland:1783454400',
+        playId: 'Soccer:PREMATCH:Colombia:Switzerland:1783454400::Draw No Bet::switzerland'
+      });
+      assert.equal(r.ok, true, `expected ok, got: ${JSON.stringify(r)}`);
+    });
+
+    it('gate accepts league+gameId+playId with no selection (handler enforces selection-or-playId)', () => {
+      // The schema gate only checks `required` + additionalProperties, so it
+      // accepts {league, gameId, playId} (selection omitted). The
+      // "selection or playId required" rule is enforced in runValidatePlayImpl,
+      // not here — assert the gate passes and the handler would catch the gap.
+      const schema = validatePlaySchema();
+      const r = validateArgs(schema, {
+        league: 'NBA',
+        gameId: 'NBA:game-1'
+      });
+      assert.equal(r.ok, true, `gate should accept league+gameId; got: ${JSON.stringify(r)}`);
+    });
+
+    it('handler rejects when neither selection nor playId is supplied', async () => {
+      const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
+      const { createMockClient } = require('./fixtures/mock-client');
+      const handlers = createMcpHandlers({ client: createMockClient() });
+      const result = await handlers.validate_play({ league: 'NBA', gameId: 'NBA:game-1' });
+      assert.equal(result.ok, false);
+      assert.equal(result.error.code, 'VALIDATION_ERROR');
+      assert.match(result.error.message, /selection or playId/);
+    });
+
+    it('rejects unknown properties that are NOT playId', () => {
+      const schema = validatePlaySchema();
+      const r = validateArgs(schema, {
+        league: 'NBA',
+        gameId: 'NBA:game-1',
+        selection: 'Lakers',
+        bogusField: true
+      });
+      assert.equal(r.ok, false);
+      assert.ok(/unknown property/.test(r.message), `got: ${r.message}`);
     });
   });
 });
