@@ -1,8 +1,15 @@
 'use strict';
 
-const { describe, it } = require('node:test');
+const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
-const { gradeRiskToTierAndCall, calculateRiskScore, getConfidenceTier } = require('../lib/propprofessor-risk-score');
+const {
+  gradeRiskToTierAndCall,
+  calculateRiskScore,
+  getConfidenceTier,
+  getConfidenceTierStable,
+  clearTierCache,
+  clearScoreTimeline
+} = require('../lib/propprofessor-risk-score');
 
 describe('gradeRiskToTierAndCall — unified lookup', () => {
   it('red always → TIER 4, PASS regardless of risk', () => {
@@ -228,6 +235,43 @@ describe('TIER 1 guardrails', () => {
     const tier = getConfidenceTier(greenTier1Item({ movementLabel: 'deteriorating' }));
     assert.notStrictEqual(tier, 'TIER 1');
   });
+
+  it('heavy favorite (-250) downgrades TIER 1 to TIER 2', () => {
+    const tier = getConfidenceTier(greenTier1Item({ odds: -250 }));
+    assert.strictEqual(tier, 'TIER 2');
+  });
+
+  it('heavy favorite (-426) downgrades TIER 1 to TIER 2', () => {
+    const tier = getConfidenceTier(greenTier1Item({ odds: -426 }));
+    assert.strictEqual(tier, 'TIER 2');
+  });
+
+  it('moderate favorite (-150) stays TIER 1', () => {
+    const tier = getConfidenceTier(greenTier1Item({ odds: -150 }));
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('pick em (-110) stays TIER 1', () => {
+    const tier = getConfidenceTier(greenTier1Item({ odds: -110 }));
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('underdog (+150) stays TIER 1', () => {
+    const tier = getConfidenceTier(greenTier1Item({ odds: 150 }));
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('boundary (-200) stays TIER 1', () => {
+    // -200 exactly is the cutoff — not worse than -200, so it stays
+    const tier = getConfidenceTier(greenTier1Item({ odds: -200 }));
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('boundary (-201) downgrades to TIER 2', () => {
+    // -201 is worse than -200, demotes
+    const tier = getConfidenceTier(greenTier1Item({ odds: -201 }));
+    assert.strictEqual(tier, 'TIER 2');
+  });
 });
 
 // ─── Novig 2026-06-27 regression ──────────────────────────────────────────────
@@ -391,3 +435,55 @@ describe('CLV weight — strong positive CLV scores significantly lower risk', (
     assert.ok(modScore < noScore, `Expected ${modScore} < ${noScore}`);
   });
 });
+
+describe('tier hysteresis cache — per-call reset contract', () => {
+  function baseItem(overrides = {}) {
+    return {
+      gameId: 'g1',
+      league: 'Tennis',
+      market: 'Moneyline',
+      selection: 'Test Player',
+      participant: 'Test Player',
+      // Genuine TIER 1 inputs: green movement, low risk.
+      movementLabel: 'supportive',
+      movementQuality: 'high',
+      executionQuality: 'best',
+      consensusBookCount: 5,
+      steamMove: true,
+      clvProxyPct: 1.5,
+      consensusEdge: 2.5,
+      multiWindowInsufficientData: true,
+      odds: -110,
+      ...overrides
+    };
+  }
+
+  before(() => {
+    clearScoreTimeline();
+    clearTierCache();
+  });
+  after(() => {
+    clearScoreTimeline();
+    clearTierCache();
+  });
+
+  it('produces the same stable tier across two identical calls when cache is cleared between them', () => {
+    clearTierCache();
+    const first = getConfidenceTierStable(baseItem());
+    // Simulate the MCP entry point clearing the cache between calls.
+    clearTierCache();
+    const second = getConfidenceTierStable(baseItem());
+    assert.equal(first, 'TIER 1');
+    assert.equal(second, 'TIER 1');
+  });
+
+  it('does not let a stale cached TIER 4 mask a fresh TIER 1 after cache clear', () => {
+    // Seed cache with a deteriorating TIER 4 observation (adverse movement → red → TIER 4).
+    getConfidenceTierStable(baseItem({ movementLabel: 'adverse', movementQuality: 'low', executionQuality: 'bad', consensusBookCount: 1, clvProxyPct: -3, consensusEdge: -1 }));
+    // A new call with clean cache must recompute from raw, not carry the TIER 4.
+    clearTierCache();
+    const fresh = getConfidenceTierStable(baseItem());
+    assert.equal(fresh, 'TIER 1');
+  });
+});
+

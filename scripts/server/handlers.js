@@ -88,6 +88,7 @@ const {
 const {
   getConfidenceTier,
   getConfidenceTierStable,
+  clearTierCache,
   clearScoreTimeline,
   suggestStakes
 } = require('../../lib/propprofessor-risk-score');
@@ -1589,6 +1590,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     },
 
     async screen_ranked(args = {}) {
+      // Reset per-call tier hysteresis so each screen call starts clean
+      // (prevents cross-call tier drift from stale cache state).
+      clearTierCache();
       // Canonical cache key for stable (gameId, market, book) tuples
       const canonicalKey = canonicalizeScreenArgs(args);
 
@@ -1668,6 +1672,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // sharp_plays + player_context for each (league, market) pair.
     // Defaults to ['NoVigApp'].
     async quick_screen(args = {}) {
+      // Reset per-call tier hysteresis so each screen call starts clean
+      // (prevents cross-call tier drift from stale cache state).
+      clearTierCache();
       const targetBooks =
         Array.isArray(args.books) && args.books.length ? args.books : args.book ? [args.book] : ['NoVigApp'];
       const leagues =
@@ -2095,6 +2102,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     // ─── Betting ────────────────────────────────────────────────────
     async recommended_bets(args = {}) {
+      // Reset per-call tier hysteresis so each screen call starts clean
+      // (prevents cross-call tier drift from stale cache state).
+      clearTierCache();
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : Array.from(DEFAULT_LEAGUES);
       // Resolve markets using aliases for each league
       const allAliasesUsed = [];
@@ -2884,6 +2894,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
      * there's no dedup benefit worth the staleness risk.
      */
     async validate_play(args = {}) {
+      // Reset per-call tier hysteresis so each screen call starts clean
+      // (prevents cross-call tier drift from stale cache state).
+      clearTierCache();
       return await runValidatePlayImpl(client, args);
     },
 
