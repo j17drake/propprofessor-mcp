@@ -487,3 +487,43 @@ describe('tier hysteresis cache — per-call reset contract', () => {
   });
 });
 
+describe('tier grading — tennis field vocabulary', () => {
+  // Tennis rows (from runTennisScreen) use movementGrade / edge / clv /
+  // movementDisposition instead of the NBA/MLB movementLabel / consensusEdge /
+  // clvProxyPct. getConfidenceTierStable must grade them correctly, not fall
+  // back to worst-case because the NBA keys are undefined.
+  function tennisItem(overrides = {}) {
+    return {
+      league: 'Tennis',
+      movementGrade: 'green',
+      movementDisposition: 'supportive_clean',
+      movementQuality: 'high',
+      multiWindowInsufficientData: true,
+      executionQuality: 'best',
+      consensusBookCount: 12,
+      steamMove: true,
+      clv: 1.5,
+      edge: 2.5,
+      odds: -110,
+      ...overrides
+    };
+  }
+
+  before(() => clearScoreTimeline());
+  after(() => clearScoreTimeline());
+
+  it('grades a tennis-shaped green row as TIER 1 (not garbage TIER 4)', () => {
+    clearTierCache();
+    const tier = getConfidenceTierStable(tennisItem());
+    assert.equal(tier, 'TIER 1');
+  });
+
+  it('grades a tennis-shaped adverse row as TIER 4', () => {
+    clearTierCache();
+    const tier = getConfidenceTierStable(
+      tennisItem({ movementGrade: 'red', movementDisposition: 'adverse_full', clv: -1.15, edge: 2.5 })
+    );
+    assert.equal(tier, 'TIER 4');
+  });
+});
+
