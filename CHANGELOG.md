@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.8.0
+
+**quick_screen / recommended_bets agent UX: honest cardWindow label, exposed cardWindow + maxPlaysPerGame params.**
+
+### What changed
+
+- **`cardWindow` param now exposed on `quick_screen` and `recommended_bets`** — values `today` (default), `next`, `all`. Previously hard-coded to `today` internally and unreachable through the tool surface; agents can now request tomorrow (`next`) or the full upcoming slate (`all`) directly.
+- **Honest date-window label** — when `today` is alive and next-day matches are merged in, the response now reports `cardWindow: "today"` plus `nextDayMerged: true` and `nextDayDate`. Earlier builds overwrote `cardWindow` with tomorrow's date (`nextKey`) whenever any next-day row existed, making "today" scans falsely report tomorrow. The rows returned were always correct; only the label misled.
+- **`nextDayMerged` / `nextDayDate` surfaced in `minimal` + `standard` formatters** — agents reading formatted output now see the two-day span instead of a lone mislabeled date.
+- **`maxPlaysPerGame` param (default 2, max 50)** — controls how many plays per game appear in `minimal` verbosity (highest `screenScore` first). Raise it (e.g. `10`) for full coverage of a game without a second call. `standard`/`full` verbosity always return every candidate regardless of this value. Also fixed the trailing "... and N more plays" count, which used a hardcoded `2` instead of the actual shown count.
+
+### Migration notes
+
+All changes are additive. Default behavior is unchanged: `cardWindow` defaults to `today`, `maxPlaysPerGame` defaults to `2`, and `today` scans still merge next-day rows (now correctly labeled).
+
 ## 2.7.0
 
 **Agent UX improvements: npm publish, cookie-based auth, agent examples, minEV filter.**

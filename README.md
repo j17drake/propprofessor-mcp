@@ -269,11 +269,20 @@ Agent: quick_screen({ books: ["Fliff"] })
 
 Every tool accepts:
 
-| Parameter   | Values                      | What it does                                                           |
-| ----------- | --------------------------- | ---------------------------------------------------------------------- |
-| `verbosity` | `minimal` `standard` `full` | Controls explanation depth and field output                            |
-| `compact`   | `true` / `false`            | Strips line history and debug payloads — reduces response size by ~90% |
-| `fields`    | `["game", "edge", "tier"]`  | Return only specified fields per row                                   |
+| Parameter         | Values                      | What it does                                                           |
+| ----------------- | --------------------------- | ---------------------------------------------------------------------- |
+| `verbosity`       | `minimal` `standard` `full` | Controls explanation depth and field output                            |
+| `compact`         | `true` / `false`            | Strips line history and debug payloads — reduces response size by ~90% |
+| `fields`          | `["game", "edge", "tier"]`  | Return only specified fields per row                                   |
+
+`quick_screen` and `recommended_bets` additionally accept:
+
+| Parameter        | Values                  | What it does                                                                                                                              |
+| ---------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `cardWindow`     | `today` `next` `all`    | Date filter. `today` = today's slate plus any next-day matches merged in (flagged via `nextDayMerged` in the response). `next` = tomorrow only. `all` = every upcoming match, no date filtering. Default `today`. |
+| `maxPlaysPerGame`| `1`–`50` (default `2`)  | Max plays shown per game in `minimal` verbosity (highest `screenScore` first). Raise it (e.g. `10`) for full coverage of a game without a second call. `standard`/`full` verbosity always return every candidate regardless of this value. |
+
+> **`cardWindow` honesty:** when `today` is alive and next-day rows are merged, the response reports `cardWindow: "today"` (not tomorrow's date) plus `nextDayMerged: true` and `nextDayDate`. Earlier builds mislabeled this as tomorrow — that bug is fixed.
 
 > **`verbosity: minimal` returns a plain-English SUMMARY STRING, not structured JSON** — agents that need to parse the response must use `standard` or `full`.
 
