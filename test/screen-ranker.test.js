@@ -2,7 +2,14 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { expandScreenRow, rankScreenRows, isEdgePlausible } = require('../lib/screen-ranker');
+const {
+  expandScreenRow,
+  rankScreenRows,
+  isEdgePlausible,
+  resolveGameConflicts,
+  baseTeamFromSelection,
+  isSideMarket
+} = require('../lib/screen-ranker');
 
 describe('screen-ranker (direct unit tests)', () => {
   describe('expandScreenRow', () => {
@@ -790,5 +797,131 @@ describe('expandScreenRow edge sanity', () => {
     const [out] = expandScreenRow(row, { preferredBook: 'NoVigApp' });
     assert.ok(Number.isFinite(out.consensusEdge), 'on-market edge should be a finite number');
     assert.equal(out.edgeSanityFlag, 'ok', 'row should be tagged ok');
+  });
+});
+
+describe('game-conflict resolution (resolveGameConflicts)', () => {
+  it('downgrades an opposite-sided TIER 1 bet that loses to a higher-edge same-game pick', () => {
+    const ranked = [
+      {
+        gameId: 'MLB:PREMATCH:Cleveland_Guardians:Minnesota_Twins:1783618800',
+        game: 'Cleveland Guardians vs Minnesota Twins',
+        selection: 'Minnesota Twins',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 1.18,
+        screenScore: 4.7
+      },
+      {
+        gameId: 'MLB:PREMATCH:Cleveland_Guardians:Minnesota_Twins:1783618800',
+        game: 'Cleveland Guardians vs Minnesota Twins',
+        selection: 'Cleveland Guardians -1.5',
+        market: 'Run Line',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 1.59,
+        screenScore: 6.1
+      }
+    ];
+    const out = resolveGameConflicts(ranked);
+    const twins = out.find((r) => r.selection === 'Minnesota Twins');
+    const guards = out.find((r) => r.selection.includes('Cleveland'));
+    assert.equal(guards.confidenceTier, 'TIER 1', 'higher-edge Guardians -1.5 wins the game');
+    assert.equal(twins.confidenceTier, 'TIER 2', 'opposite Twins ML demoted one tier');
+    assert.equal(twins.kaiCall, 'CONSIDER', 'demoted pick drops from BET to CONSIDER');
+    assert.equal(twins.conflictWith, 'Cleveland Guardians -1.5', 'points at the winning side');
+    assert.equal(twins.conflictFlag, true, 'flag is set so the UI can explain the demotion');
+  });
+
+  it('does NOT demote both sides when they are on different games', () => {
+    const ranked = [
+      {
+        gameId: 'g1',
+        selection: 'Team A',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 2.0,
+        screenScore: 9
+      },
+      {
+        gameId: 'g2',
+        selection: 'Team B',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 2.0,
+        screenScore: 9
+      }
+    ];
+    const out = resolveGameConflicts(ranked);
+    assert.equal(out[0].confidenceTier, 'TIER 1');
+    assert.equal(out[1].confidenceTier, 'TIER 1');
+    assert.equal(out[0].conflictFlag, undefined);
+    assert.equal(out[1].conflictFlag, undefined);
+  });
+
+  it('ignores totals — Under 168.5 and Under 171.5 on the same game are not conflicting sides', () => {
+    const ranked = [
+      {
+        gameId: 'WNBA:samegame',
+        selection: 'Under 168.5',
+        market: 'Total Points',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 1.9,
+        screenScore: 10.5
+      },
+      {
+        gameId: 'WNBA:samegame',
+        selection: 'Under 171.5',
+        market: 'Total Points',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 2.2,
+        screenScore: 7.0
+      }
+    ];
+    const out = resolveGameConflicts(ranked);
+    assert.equal(out[0].confidenceTier, 'TIER 1');
+    assert.equal(out[1].confidenceTier, 'TIER 1');
+    assert.equal(out[0].conflictFlag, undefined);
+  });
+
+  it('leaves a PASS row alone (no conflict resolution on non-actionable picks)', () => {
+    const ranked = [
+      {
+        gameId: 'g',
+        selection: 'Team A',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET',
+        consensusEdge: 3.0,
+        screenScore: 12
+      },
+      {
+        gameId: 'g',
+        selection: 'Team B',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'PASS',
+        consensusEdge: 3.0,
+        screenScore: 12
+      }
+    ];
+    const out = resolveGameConflicts(ranked);
+    const pass = out.find((r) => r.kaiCall === 'PASS');
+    assert.equal(pass.confidenceTier, 'TIER 1', 'already-PASS row is untouched');
+  });
+
+  it('baseTeamFromSelection strips line suffixes and parenthetical tags', () => {
+    assert.equal(baseTeamFromSelection('Cleveland Guardians -1.5'), 'cleveland guardians');
+    assert.equal(baseTeamFromSelection('Minnesota Twins'), 'minnesota twins');
+    assert.equal(baseTeamFromSelection('Morocco (Draw No Bet)'), 'morocco');
+    assert.equal(isSideMarket('Moneyline'), true);
+    assert.equal(isSideMarket('Run Line'), true);
+    assert.equal(isSideMarket('Total Points'), false);
+    assert.equal(isSideMarket('Total Games'), false);
   });
 });
