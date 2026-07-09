@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.8.1
+
+**Tier consistency fix + `parseable` flag for agent-friendly minimal output.**
+
+### What changed
+
+- **Tier consistency fix** — `clearTierCache()` is now invoked at the start of each MCP screen call (`quick_screen`, `recommended_bets`, `screen_ranked`, `validate_play`). Previously the per-call hysteresis cache (`tierCache`) was never reset, so a play's tier could drift between otherwise-identical calls as the score timeline accumulated observations. The documented "cleared each call" contract now holds; tiers are stable within a call and recomputed fresh per call.
+- **`parseable` flag** — `quick_screen` / `recommended_bets` `minimal` verbosity can now return a structured `plays` array (one object per candidate, alongside the summary string) when `parseable: true`. Agents no longer need a second `standard` call just to parse.
+- **Heavy-favorite demotion** — TIER 1 plays with extreme odds (worse than -200) are now demoted to TIER 2, since one loss wipes out multiple wins. They still surface as value plays, just not as locks.
+
+### Migration notes
+
+All changes are additive. `clearTierCache` runs automatically per call. `parseable` defaults to `false` (summary string only). Default tier behavior is unchanged for typical plays; only extreme-favorite "locks" are demoted.
+
 ## 2.8.0
 
 **quick_screen / recommended_bets agent UX: honest cardWindow label, exposed cardWindow + maxPlaysPerGame params.**

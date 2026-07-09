@@ -281,10 +281,13 @@ Every tool accepts:
 | ---------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `cardWindow`     | `today` `next` `all`    | Date filter. `today` = today's slate plus any next-day matches merged in (flagged via `nextDayMerged` in the response). `next` = tomorrow only. `all` = every upcoming match, no date filtering. Default `today`. |
 | `maxPlaysPerGame`| `1`–`50` (default `2`)  | Max plays shown per game in `minimal` verbosity (highest `screenScore` first). Raise it (e.g. `10`) for full coverage of a game without a second call. `standard`/`full` verbosity always return every candidate regardless of this value. |
+| `parseable`      | `true`/`false` (default `false`) | When `true` on `minimal` verbosity, the response includes a structured `plays` array (one object per candidate) alongside the summary string, so agents can parse without re-calling at `standard`. |
 
 > **`cardWindow` honesty:** when `today` is alive and next-day rows are merged, the response reports `cardWindow: "today"` (not tomorrow's date) plus `nextDayMerged: true` and `nextDayDate`. Earlier builds mislabeled this as tomorrow — that bug is fixed.
 
-> **`verbosity: minimal` returns a plain-English SUMMARY STRING, not structured JSON** — agents that need to parse the response must use `standard` or `full`.
+> **Tier consistency:** as of 2.8.x, `tierCache` is cleared at the start of every MCP screen call (`quick_screen`, `recommended_bets`, `screen_ranked`, `validate_play`). A given play's tier is therefore stable within a call and recomputed fresh per call — no cross-call drift from stale hysteresis state.
+
+> **`verbosity: minimal` returns a plain-English SUMMARY STRING, not structured JSON** — agents that need to parse the response must use `standard`/`full`, OR pass `parseable: true` on `minimal` to get a structured `plays` array next to the summary.
 
 ### Tool Surface Modes
 
