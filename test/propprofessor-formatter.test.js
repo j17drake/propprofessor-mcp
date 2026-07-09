@@ -16,6 +16,7 @@ const {
   riskScoreToLabel,
   actionWord,
   formatOdds,
+  formatQuickScreenMinimal,
   STANDARD_KEEP_FIELDS,
   STANDARD_STRIP_FIELDS
 } = require('../lib/propprofessor-formatter');
@@ -368,5 +369,44 @@ describe('module exports', () => {
     assert.ok(STANDARD_KEEP_FIELDS.has('riskScore'));
     assert.ok(STANDARD_STRIP_FIELDS.has('lineHistory'));
     assert.ok(STANDARD_STRIP_FIELDS.has('debug'));
+  });
+});
+
+describe('formatQuickScreenMinimal — parseable flag', () => {
+  const response = {
+    maxPlaysPerGame: 50,
+    results: [
+      {
+        league: 'Tennis',
+        market: 'Moneyline',
+        candidates: [
+          {
+            game: 'Gauff vs Muchova',
+            selection: 'Gauff',
+            odds: -120,
+            confidenceTier: 'TIER 1',
+            edge: 2.1,
+            startCST: 'Thu, Jul 9, 7:00 AM',
+            movementDisposition: 'supportive_clean',
+            screenScore: 90
+          }
+        ]
+      }
+    ]
+  };
+
+  it('returns a structured plays array when parseable=true', () => {
+    const out = formatQuickScreenMinimal({ ...response, parseable: true });
+    assert.ok(Array.isArray(out.plays), 'plays should be an array when parseable');
+    assert.equal(out.plays.length, 1);
+    assert.equal(out.plays[0].selection, 'Gauff');
+    assert.equal(out.plays[0].confidenceTier, 'TIER 1');
+    assert.equal(typeof out.summary, 'string');
+  });
+
+  it('omits plays when parseable is omitted', () => {
+    const out = formatQuickScreenMinimal(response);
+    assert.equal(out.plays, undefined);
+    assert.equal(typeof out.summary, 'string');
   });
 });
