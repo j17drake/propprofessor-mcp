@@ -1715,7 +1715,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const cardWindow = String(args.cardWindow || 'today')
         .trim()
         .toLowerCase();
-      let cardWindowFallthrough = null; // set when today is dead and we fall through to 'next'
+      let cardWindowFallthrough = null; // set ONLY when today is dead and we fall through to 'next'
+      let nextDayMerged = null; // set when today is alive AND tomorrow's rows are merged in
 
       // Fan out leagues concurrently with concurrency=4.
       // Previously serialized 10 leagues × 3 markets = 30 sequential HTTP calls;
@@ -1878,7 +1879,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             filterBy(targetDateKey);
             cardWindowFallthrough = targetDateKey;
           } else if (nextCandidates.length > 0) {
-            // Today has action AND tomorrow has action — merge both days
+            // Today has action AND tomorrow has action — merge both days.
+            // This is NOT a fall-through: today is alive, so the reported
+            // cardWindow must stay 'today'. We only flag that next-day rows
+            // were merged so consumers know the slate spans two days.
             for (const nc of nextCandidates) {
               // Avoid duplicate entries: if the same league+market already
               // exists from today, append tomorrow's candidates to it.
@@ -1892,7 +1896,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                 allCandidates.push(nc);
               }
             }
-            cardWindowFallthrough = nextKey;
+            nextDayMerged = nextKey;
           }
         }
       }
@@ -2061,6 +2065,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         activeSlate,
         cardWindow: cardWindowFallthrough || cardWindow,
         ...(cardWindowFallthrough ? { cardWindowFallthrough: true } : {}),
+        ...(nextDayMerged ? { nextDayMerged: true, nextDayDate: nextDayMerged } : {}),
+        maxPlaysPerGame:
+          Number.isFinite(Number(args.maxPlaysPerGame)) && Number(args.maxPlaysPerGame) > 0
+            ? Number(args.maxPlaysPerGame)
+            : 2,
         results: allCandidates,
         research: researchResults,
         warnings,
