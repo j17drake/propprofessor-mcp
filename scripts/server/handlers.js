@@ -1751,51 +1751,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
               if (!candidates.length) continue;
 
-              if (includeResearch) {
-                const researchBatch = [];
-                for (const row of candidates) {
-                  const player = row.selection || row.participant || row.pick;
-                  if (!player) continue;
-                  const league = String(row.league || league || '').trim();
-                  const game = row.game || `${row.awayTeam || '?'} @ ${row.homeTeam || '?'}`;
-                  researchBatch.push({ player, league, game, row });
-                }
-
-                // Run research in parallel with concurrency-3, routing by selection type
-                const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
-                const researchOpts = {
-                  rows: researchBatch.map((r) => ({
-                    selection: r.player,
-                    league: r.league,
-                    game: r.game,
-                    start: r.row.start || r.row.eventStart || null,
-                    market: r.row.market || ''
-                  })),
-                  limit: researchBatch.length,
-                  playerContextFn: handlers.player_context,
-                  gameContextFn: (opts) =>
-                    getGameContext({
-                      sport: opts.sport || opts.league,
-                      selection: opts.selection,
-                      game: opts.game,
-                      start: opts.start,
-                      market: opts.market
-                    }),
-                  concurrency: 3
-                };
-                const researchOut = await runResearchOnTopRows(researchOpts);
-                for (const r of researchOut.results) {
-                  researchResults.push({
-                    player: r.player,
-                    game: r.game,
-                    riskFlag: r.riskFlag,
-                    riskSummary: r.riskSummary || null,
-                    contextType: r.contextType || 'player',
-                    ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {})
-                  });
-                }
-              }
-
               allCandidates.push({
                 league,
                 market,
@@ -2048,6 +2003,50 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             sortBy: args.sortBy,
           sortDir: args.sortDir
         });
+      }
+
+      // === Player research (scoped to FINAL returned plays) ===
+      // Runs AFTER targetTiers/kaiCall/card-window filtering so the research
+      // array matches exactly what the agent sees — no raw-scan payload blowup.
+      if (includeResearch) {
+        const { buildFinalResearchBatch } = require('../../lib/propprofessor-quick-screen-research');
+        const researchLimit = Number.isFinite(Number(args.researchLimit))
+          ? Math.max(1, Math.min(50, Number(args.researchLimit)))
+          : 50;
+        const researchBatch = buildFinalResearchBatch(allCandidates, researchLimit);
+        if (researchBatch.length) {
+          const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
+          const researchOut = await runResearchOnTopRows({
+            rows: researchBatch.map((r) => ({
+              selection: r.player,
+              league: r.league,
+              game: r.game,
+              start: r.start,
+              market: r.market
+            })),
+            limit: researchBatch.length,
+            playerContextFn: handlers.player_context,
+            gameContextFn: (opts) =>
+              getGameContext({
+                sport: opts.sport || opts.league,
+                selection: opts.selection,
+                game: opts.game,
+                start: opts.start,
+                market: opts.market
+              }),
+            concurrency: 3
+          });
+          for (const r of researchOut.results) {
+            researchResults.push({
+              player: r.player,
+              game: r.game,
+              riskFlag: r.riskFlag,
+              riskSummary: r.riskSummary || null,
+              contextType: r.contextType || 'player',
+              ...(r.topTweet ? { topTweet: r.topTweet.slice(0, 120) } : {})
+            });
+          }
+        }
       }
 
       // === topPick: collapse to the single best BET-tier play (one-call all-in) ===

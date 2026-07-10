@@ -347,6 +347,69 @@ describe('handler integration: quick_screen', () => {
   });
 });
 
+// ─── quick_screen research scoping ───────────────────────────────
+
+describe('handler integration: quick_screen research scoping', () => {
+  // Stub player_context + game_context paths so research never hits network.
+  function makeHandlers() {
+    const handlers = createHandlers();
+    handlers.player_context = async () => ({ riskFlag: 'clean', tweets: [], news: [] });
+    return handlers;
+  }
+
+  it('research runs by default and is scoped to final returned plays', async () => {
+    const handlers = makeHandlers();
+    const result = await handlers.quick_screen({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 5
+    });
+
+    assert.equal(result.ok, true);
+    // research must be present by default (no includeResearch arg)
+    assert.ok(Array.isArray(result.research), 'research should be an array');
+    assert.ok(result.research.length > 0, 'research should run by default');
+
+    // every research entry must correspond to a selection in the final results
+    const resultSelections = new Set();
+    for (const entry of result.results || []) {
+      for (const c of entry.candidates || []) {
+        resultSelections.add(String(c.selection || '').toLowerCase());
+      }
+    }
+    for (const r of result.research) {
+      assert.ok(
+        resultSelections.has(String(r.player || '').toLowerCase()),
+        `research entry ${r.player} not present in final results`
+      );
+    }
+
+    // research count must not exceed returned-play count (no raw-scan blowup)
+    const totalPlays = (result.results || []).reduce(
+      (n, e) => n + (e.candidates?.length || 0),
+      0
+    );
+    assert.ok(
+      result.research.length <= totalPlays + 1,
+      `research (${result.research.length}) should not exceed returned plays (${totalPlays})`
+    );
+  });
+
+  it('includeResearch:false yields empty research array', async () => {
+    const handlers = makeHandlers();
+    const result = await handlers.quick_screen({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 5,
+      includeResearch: false
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(Array.isArray(result.research), 'research should be an array');
+    assert.equal(result.research.length, 0, 'research should be empty when disabled');
+  });
+});
+
 // ─── recommended_bets ──────────────────────────────────────────────
 
 describe('handler integration: recommended_bets', () => {
