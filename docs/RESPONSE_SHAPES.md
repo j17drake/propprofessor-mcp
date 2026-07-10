@@ -156,7 +156,7 @@ When a tool returns ranked rows, each row may include:
 | Field                        | Type     | Source                                                                  |
 | ---------------------------- | -------- | ----------------------------------------------------------------------- |
 | validatedTier                | string   | BET/CONSIDER/PASS from validate_play                                    |
-| validatedConsensusBookCount  | number   | Full-book consensus count (may differ from the screen's condensed view) |
+| validatedConsensusBookCount  | number   | Re-fetched consensus count. 0 when the line could not be re-found (validatedUnverified=true) — never silently reuses the screen's stale count |
 | validatedMovementDisposition | string   | supportive_clean / supportive_bouncy / adverse_full / insufficient      |
 | validatedRiskFlags           | string[] | Risk flags from validation                                              |
 | validatedActionableSummary   | string   | Human-readable summary from validate_play verdictSummary                |

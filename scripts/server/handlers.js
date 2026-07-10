@@ -395,6 +395,11 @@ async function validatePositiveEvCandidates({ client, candidates = [], args = {}
  */
 function applyValidatedFields(target, validationResult) {
   const verdict = validationResult.verdictSummary;
+  // play is null on lookup_failed (line gone / no longer priced). The `|| {}`
+  // fallback below would make `!play` evaluate against an object (always
+  // truthy), which is why unverified must key off the ORIGINAL null, not the
+  // fallback object.
+  const playPresent = Boolean(validationResult.play);
   const play = validationResult.play || {};
   const gameCtx = validationResult.gameContext || null;
 
@@ -404,7 +409,19 @@ function applyValidatedFields(target, validationResult) {
   // displayTier is BET/CONSIDER/PASS (a different vocabulary) — do NOT confuse
   // it with a confidence tier. finalConfidenceTier must hold a TIER string.
   target.validatedConfidenceTier = validationResult.tier || verdict.displayTier || target.confidenceTier;
-  target.validatedConsensusBookCount = play.consensusBookCount ?? target.consensusBookCount;
+  // Lookup_failed (play===null) means the screen row could not be rehydrated
+  // from the current feed — the requested line is gone or no longer priced.
+  // Do NOT fall back to the screen's (now-stale) consensusBookCount, or agents
+  // see a phantom "5 books" on a play that doesn't exist anymore. Mark it
+  // 0 + unverified so the drift is visible instead of buried.
+  target.validatedConsensusBookCount = playPresent && Number.isFinite(Number(play.consensusBookCount))
+    ? Number(play.consensusBookCount)
+    : 0;
+  target.validatedUnverified = !playPresent;
+  // Thread consensus drift so applyFinalVerdict can downgrade a BET that
+  // was built on a consensus that evaporated between screen and validate.
+  target.validatedConsensusDrift = Boolean(validationResult.consensusDrift);
+  target.validatedDriftReason = validationResult.driftReason || null;
   target.validatedMovementDisposition = verdict.movementDisposition || target.movementDisposition;
   target.validatedRiskFlags = verdict.riskFlags || [];
   target.validatedActionableSummary = verdict.actionableSummary || null;
@@ -446,6 +463,16 @@ function applyFinalVerdict(target) {
     verdict = 'PASS';
   }
 
+  // Consensus-drift / unverified downgrade: if the re-fetch collapsed the
+  // screen's consensus (e.g. 5 books → 1) or couldn't re-find the line at
+  // all, the pre-validation BET is no longer trustworthy. This mirrors the
+  // guard inside runValidatePlayImpl (which already downgrades to CONSIDER
+  // there) — applied again here so finalVerdict + the promoted display tier
+  // can never ship a stale BET. Idempotent: CONSIDER/PASS are left alone.
+  if ((target.validatedConsensusDrift || target.validatedUnverified) && verdict === 'BET') {
+    verdict = 'CONSIDER';
+  }
+
   target.finalVerdict = verdict;
   target.finalConfidenceTier = validatedTier;
 
@@ -466,6 +493,12 @@ function applyFinalVerdict(target) {
   }
   if (!target._validated) {
     target.finalWarnings = [...(target.finalWarnings || []), 'validation-failed'];
+  }
+  if (target.validatedConsensusDrift) {
+    target.finalWarnings = [...(target.finalWarnings || []), 'consensus-drift'];
+  }
+  if (target.validatedUnverified) {
+    target.finalWarnings = [...(target.finalWarnings || []), 'unverified-line'];
   }
 }
 
@@ -1013,6 +1046,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       } else {
         verdict = 'PASS';
         reasons.push('TIER 4 (no signal)');
+      }
+
+      // Consensus-drift guard: the screen snapshot showed broad agreement
+      // (e.g. 5 books) but the re-fetch collapsed to a thin/none consensus
+      // (e.g. 1 book). That is NOT noise — it means the line either lost
+      // cross-book support or moved off the requested number between the
+      // screen and validation. A BET built on a phantom 5-book consensus is
+      // a lie, so downgrade to CONSIDER and flag it. Without this, the
+      // surveyor ships TIER 1 BETs whose real support evaporated.
+      if (consensusDrift && verdict === 'BET') {
+        verdict = 'CONSIDER';
+        reasons.push(`consensus drift: ${driftReason} (re-fetch disagrees with screen snapshot)`);
       }
 
       // Execution quality on the requested book.
@@ -2024,7 +2069,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     skipResearch: true,
                     lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6,
                     screenTier: candidate.confidenceTier,
-                    screenKaiCall: candidate.kaiCall
+                    screenKaiCall: candidate.kaiCall,
+                    // Pass the screen snapshot's consensus/exec so the validator
+                    // can detect drift (e.g. 5 books on screen → 1 book on re-fetch)
+                    // and downgrade a phantom BET. Without this, consensusDrift can
+                    // never fire in the bundled validate path.
+                    screenConsensusBookCount: candidate.consensusBookCount,
+                    screenExecutionQuality: candidate.executionQuality
                   });
                   if (candidate.gameId && result && result.ok) {
                     validationCache.set(qsCacheKey, result);
@@ -2431,7 +2482,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     skipResearch: true,
                     lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6,
                     screenTier: play.confidenceTier,
-                    screenKaiCall: play.kaiCall
+                    screenKaiCall: play.kaiCall,
+                    // Pass the screen snapshot's consensus/exec so the validator
+                    // can detect drift and downgrade a phantom BET.
+                    screenConsensusBookCount: play.consensusBookCount,
+                    screenExecutionQuality: play.executionQuality
                   });
                   if (play.gameId && result && result.ok) {
                     validationCache.set(rbCacheKey, result);
