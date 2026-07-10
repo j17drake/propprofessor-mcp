@@ -8,12 +8,12 @@ describe('propprofessor-tool-definitions', () => {
   describe('default (full) mode', () => {
     it('returns all 29 tools by default', () => {
       const tools = buildToolDefinitions();
-      assert.equal(tools.length, 29);
+      assert.equal(tools.length, 30);
     });
 
     it('returns all 29 tools when mode is explicitly "full"', () => {
       const tools = buildToolDefinitions({ mode: 'full' });
-      assert.equal(tools.length, 29);
+      assert.equal(tools.length, 30);
       for (const tool of tools) {
         assert.equal(typeof tool.name, 'string', `${tool.name}: name missing`);
         assert.equal(typeof tool.description, 'string', `${tool.name}: description missing`);
@@ -27,7 +27,7 @@ describe('propprofessor-tool-definitions', () => {
   describe('lite mode', () => {
     it('returns only the 13 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 13);
+      assert.equal(tools.length, 14);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {
@@ -87,7 +87,7 @@ describe('propprofessor-tool-definitions', () => {
     });
 
     it('only uses the 7 known categories', () => {
-      const validCategories = new Set(['discovery', 'screen', 'drill_down', 'research', 'tracking', 'admin', 'meta']);
+      const validCategories = new Set(['discovery', 'screen', 'alerts', 'drill_down', 'research', 'tracking', 'admin', 'meta']);
       for (const [name, cat] of Object.entries(TOOL_CATEGORIES)) {
         assert.ok(validCategories.has(cat), `${name} has unknown category: ${cat}`);
       }
@@ -100,6 +100,7 @@ describe('propprofessor-tool-definitions', () => {
       const expected = {
         discovery: 6,
         screen: 8,
+        alerts: 1,
         drill_down: 3,
         research: 3,
         tracking: 4,

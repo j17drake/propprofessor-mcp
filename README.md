@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 29 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 30 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -53,7 +53,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **29 tools** — organized into situational, analytical, and research tiers
+- **30 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 

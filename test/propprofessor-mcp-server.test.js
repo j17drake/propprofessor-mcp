@@ -280,6 +280,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'recommended_bets',
         'resolve_pick',
         'screen_ranked',
+        'sharp_alerts',
         'sharp_consensus',
         'sharp_plays',
         'smart_bet',
