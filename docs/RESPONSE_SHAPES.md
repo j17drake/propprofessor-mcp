@@ -164,6 +164,30 @@ When a tool returns ranked rows, each row may include:
 | validatedClv                 | number   | Validated CLV                                                           |
 | validatedGameContext         | object   | MLB weather/pitchers/park or Tennis surface/tournament                  |
 
+#### `finalVerdict` (authoritative bet/no-bet call)
+
+Computed server-side by merging the screen tier and the validation verdict into ONE field, so agents no longer reconcile a screen BET against a validation PASS by hand.
+
+| Field               | Type     | Meaning                                                                 |
+| ------------------- | -------- | ----------------------------------------------------------------------- |
+| finalVerdict        | string   | `BET` \| `CONSIDER` \| `PASS`. Validation wins; hard fails force PASS.  |
+| finalConfidenceTier | string   | `TIER 1`..`TIER 4`. `validatedTier` if present, else `confidenceTier`.  |
+| priceDrift          | number   | `\|validatedOdds - odds\|` when both finite; null otherwise.            |
+| finalWarnings       | string[] | `price-drift`, `unknown-game-context`, `validation-failed`.             |
+
+#### `sharp_alerts` response shape
+
+```jsonc
+{
+  "ok": true,
+  "newAlerts":   [ /* finalVerdict=BET plays seen for the first time in the dedup window */ ],
+  "repeatAlerts":[ /* same plays re-confirmed within the dedup window */ ],
+  "allBets":     [ /* every finalVerdict=BET play this scan, new+repeat */ ],
+  "message": null /* or "No new sharp plays right now." when newAlerts is empty */
+}
+```
+
+Each alert: `{ game, selection, market, odds (validatedOdds ?? odds), edge, clv, startCST, finalConfidenceTier, researchRiskFlag, priceDrift, finalWarnings }`.
 The `_meta.validation` block on the response root reports how many candidates were validated:
 
 ```jsonc

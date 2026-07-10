@@ -179,6 +179,20 @@ sharp_plays (Fliff, NBA Moneyline): 3 candidates
 
 ---
 
+## 3b. Sharp Alerts (on-demand, no cron)
+
+**Call `sharp_alerts` when the user asks "any new sharp plays?" or "alert me on sharp plays."** It is the alert surface — NOT a cron.
+
+- Returns ONLY `finalVerdict=BET` plays with clean research (`riskFlag` not `high`), at/above `minFinalTier` (default TIER 1).
+- Deduped against a local store (`~/.propprofessor/sharp-alerts-store.json`): the same play is not re-alerted within the dedup window (default 6h). Response splits into `newAlerts` vs `repeatAlerts` so you only surface fresh ones.
+- If `newAlerts` is empty, say "No new sharp plays right now." — do not force recommendations.
+
+**`finalVerdict` is the field to trust.** It merges the raw screen tier and the validation verdict into one authoritative `BET`/`CONSIDER`/`PASS` call. Validation wins; a `movement adverse` or `exec bad` flag forces PASS. Read `finalVerdict`, not the raw `displayTier` — that is exactly the trap that produced the Djokovic-ML false positive this project hit.
+
+To show the user only the actionable bets from a manual scan, use `quick_screen` with `onlyBets: true` + `minFinalTier`.
+
+---
+
 ## 4. Key Rules
 
 ### Always check player context before recommending

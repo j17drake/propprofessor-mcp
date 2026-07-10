@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+**Sharp-play alerts (on-demand) + authoritative `finalVerdict`.**
+
+### What changed
+- **`finalVerdict` field.** Every returned candidate now carries a single authoritative bet/no-bet call that merges the raw screen tier and the validation verdict. Resolution rule: prefer `validatedVerdict` (it reflects re-fetched consensus + movement); hard safety override forces a `movement adverse` / `exec bad` flag to PASS (never BET). Also sets `finalConfidenceTier`, `priceDrift` (screen vs validated odds), and `finalWarnings` (`price-drift`, `unknown-game-context`, `validation-failed`).
+- **`onlyBets` / `minFinalTier` filter on `quick_screen`.** Return only `finalVerdict=BET` rows at/above the tier floor in one call.
+- **New `sharp_alerts` tool.** On-demand alert surface (no cron/polling). Returns ONLY `finalVerdict=BET` plays with clean research, deduped against a local store (`~/.propprofessor/sharp-alerts-store.json`) so the same play isn't re-alerted within the dedup window (default 6h). Response shape: `newAlerts` / `repeatAlerts` / `allBets` + a `message` when nothing is new.
+
+### Migration notes
+No breaking changes. `finalVerdict` is additive. `sharp_alerts` is a new tool (available in full and lite modes). Prefer `sharp_alerts` over polling crons — frequent screen-endpoint polling triggered a rate-limit ban for the project owner.
+
 ## 2.8.2
 
 **Player research on by default (scoped).**

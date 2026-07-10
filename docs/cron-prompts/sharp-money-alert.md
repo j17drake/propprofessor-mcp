@@ -1,5 +1,7 @@
 # Sharp-Money Alert — PropProfessor Cron Prompt
 
+> ⚠️ **WARNING — do not use if you have been rate-limited or banned from automated PropProfessor scans.** Frequent polling of the screen endpoint caused a ban for the project owner (root cause: a 10-minute `recommended_bets` cron). Prefer the **`sharp_alerts`** tool instead — it is on-demand and deduped, with no autonomous polling. If you must schedule this cron anyway, throttle to **≥2h** and never poll the raw screen endpoint more often than that.
+
 > Self-contained prompt for `hermes cron create`. Drop into a cron job that
 > fires every 1-2 hours during the sports window. The agent loop loads
 > `propprofessor-coach` automatically and delivers TIER 1 plays to telegram.
