@@ -1947,20 +1947,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
 
-      // === validateTop: run validate_play on top N candidates per league/market ===
+      // === validate: run validate_play on returned candidates ===
+      // validateAll (default true) validates EVERY candidate. validateTop is only a cap, honored when validate is false.
       const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
+      const validateAll = args.validate !== false; // default true
 
-      if (validateTop > 0) {
+      if (validateAll || validateTop > 0) {
         const validationCache = new Map(); // gameId → validated result, shared across candidates
         const validationPromises = [];
 
         for (const entry of allCandidates) {
           if (!entry.candidates || !entry.candidates.length) continue;
-          const sorted = [...entry.candidates].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
+          const sorted = validateAll
+            ? entry.candidates
+            : [...entry.candidates].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
           const topN = sorted.slice(0, validateTop);
 
           for (const candidate of entry.candidates) {
-            if (!topN.includes(candidate)) continue;
+            // validateAll => validate everything; else only top-N (capped)
+            if (!validateAll && !topN.includes(candidate)) continue;
             if (!candidate.gameId || !candidate.selection) continue;
 
             // Per-gameId+market cache: same game, same market candidates (e.g. Over 8.5, Under 8.5)
@@ -2081,7 +2086,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         research: researchResults,
         warnings,
         _meta:
-          validateTop > 0
+          (validateAll || validateTop > 0)
             ? {
                 validation: {
                   requested: validateTop,

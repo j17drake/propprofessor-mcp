@@ -300,6 +300,53 @@ describe('handler integration: sharp_plays', () => {
   });
 });
 
+// ─── quick_screen ──────────────────────────────────────────────────
+
+describe('handler integration: quick_screen', () => {
+  it('validates every returned candidate by default (validate defaults true)', async () => {
+    const handlers = createHandlers();
+    const result = await handlers.quick_screen({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 5
+    });
+    assert.equal(result.ok, true);
+    let seen = 0;
+    let validated = 0;
+    for (const entry of result.results || []) {
+      for (const c of entry.candidates || []) {
+        seen += 1;
+        if (c._validated === true) validated += 1;
+        assert.ok(c.validatedTier, `candidate ${c.selection} should carry validatedTier`);
+      }
+    }
+    assert.ok(seen > 0, 'should have returned candidates');
+    assert.equal(validated, seen, 'every returned candidate should be validated by default');
+    assert.ok(result._meta && result._meta.validation, '_meta.validation should be present');
+    assert.ok(result._meta.validation.completedCount > 0, 'completedCount should be > 0');
+  });
+
+  it('skips validation when validate: false', async () => {
+    const handlers = createHandlers();
+    const result = await handlers.quick_screen({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 5,
+      validate: false
+    });
+    assert.equal(result.ok, true);
+    let seen = 0;
+    for (const entry of result.results || []) {
+      for (const c of entry.candidates || []) {
+        seen += 1;
+        assert.notEqual(c._validated, true, 'no candidate should be validated when validate:false');
+      }
+    }
+    assert.ok(seen > 0, 'should still return candidates');
+    assert.ok(!result._meta || !result._meta.validation, '_meta.validation should be absent when validate:false');
+  });
+});
+
 // ─── recommended_bets ──────────────────────────────────────────────
 
 describe('handler integration: recommended_bets', () => {
