@@ -12,6 +12,16 @@
 ### Migration notes
 No breaking changes. `finalVerdict` is additive. `sharp_alerts` is a new tool (available in full and lite modes). Prefer `sharp_alerts` over polling crons — frequent screen-endpoint polling triggered a rate-limit ban for the project owner.
 
+## 2.8.3 (unreleased)
+
+**Tennis `unknown-game-context` false-positive fix.**
+
+### What changed
+- `pickTourneyForMatchup` (lib/tennis-schedule-data/weekly-schedule-2026.js) now has a **week-level inference fallback** after the player-circuit lookup fails: during a **Grand Slam week** every relevant matchup resolves to that Slam (authoritative surface/level from the schedule), and a **single-event week** resolves to its one tourney. Previously these returned `null` → ESPN fallback (no venue for WTA/challenger early rounds) → `surface: unknown` → `riskFlag: 'unknown'`, which wrongly soft-failed Slam-week WTA/challenger plays (e.g. `Tubello vs Jeanjean` flagged `unknown-game-context` at Wimbledon). Genuinely ambiguous multi-event weeks (no circuit hint, several events per tour) still return `null` — the resolver never guesses a wrong surface.
+
+### Why this matters
+The `unknown-game-context` flag used to flow into `validatedGameContext.riskFlag` and the `finalWarnings`/`sharp_alerts` research gate, soft-failing legitimate WTA/challenger sharp plays. It now only fires for genuinely unresolvable matchups.
+
 ## 2.8.2
 
 **Player research on by default (scoped).**

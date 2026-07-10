@@ -494,6 +494,23 @@ describe('resolveTournamentFromMatchup', () => {
     const r = resolveTournamentFromMatchup('Unknownplayer1 vs Unknownplayer2', '2026-06-22T10:00:00.000Z');
     assert.equal(r, null);
   });
+
+  it('Case 3 — resolves a non-circuit matchup during a Grand Slam week (kills false "unknown")', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    // Two unranked WTA players, Wimbledon week, neither in PLAYER_CIRCUIT.
+    const r = resolveTournamentFromMatchup('Tubello vs Jeanjean', '2026-07-10T15:30:00.000Z');
+    assert.ok(r, 'Slam-week matchup must resolve, not return null');
+    assert.equal(r.slug, 'wimbledon');
+    assert.equal(r.surface, 'Grass');
+    assert.equal(r.level, 'Grand Slam');
+  });
+
+  it('Case 3 — does NOT over-resolve an ambiguous multi-event week', () => {
+    const { resolveTournamentFromMatchup } = require('../lib/propprofessor-tennis-context');
+    // July 20 week: 4 events (Kitzbuhel, Winston-Salem, Athens, Prague), no circuit hint.
+    const r = resolveTournamentFromMatchup('Nobody vs Nobody', '2026-07-22T10:00:00.000Z');
+    assert.equal(r, null, 'ambiguous week must stay null rather than guess a wrong surface');
+  });
 });
 
 describe('getTennisContext — matchup resolution integration', () => {
