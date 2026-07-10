@@ -151,7 +151,7 @@ When a tool returns ranked rows, each row may include:
 }
 ```
 
-#### validated fields (when `validateTop > 0`)
+#### validated fields (when `validate` is true — the default)
 
 | Field                        | Type     | Source                                                                  |
 | ---------------------------- | -------- | ----------------------------------------------------------------------- |

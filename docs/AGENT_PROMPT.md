@@ -103,7 +103,7 @@ No strong plays in MLB right now.
 **Tools to call:**
 
 1. `quick_screen` with `verbosity: "standard"` — structured plays with edge, tier, risk, and research — one call instead of three
-   - For immediate validation without an extra round-trip, use `validateTop: 3`. The top N candidates per league/market get real-time validate_play data merged in — `validatedTier`, `validatedConsensusBookCount`, `validatedActionableSummary`, and `validatedMovementDisposition` reflect the full-depth view.
+   - Validation is ON by default. `quick_screen` and `recommended_bets` run `validate_play` on EVERY returned play (post tier/kaiCall filter) and merge `validatedTier`, `validatedConsensusBookCount`, `validatedMovementDisposition`, `validatedRiskFlags`, and `validatedActionableSummary` into each row — no second round-trip. To opt out for speed, pass `validate: false`. The older `validateTop: N` param still works as a cap but is only honored when `validate: false` (top N per league/market bucket).
 2. `player_context` — injury risk check
 3. `find_best_price` — line shop across books
 4. `league_presets` — show ranking weights if they ask "how does this work?"

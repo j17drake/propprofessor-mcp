@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "PropProfessor MCP API",
-    "version": "2.5.0",
+    "version": "2.7.0",
     "description": "Lean, fast odds analysis engine for AI agents. Screens 36+ sportsbooks across NBA, MLB, NHL, NFL, WNBA, UFC, Tennis, Soccer — ranks plays by sharp movement, consensus edge, and steam detection.\n\nSee the README for setup instructions and tool guides by user type.",
     "contact": {
       "name": "James Drake",
@@ -4057,6 +4057,11 @@
                     "default": 0,
                     "description": "When > 0, runs validate_play on the top N candidates per league/market before returning, merging verdictSummary and gameContext data into each row. Defaults to 0 (off) — the condensed scan already returns tiers, movement disposition, and research. Set to 3+ when you want deep validation with re-fetched consensus counts."
                   },
+                  "validate": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When true (default), run validate_play on EVERY returned candidate before returning — merging validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedRiskFlags, and validatedActionableSummary into each row. Eliminates the need for a separate validate_play call. Set to false for max-speed scans. When false, validateTop can still cap validation to the top N per league/market."
+                  },
                   "kaiCall": {
                     "type": "array",
                     "items": {
@@ -4068,6 +4073,10 @@
                       ]
                     },
                     "description": "Optional filter by display tier (BET | CONSIDER | PASS). Default: no filter. Example: [\"BET\"] for \"bets only\" or [\"BET\", \"CONSIDER\"] to drop PASS rows. Missing/garbage kaiCall is treated as PASS."
+                  },
+                  "minEV": {
+                    "type": "number",
+                    "description": "Optional minimum consensus edge percentage. Filters to +EV plays only (e.g. minEV=1.0 keeps plays with 1%+ edge). Default: no filter."
                   },
                   "sortBy": {
                     "type": "string",
@@ -4087,6 +4096,36 @@
                       "desc"
                     ],
                     "description": "Optional sort direction. Overrides the per-field default. asc = ascending, desc = descending."
+                  },
+                  "topPick": {
+                    "type": "boolean",
+                    "description": "When true, return only the single highest-conviction BET-tier play with a \"why\" rationale string. Use for one-call all-in betting."
+                  },
+                  "lite": {
+                    "type": "boolean",
+                    "description": "Token-light mode: returns only essential act fields (game, selection, odds, edge, clv, tier, kaiCall, startCST, movementDisposition, riskFlag). Avoids 200KB payloads. Implies compact."
+                  },
+                  "cardWindow": {
+                    "type": "string",
+                    "enum": [
+                      "today",
+                      "next",
+                      "all"
+                    ],
+                    "default": "today",
+                    "description": "Card window filter. 'today' returns today's slate plus any next-day matches merged in (flagged via nextDayMerged in the response). 'next' returns only tomorrow. 'all' returns every upcoming match with no date filtering. Default 'today'."
+                  },
+                  "maxPlaysPerGame": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 2,
+                    "description": "Max plays shown per game in minimal verbosity (highest screenScore first). Default 2 to keep output scannable. Raise it (e.g. 10) when you want full coverage of a game without a second call. Standard verbosity always returns every candidate regardless of this value."
+                  },
+                  "parseable": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true on minimal verbosity, the response includes a structured `plays` array (one object per candidate) alongside the summary string — so agents can parse without a second standard call. Default false (summary string only)."
                   }
                 },
                 "additionalProperties": false
@@ -4332,12 +4371,39 @@
                     ],
                     "description": "Output detail level. Default: standard."
                   },
+                  "cardWindow": {
+                    "type": "string",
+                    "enum": [
+                      "today",
+                      "next",
+                      "all"
+                    ],
+                    "default": "today",
+                    "description": "Card window filter. 'today' returns today's slate plus any next-day matches merged in (flagged via nextDayMerged in the response). 'next' returns only tomorrow. 'all' returns every upcoming match with no date filtering. Default 'today'."
+                  },
+                  "maxPlaysPerGame": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 2,
+                    "description": "Max plays shown per game in minimal verbosity (highest screenScore first). Default 2 to keep output scannable. Raise it (e.g. 10) when you want full coverage of a game without a second call. Standard verbosity always returns every candidate regardless of this value."
+                  },
+                  "parseable": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true on minimal verbosity, the response includes a structured `plays` array (one object per candidate) alongside the summary string — so agents can parse without a second standard call. Default false (summary string only)."
+                  },
                   "validateTop": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 10,
                     "default": 0,
                     "description": "When > 0, runs validate_play on the top N plays per league before returning, merging verdictSummary and gameContext data into each row. Eliminates the need for a separate validate_play call."
+                  },
+                  "validate": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When true (default), run validate_play on EVERY returned play before returning — merging validatedTier, validatedConsensusBookCount, validatedMovementDisposition, validatedRiskFlags, and validatedActionableSummary into each row. Eliminates the need for a separate validate_play call. Set to false for max-speed scans. When false, validateTop can still cap validation to the top N per league."
                   },
                   "kaiCall": {
                     "type": "array",
@@ -4350,6 +4416,10 @@
                       ]
                     },
                     "description": "Optional filter by display tier (BET | CONSIDER | PASS). Default: no filter. Example: [\"BET\"] for \"bets only\" or [\"BET\", \"CONSIDER\"] to drop PASS rows. Missing/garbage kaiCall is treated as PASS."
+                  },
+                  "minEV": {
+                    "type": "number",
+                    "description": "Optional minimum consensus edge percentage. Filters to +EV plays only (e.g. minEV=1.0 keeps plays with 1%+ edge). Default: no filter."
                   },
                   "sortBy": {
                     "type": "string",
@@ -4369,6 +4439,14 @@
                       "desc"
                     ],
                     "description": "Optional sort direction. Overrides the per-field default. asc = ascending, desc = descending."
+                  },
+                  "topPick": {
+                    "type": "boolean",
+                    "description": "When true, return only the single highest-conviction BET-tier play with a \"why\" rationale string. Use for one-call all-in betting."
+                  },
+                  "lite": {
+                    "type": "boolean",
+                    "description": "Token-light mode: returns only essential act fields (game, selection, odds, edge, clv, tier, kaiCall, startCST, movementDisposition, riskFlag). Avoids 200KB payloads. Implies compact."
                   }
                 },
                 "additionalProperties": false
@@ -4881,6 +4959,10 @@
                       ]
                     },
                     "description": "Optional filter by display tier (BET | CONSIDER | PASS). Default: no filter. Example: [\"BET\"] for \"bets only\" or [\"BET\", \"CONSIDER\"] to drop PASS rows. Missing/garbage kaiCall is treated as PASS."
+                  },
+                  "minEV": {
+                    "type": "number",
+                    "description": "Optional minimum consensus edge percentage. Filters to +EV plays only (e.g. minEV=1.0 keeps plays with 1%+ edge). Default: no filter."
                   },
                   "sortBy": {
                     "type": "string",
@@ -5455,6 +5537,10 @@
                       ]
                     },
                     "description": "Optional filter by display tier (BET | CONSIDER | PASS). Default: no filter. Example: [\"BET\"] for \"bets only\" or [\"BET\", \"CONSIDER\"] to drop PASS rows. Missing/garbage kaiCall is treated as PASS."
+                  },
+                  "minEV": {
+                    "type": "number",
+                    "description": "Optional minimum consensus edge percentage. Filters to +EV plays only (e.g. minEV=1.0 keeps plays with 1%+ edge). Default: no filter."
                   },
                   "sortBy": {
                     "type": "string",
@@ -6610,11 +6696,15 @@
                   },
                   "selection": {
                     "type": "string",
-                    "description": "Player or team name from a prior screen_ranked row (selection or participant field). Required."
+                    "description": "Player or team name from a prior screen_ranked row (selection or participant field). Required UNLESS playId is provided."
+                  },
+                  "playId": {
+                    "type": "string",
+                    "description": "Canonical playId from a prior quick_screen / recommended_bets / screen_ranked row. When provided, row matching uses exact playId lookup and skips fragile string comparison — pass this to avoid \"no row matched\" lookup_failed errors. Takes priority over selection string matching."
                   },
                   "market": {
                     "type": "string",
-                    "description": "Market type, default Moneyline"
+                    "description": "Market type, default Moneyline. Required for correct row matching when playId is NOT supplied — use the league-specific market name (e.g. \"Total Points\", \"Point Spread\", \"Draw No Bet\", \"Total Games\")."
                   },
                   "books": {
                     "type": "array",
@@ -6647,8 +6737,7 @@
                 },
                 "required": [
                   "league",
-                  "gameId",
-                  "selection"
+                  "gameId"
                 ],
                 "additionalProperties": false
               }
