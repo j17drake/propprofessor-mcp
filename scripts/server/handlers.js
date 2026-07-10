@@ -2052,6 +2052,21 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         });
       }
 
+      // === onlyBets: collapse to BET-tier rows only (server-side) ===
+      // Applied after validation so finalVerdict/finalConfidenceTier exist.
+      if (args.onlyBets) {
+        const floor = ['TIER 1', 'TIER 2', 'TIER 3'].indexOf(args.minFinalTier || 'TIER 1');
+        for (const entry of allCandidates) {
+          if (!entry.candidates || !entry.candidates.length) continue;
+          entry.candidates = entry.candidates.filter((c) => {
+            const tierIdx = ['TIER 1', 'TIER 2', 'TIER 3', 'TIER 4'].indexOf(
+              c.finalConfidenceTier || c.confidenceTier || 'TIER 4'
+            );
+            return c.finalVerdict === 'BET' && tierIdx <= floor;
+          });
+        }
+      }
+
       // === Player research (scoped to FINAL returned plays) ===
       // Runs AFTER targetTiers/kaiCall/card-window filtering so the research
       // array matches exactly what the agent sees — no raw-scan payload blowup.
