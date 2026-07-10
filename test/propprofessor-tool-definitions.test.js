@@ -127,6 +127,30 @@ describe('propprofessor-tool-definitions', () => {
     });
   });
 
+  describe('validate defaults to true on quick_screen and recommended_bets', () => {
+    it('quick_screen validate default is true', () => {
+      const tools = buildToolDefinitions();
+      const qs = tools.find((t) => t.name === 'quick_screen');
+      assert.ok(qs, 'quick_screen tool definition exists');
+      assert.strictEqual(
+        qs.inputSchema.properties.validate.default,
+        true,
+        'quick_screen validate should default to true'
+      );
+    });
+
+    it('recommended_bets validate default is true', () => {
+      const tools = buildToolDefinitions();
+      const rb = tools.find((t) => t.name === 'recommended_bets');
+      assert.ok(rb, 'recommended_bets tool definition exists');
+      assert.strictEqual(
+        rb.inputSchema.properties.validate.default,
+        true,
+        'recommended_bets validate should default to true'
+      );
+    });
+  });
+
   describe('tools are sorted alphabetically by name', () => {
     it('returns tools in alphabetical order', () => {
       const tools = buildToolDefinitions();
