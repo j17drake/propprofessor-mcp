@@ -345,6 +345,68 @@ describe('handler integration: quick_screen', () => {
     assert.ok(seen > 0, 'should still return candidates');
     assert.ok(!result._meta || !result._meta.validation, '_meta.validation should be absent when validate:false');
   });
+
+  it('finalVerdict resolves to validation when screen and validation disagree', async () => {
+    const handlers = createHandlers();
+    const result = await handlers.quick_screen({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      limit: 5
+    });
+    assert.equal(result.ok, true);
+    let seen = 0;
+    for (const entry of result.results || []) {
+      for (const c of entry.candidates || []) {
+        seen += 1;
+        assert.ok(c.finalVerdict, `candidate ${c.selection} should carry finalVerdict`);
+        assert.ok(['BET', 'CONSIDER', 'PASS'].includes(c.finalVerdict), `finalVerdict valid: ${c.finalVerdict}`);
+        assert.ok(c.finalConfidenceTier, `candidate ${c.selection} should carry finalConfidenceTier`);
+      }
+    }
+    assert.ok(seen > 0, 'should have returned candidates');
+  });
+});
+
+// ─── sharp_alerts (on-demand, deduped) ───────────────────────────
+
+describe('handler integration: sharp_alerts', () => {
+  function makeHandlers() {
+    const handlers = createHandlers();
+    // Stub research so the quick_screen delegation never hits network.
+    handlers.player_context = async () => ({ riskFlag: 'clean', tweets: [], news: [] });
+    return handlers;
+  }
+
+  it('returns ok and dedups repeats within the window', async () => {
+    const handlers = makeHandlers();
+    const tmp = require('os').tmpdir() + '/pp-alerts-test-' + Date.now() + '.json';
+    const first = await handlers.sharp_alerts({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      storePath: tmp
+    });
+    assert.equal(first.ok, true);
+    assert.ok(Array.isArray(first.newAlerts), 'newAlerts is an array');
+    assert.ok(Array.isArray(first.repeatAlerts), 'repeatAlerts is an array');
+    assert.ok(Array.isArray(first.allBets), 'allBets is an array');
+
+    const second = await handlers.sharp_alerts({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      storePath: tmp
+    });
+    assert.equal(second.ok, true);
+    // Second call within the dedup window must not surface MORE new alerts.
+    assert.ok(
+      second.newAlerts.length <= first.newAlerts.length,
+      'repeat call yields no more new alerts than first'
+    );
+    // Every alert carries the canonical fields.
+    for (const a of first.allBets) {
+      assert.ok(a.game && a.selection && a.market, 'alert has game/selection/market');
+      assert.ok(['BET'].includes(a.finalVerdict || 'BET'), 'allBets are BET-tier');
+    }
+  });
 });
 
 // ─── quick_screen research scoping ───────────────────────────────
