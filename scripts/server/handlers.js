@@ -400,6 +400,10 @@ function applyValidatedFields(target, validationResult) {
 
   target.validatedTier = verdict.displayTier || target.displayTier;
   target.validatedVerdict = validationResult.verdict || null;
+  // Real confidence tier (TIER 1/2/3/4) from the validate impl. The verdict's
+  // displayTier is BET/CONSIDER/PASS (a different vocabulary) — do NOT confuse
+  // it with a confidence tier. finalConfidenceTier must hold a TIER string.
+  target.validatedConfidenceTier = validationResult.tier || verdict.displayTier || target.confidenceTier;
   target.validatedConsensusBookCount = play.consensusBookCount ?? target.consensusBookCount;
   target.validatedMovementDisposition = verdict.movementDisposition || target.movementDisposition;
   target.validatedRiskFlags = verdict.riskFlags || [];
@@ -431,7 +435,9 @@ function applyValidatedFields(target, validationResult) {
  */
 function applyFinalVerdict(target) {
   const validatedVerdict = target.validatedVerdict || null;
-  const validatedTier = target.validatedTier || target.confidenceTier || 'TIER 4';
+  // validatedTier / displayTier are BET/CONSIDER/PASS verdicts. The real
+  // confidence tier (TIER 1/2/3/4) lives in validatedConfidenceTier.
+  const validatedTier = target.validatedConfidenceTier || target.confidenceTier || 'TIER 4';
   let verdict = validatedVerdict || target.displayTier || target.kaiCall || 'PASS';
 
   const riskFlags = target.validatedRiskFlags || [];
@@ -460,6 +466,29 @@ function applyFinalVerdict(target) {
   }
   if (!target._validated) {
     target.finalWarnings = [...(target.finalWarnings || []), 'validation-failed'];
+  }
+}
+
+/**
+ * Promote the authoritative merged verdict (finalVerdict / finalConfidenceTier)
+ * into the agent-facing display fields (displayTier, confidenceTier, kaiCall)
+ * so consumers that read the PRIMARY fields — not the buried finalVerdict —
+ * see the validated call. Without this, an adverse-movement play ships as
+ * displayTier BET because the screen's snapshot always won, and the tier
+ * filters (targetTiers) keyed off confidenceTier, so PASS-level validated
+ * plays leaked through as TIER 1 BETs.
+ *
+ * Only promotes when validation actually ran (_validated) and produced a
+ * finalVerdict. If validation didn't run, the screen snapshot stands.
+ */
+function promoteFinalVerdictToDisplay(target) {
+  if (!target._validated) return;
+  if (!target.finalVerdict) return;
+  // finalVerdict is the single authoritative bet/no-bet call.
+  target.displayTier = target.finalVerdict;
+  target.kaiCall = target.finalVerdict;
+  if (target.finalConfidenceTier) {
+    target.confidenceTier = target.finalConfidenceTier;
   }
 }
 
@@ -1978,6 +2007,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               if (cached) {
                 applyValidatedFields(candidate, cached);
                 candidate._validated = true;
+                applyFinalVerdict(candidate);
+                promoteFinalVerdictToDisplay(candidate);
               }
               continue;
             }
@@ -2018,6 +2049,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           applyValidatedFields(vr.candidate, vr.result);
           vr.candidate._validated = true;
           applyFinalVerdict(vr.candidate);
+          // Promote the authoritative validated call into the agent-facing
+          // display fields so the tier filters below and downstream consumers
+          // see the merged verdict, not the raw screen snapshot.
+          promoteFinalVerdictToDisplay(vr.candidate);
         }
       }
 
@@ -2029,11 +2064,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // === targetTiers filter (agent ergonomics) ===
       // Apply before kaiCall/sort so the sequence is: execute -> validateTop -> tier filter -> kaiCall filter -> sort.
       // When omitted, passes through unchanged (same no-op pattern as filterRowsByKaiCall).
+      // Key off the AUTHORITATIVE tier: finalConfidenceTier (set by validation
+      // merge) takes priority over the raw screen confidenceTier, so a play
+      // downgraded by validation can't survive a TIER 1 filter as BET.
       if (Array.isArray(args.targetTiers) && args.targetTiers.length) {
         for (const entry of allCandidates) {
           if (!entry.candidates || !entry.candidates.length) continue;
           entry.candidates = entry.candidates.filter((c) => {
-            const liveTier = c.confidenceTierLive || c.confidenceTier || 'TIER 4';
+            const liveTier =
+              c.finalConfidenceTier || c.confidenceTierLive || c.confidenceTier || 'TIER 4';
             return args.targetTiers.includes(liveTier);
           });
         }
@@ -2375,6 +2414,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               if (cached) {
                 applyValidatedFields(play, cached);
                 play._validated = true;
+                applyFinalVerdict(play);
+                promoteFinalVerdictToDisplay(play);
               }
               continue;
             }
@@ -2415,6 +2456,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           applyValidatedFields(vr.play, vr.result);
           vr.play._validated = true;
           applyFinalVerdict(vr.play);
+          promoteFinalVerdictToDisplay(vr.play);
         }
       }
 

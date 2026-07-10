@@ -113,12 +113,19 @@ describe('Opposite-side CLV inversion', () => {
       { odds: +110, book: '4cx', time: 1782551782005 },
       { odds: -105, book: '4cx', time: 1782555493583 }
     ];
+    // Anchor nowMs to the end of the synthetic history so the 6h recent
+    // window is relative to the data, not wall-clock. (Previously the code
+    // defaulted nowMs to the last history point's timestamp, which masked
+    // window-staleness bugs; buildMovementWindows now anchors to real time,
+    // so tests must pin nowMs explicitly to stay deterministic.)
+    const nowMs = 1782555493583 + 60 * 60 * 1000;
 
     // Default (supportive)
     const normal = summarizeSharpMovement({
       lineHistory,
       preferredBook: 'NoVigApp',
-      sharpBooks: ['4cx']
+      sharpBooks: ['4cx'],
+      options: { nowMs }
     });
     assert.ok(normal.openToCurrentClvPct > 0, 'Normal CLV should be positive');
     assert.strictEqual(normal.fullWindowSharpMoveDirection, 'supportive');
@@ -129,7 +136,7 @@ describe('Opposite-side CLV inversion', () => {
       lineHistory,
       preferredBook: 'NoVigApp',
       sharpBooks: ['4cx'],
-      options: { invertDirection: true }
+      options: { invertDirection: true, nowMs }
     });
     assert.ok(inverted.openToCurrentClvPct < 0, 'Inverted CLV should be negative');
     assert.strictEqual(inverted.fullWindowSharpMoveDirection, 'adverse');

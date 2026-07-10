@@ -513,10 +513,15 @@ describe('handler integration: recommended_bets', () => {
     });
 
     assert.equal(result.ok, true);
-    // All returned plays should be TIER 1
+    // All returned plays should satisfy the requested tier. The tier filter
+    // keys off the authoritative finalConfidenceTier (validated merge), which
+    // is also promoted into confidenceTier, so both must match. An empty
+    // result is valid — it means validation downgraded every screen TIER 1
+    // play below TIER 1, and the filter correctly dropped them.
     for (const league of result.leagues) {
       for (const play of league.plays) {
-        assert.equal(play.confidenceTier, 'TIER 1');
+        const liveTier = play.finalConfidenceTier || play.confidenceTier;
+        assert.equal(liveTier, 'TIER 1', `play ${play.selection} tier ${liveTier} leaked past TIER 1 filter`);
       }
     }
   });
