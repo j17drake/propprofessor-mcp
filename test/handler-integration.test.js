@@ -409,6 +409,50 @@ describe('handler integration: recommended_bets', () => {
     assert.ok(result.marketsBreakdown, 'Should have marketsBreakdown');
     assert.ok(typeof result.marketsBreakdown === 'object');
   });
+
+  it('validates every returned play by default (validate defaults true)', async () => {
+    const handlers = createHandlers();
+    const result = await handlers.recommended_bets({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      bankroll: 1000,
+      limit: 10
+    });
+    assert.equal(result.ok, true);
+    let seen = 0;
+    let validated = 0;
+    for (const league of result.leagues) {
+      for (const play of league.plays || []) {
+        seen += 1;
+        if (play._validated === true) validated += 1;
+        assert.ok(play.validatedTier, `play ${play.selection} should carry validatedTier`);
+      }
+    }
+    assert.ok(seen > 0, 'should have returned plays');
+    assert.equal(validated, seen, 'every returned play should be validated by default');
+    assert.ok(result._meta && result._meta.validation, '_meta.validation should be present');
+  });
+
+  it('skips validation when validate: false', async () => {
+    const handlers = createHandlers();
+    const result = await handlers.recommended_bets({
+      leagues: ['NBA'],
+      markets: ['Moneyline'],
+      bankroll: 1000,
+      limit: 10,
+      validate: false
+    });
+    assert.equal(result.ok, true);
+    let seen = 0;
+    for (const league of result.leagues) {
+      for (const play of league.plays || []) {
+        seen += 1;
+        assert.notEqual(play._validated, true, 'no play should be validated when validate:false');
+      }
+    }
+    assert.ok(seen > 0, 'should still return plays');
+    assert.ok(!result._meta || !result._meta.validation, '_meta.validation should be absent when validate:false');
+  });
 });
 
 // ─── staking_plan ──────────────────────────────────────────────────

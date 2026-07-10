@@ -2285,20 +2285,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         { concurrency: 4 }
       );
 
-      // === validateTop: run validate_play on top N plays per league ===
+      // === validate: run validate_play on returned plays ===
+      // validateAll (default true) validates EVERY play. validateTop is only a cap, honored when validate is false.
       const validateTopRB = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
+      const validateAll = args.validate !== false; // default true
 
-      if (validateTopRB > 0) {
+      if (validateAll || validateTopRB > 0) {
         const validationCache = new Map();
         const validationPromises = [];
 
         for (const leagueEntry of allRecommended) {
           if (!leagueEntry.plays || !leagueEntry.plays.length) continue;
-          const sorted = [...leagueEntry.plays].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
+          const sorted = validateAll
+            ? leagueEntry.plays
+            : [...leagueEntry.plays].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
           const topN = sorted.slice(0, validateTopRB);
 
           for (const play of leagueEntry.plays) {
-            if (!topN.includes(play)) continue;
+            // validateAll => validate everything; else only top-N (capped)
+            if (!validateAll && !topN.includes(play)) continue;
             if (!play.gameId || !play.selection) continue;
 
             // Per-gameId+market cache: plays from the same game+market share one validate_play call.
@@ -2378,7 +2383,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           return breakdown;
         })(),
         _meta:
-          validateTopRB > 0
+          (validateAll || validateTopRB > 0)
             ? {
                 validation: {
                   requested: validateTopRB,
