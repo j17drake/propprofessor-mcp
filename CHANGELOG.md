@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.8.2
+
+**Player research on by default (scoped).**
+
+### What changed
+
+- **Research scoped to final returned plays.** `quick_screen` now runs `player_context` research AFTER the `targetTiers` / `kaiCall` / card-window filtering, instead of over the entire raw scan. The `research` array is de-duplicated per game (so totals variants for one game don't each spawn a call) and now always maps 1:1 to the plays in `results`. This fixes the ~194KB response truncation that made research appear absent on full-slate scans.
+- **`researchLimit` param (default 50, max 50).** Bounds how many final plays get researched, so agents doing huge unfiltered scans can cap payload size.
+- **`includeResearch` default documented as `true`.** The `recommended_bets` schema previously said "Default false" while the handler already defaulted it `true` — the doc now matches behavior. `quick_screen` already defaulted `true`; unchanged.
+
+### Migration notes
+
+No breaking changes. Research is attached by default in both tools; pass `includeResearch: false` to opt out (e.g. for max-speed scans). Existing `includeResearch: false` callers are unaffected.
+
 ## 2.8.1
 
 **Tier consistency fix + `parseable` flag for agent-friendly minimal output.**
