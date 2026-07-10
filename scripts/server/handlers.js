@@ -417,6 +417,52 @@ function applyValidatedFields(target, validationResult) {
   }
 }
 
+/**
+ * Merge the raw screen tier and the validation verdict into ONE authoritative
+ * bet/no-bet call (`finalVerdict`) so agents read a single field instead of
+ * reconciling a screen BET against a validation PASS by hand.
+ *
+ * Resolution rule:
+ *  - Prefer `validatedVerdict` (it reflects re-fetched consensus + movement).
+ *  - Fall back to displayTier / kaiCall when validation didn't run.
+ *  - Hard safety override: a validation hard-fail (movement adverse flag or
+ *    bad execution quality) can NEVER be a BET — forced to PASS.
+ * Also sets `finalConfidenceTier`, `priceDrift`, and `finalWarnings`.
+ */
+function applyFinalVerdict(target) {
+  const validatedVerdict = target.validatedVerdict || null;
+  const validatedTier = target.validatedTier || target.confidenceTier || 'TIER 4';
+  let verdict = validatedVerdict || target.displayTier || target.kaiCall || 'PASS';
+
+  const riskFlags = target.validatedRiskFlags || [];
+  const execBad = target.validatedExecQuality === 'bad';
+  if ((riskFlags.includes('movement adverse') || execBad) && verdict === 'BET') {
+    verdict = 'PASS';
+  }
+
+  target.finalVerdict = verdict;
+  target.finalConfidenceTier = validatedTier;
+
+  const screenOdds = Number(target.odds);
+  const valOdds = Number(target.validatedOdds);
+  if (Number.isFinite(screenOdds) && Number.isFinite(valOdds)) {
+    const drift = Math.abs(valOdds - screenOdds);
+    target.priceDrift = drift;
+    if (drift > 30) {
+      target.finalWarnings = [...(target.finalWarnings || []), 'price-drift'];
+    }
+  } else {
+    target.priceDrift = null;
+  }
+
+  if (target.validatedGameContext && target.validatedGameContext.riskFlag === 'unknown') {
+    target.finalWarnings = [...(target.finalWarnings || []), 'unknown-game-context'];
+  }
+  if (!target._validated) {
+    target.finalWarnings = [...(target.finalWarnings || []), 'validation-failed'];
+  }
+}
+
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   const { getCacheTtlMs, getCacheMaxEntries } = require('../../lib/mcp-runtime-config');
   const { LruCache } = require('../../lib/propprofessor-lru-cache');
@@ -1971,6 +2017,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
           applyValidatedFields(vr.candidate, vr.result);
           vr.candidate._validated = true;
+          applyFinalVerdict(vr.candidate);
         }
       }
 
@@ -2352,6 +2399,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           if (!vr.result || !vr.result.ok || !vr.result.verdictSummary) continue;
           applyValidatedFields(vr.play, vr.result);
           vr.play._validated = true;
+          applyFinalVerdict(vr.play);
         }
       }
 
