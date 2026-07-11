@@ -770,9 +770,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         market,
         league,
         games: gameIds,
-        participants: [],
+        participants: Array.isArray(args.participants) ? args.participants : [],
         books: augmentedBooksExcluded,
-        is_live: false
+        is_live: Boolean(args.live || args.is_live)
       });
     } catch (err) {
       return {

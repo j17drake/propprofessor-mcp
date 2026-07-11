@@ -57,3 +57,34 @@ describe('excludeBooks (Task 2: mirror website account Settings)', () => {
     assert.deepEqual(lastCall.books.sort(), ['Fliff', 'Pinnacle']);
   });
 });
+
+describe('get_play_details: /screen grid filters (Task 5)', () => {
+  it('passes participants + live through to the backend query', async () => {
+    const { client, calls } = createMockClient();
+    const handlers = createMcpHandlers({ client });
+    await handlers.get_play_details({
+      league: 'NBA',
+      game_ids: ['NBA:PREMATCH:Lakers:Celtics:1783807200'],
+      market: 'Moneyline',
+      participants: ['Lakers', 'Celtics'],
+      live: true
+    });
+    const lastCall = calls.queryScreenOddsBestComps.at(-1);
+    assert.ok(lastCall, 'backend was queried');
+    assert.deepEqual(lastCall.participants, ['Lakers', 'Celtics'], 'participants forwarded');
+    assert.equal(lastCall.is_live, true, 'live toggled on');
+  });
+
+  it('defaults to pre-match (is_live false) when live omitted', async () => {
+    const { client, calls } = createMockClient();
+    const handlers = createMcpHandlers({ client });
+    await handlers.get_play_details({
+      league: 'NBA',
+      game_ids: ['NBA:PREMATCH:Lakers:Celtics:1783807200'],
+      market: 'Moneyline'
+    });
+    const lastCall = calls.queryScreenOddsBestComps.at(-1);
+    assert.equal(lastCall.is_live, false, 'pre-match by default');
+    assert.deepEqual(lastCall.participants, [], 'no participant filter by default');
+  });
+});
