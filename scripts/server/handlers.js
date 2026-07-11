@@ -853,6 +853,30 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
     }
     response.result = merged;
+    // Enrich each row with a flat per-book odds matrix (book → odds) so the
+    // agent can report "best is NoVig +125, but DK is +118" like the +EV
+    // card's per-book view. Derived from sportsbookData (hydrated) or the
+    // raw selections[].odds map (pre-hydration), whichever is present.
+    for (const row of response.result) {
+      const matrix = {};
+      const sb = Array.isArray(row?.sportsbookData) ? row.sportsbookData : [];
+      for (const entry of sb) {
+        const book = String(entry?.book || '').trim();
+        const odds = Number(entry?.odds ?? entry?.noVigOdds);
+        if (book && Number.isFinite(odds)) matrix[book] = odds;
+      }
+      // Fallback: selections[line].odds is a { book: {odds1,odds2} } map.
+      const selections = row?.selections && typeof row.selections === 'object' ? row.selections : {};
+      for (const sel of Object.values(selections)) {
+        const oddsMap = sel?.odds && typeof sel.odds === 'object' ? sel.odds : {};
+        for (const [book, v] of Object.entries(oddsMap)) {
+          if (!matrix[book] && Number.isFinite(Number(v?.odds1 ?? v))) {
+            matrix[book] = Number(v.odds1 ?? v);
+          }
+        }
+      }
+      if (Object.keys(matrix).length) row.oddsMatrix = matrix;
+    }
     // Drop the non-enumerable focusBookMissingRows from the response —
     // they've been merged into result.
     response.focusBookMissingRows = undefined;
