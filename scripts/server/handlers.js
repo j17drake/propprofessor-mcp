@@ -704,9 +704,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       );
       const combined = [];
       const metaList = [];
+      let firstError = null;
       for (const r of perMarket) {
         if (r && Array.isArray(r.result)) combined.push(...r.result);
-        if (r && r.resultMeta) metaList.push(r.resultMeta);
+        if (r && r.resultMeta) {
+          metaList.push(r.resultMeta);
+          // Propagate a per-market query failure so callers (and tests)
+          // see SCREEN_QUERY_FAILED instead of a silent empty merge.
+          if (r.resultMeta.errorCode && !firstError) {
+            firstError = { errorCode: r.resultMeta.errorCode, error: r.resultMeta.error };
+          }
+        }
       }
       const merged = {
         ok: true,
@@ -715,7 +723,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           queryGameIds: gameIds,
           matchedRows: combined.length,
           marketsQueried: markets,
-          perMarket: metaList
+          perMarket: metaList,
+          ...(firstError || {})
         }
       };
       const verbosity = String(args.verbosity || 'full').toLowerCase();
