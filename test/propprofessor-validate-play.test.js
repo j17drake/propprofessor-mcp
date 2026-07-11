@@ -244,6 +244,25 @@ describe('validate_play handler', () => {
     assert.equal(result.driftReason, null);
   });
 
+  it('direct validate_play (no screenConsensusBookCount) does not trigger drift when re-fetched count is non-zero', async () => {
+    // Audit finding #3: a direct validate_play call (no screen snapshot) must
+    // never spuriously report consensus drift when the re-fetched row has a
+    // valid consensus. Only the symmetric case (both defined AND disagree)
+    // is drift.
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'NBA:game-1',
+      selection: 'Lakers'
+      // intentionally no screenConsensusBookCount / screenExecutionQuality
+    });
+    assert.equal(result.ok, true);
+    // The mock client returns consensusBookCount=2 — that's a real signal, not drift.
+    assert.equal(result.consensusDrift, false);
+    assert.equal(result.driftReason, null);
+  });
+
   it('surfaces typed MLB game-context lookup failures without forcing PASS', async () => {
     const handlers = createMcpHandlers({ client: makeClient() });
     handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
