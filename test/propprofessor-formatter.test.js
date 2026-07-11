@@ -161,6 +161,40 @@ describe('formatBetMinimal', () => {
     const result = formatBetMinimal(bet);
     assert.ok(result.includes('Why: Because reasons.'));
   });
+
+  it('surfaces conflictWith in the rationale (audit finding #5)', () => {
+    const bet = {
+      selection: 'Celtics +3.5',
+      game: 'Lakers vs Celtics',
+      league: 'NBA',
+      market: 'Spread',
+      odds: -110,
+      confidenceTier: 'TIER 2',
+      kaiCall: 'CONSIDER',
+      consensusEdge: 1.5,
+      conflictWith: 'Lakers -3.5',
+      conflictFlag: true
+    };
+    const result = formatBetMinimal(bet);
+    assert.ok(result.includes('Lakers -3.5'), 'opposing side must be surfaced in output');
+    assert.ok(result.includes('opposing side'), 'must explicitly say it was downgraded');
+  });
+
+  it('does not add conflict context when conflictWith is absent', () => {
+    const bet = {
+      selection: 'Celtics +3.5',
+      game: 'Lakers vs Celtics',
+      league: 'NBA',
+      market: 'Spread',
+      odds: -110,
+      confidenceTier: 'TIER 2',
+      kaiCall: 'CONSIDER',
+      consensusEdge: 1.5
+      // no conflictWith / conflictFlag
+    };
+    const result = formatBetMinimal(bet);
+    assert.ok(!result.includes('opposing side'), 'no conflict → no downgrade message');
+  });
 });
 
 // ---------------------------------------------------------------------------
