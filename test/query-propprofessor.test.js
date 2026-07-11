@@ -506,4 +506,45 @@ describe('query-propprofessor CLI command execution', () => {
     assert.equal(parsed.command, 'calibration');
     assert.equal(parsed.opts.days, '30');
   });
+
+  it('accepts --reset flag (boolean, no value)', () => {
+    const parsed = parseArgs(['node', 'query', 'presets', '--reset']);
+    assert.equal(parsed.opts.reset, true);
+  });
+});
+
+describe('query-propprofessor CLI: --reset clears score timeline (audit finding #1 defense)', () => {
+  it('main() calls clearScoreTimeline when --reset is passed', async () => {
+    // The CLI imports clearScoreTimeline at module load. Verify the wiring
+    // by intercepting the require cache: load a fresh copy of the CLI into
+    // a sandboxed require where we control the risk-score module.
+    const Module = require('module');
+    const originalLoad = Module._load;
+    const calls = [];
+    Module._load = function (request, parent, isMain) {
+      const resolved = originalLoad.call(this, request, parent, isMain);
+      if (request.endsWith('propprofessor-risk-score')) {
+        return new Proxy(resolved, {
+          get(target, prop) {
+            if (prop === 'clearScoreTimeline') {
+              return () => calls.push('cleared');
+            }
+            return target[prop];
+          }
+        });
+      }
+      return resolved;
+    };
+    try {
+      // Re-require the CLI with the proxy in place
+      delete require.cache[require.resolve('../scripts/query-propprofessor')];
+      const cli = require('../scripts/query-propprofessor');
+      const { logger } = { logger: { log() {} } };
+      await cli.main({ argv: ['node', 'query', 'presets', '--reset'], client: {}, logger });
+      assert.ok(calls.length >= 1, 'clearScoreTimeline should be called when --reset is passed');
+    } finally {
+      Module._load = originalLoad;
+      delete require.cache[require.resolve('../scripts/query-propprofessor')];
+    }
+  });
 });

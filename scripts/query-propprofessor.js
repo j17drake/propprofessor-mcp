@@ -20,6 +20,7 @@ const { rankLeagueScreenRows, getLeagueRankingPreset } = require('../lib/screen-
 const { extractScreenRows } = require('../lib/screen-parser');
 const { buildRankedScreenResponse, getDebugFlag } = require('../lib/propprofessor-mcp-ranked-screen');
 const { createMcpHandlers } = require('./propprofessor-mcp-server');
+const { clearScoreTimeline } = require('../lib/propprofessor-risk-score');
 
 const LEAGUE_ALIASES = {
   sport: null,
@@ -227,6 +228,10 @@ function parseArgs(argv) {
     } else if (arg === '--leagues') {
       opts.leagues = next;
       i += 1;
+    } else if (arg === '--reset') {
+      // Audit fix (2026-07-11): clear the module-level score timeline so a
+      // new CLI invocation starts with no cross-session vote history.
+      opts.reset = true;
     } else if (arg === '--markets') {
       opts.market = next;
       opts.markets = next;
@@ -430,6 +435,13 @@ function renderUfcCardOutput(result, logger = console) {
 
 async function main({ argv = process.argv, client = createPropProfessorClient(), logger = console } = {}) {
   const { command, opts } = parseArgs(argv);
+
+  // Audit fix (2026-07-11): --reset clears the module-level score timeline
+  // so a fresh CLI invocation starts with no cross-session tier history.
+  if (opts.reset === true) {
+    try { clearScoreTimeline(); } catch { /* defensive: never block startup */ }
+  }
+
   const screenCommand = resolveScreenCommand(command, opts);
 
   if (command === 'help') {
