@@ -1856,6 +1856,60 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return response;
     },
 
+    // ─── Smart Money ───────────────────────────────────────────────
+    // Mirrors the website's "Smart Money" page. Surfaces the $ volume
+    // (totalLiquidArb) and per-side odds range (maxArbOdds/minArbOdds)
+    // the +EV feed hides — the sharp-money signal the MCP otherwise misses.
+    async smart_money(args = {}) {
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues
+        : args.league ? [args.league]
+        : ['NBA', 'MLB', 'NHL', 'WNBA', 'NFL'];
+      const filters = {
+        leagues,
+        userState: String(args.userState || 'tx').toLowerCase(),
+        hideNCAAPlayerProps: Boolean(args.hideNCAAPlayerProps),
+        sportsbooks: Array.isArray(args.sportsbooks) && args.sportsbooks.length ? args.sportsbooks : undefined,
+        marketTypes: Array.isArray(args.marketTypes) && args.marketTypes.length ? args.marketTypes : undefined,
+        periodTypes: Array.isArray(args.periodTypes) && args.periodTypes.length ? args.periodTypes : undefined,
+        minLiquidity: Number.isFinite(Number(args.minLiquidity)) ? Number(args.minLiquidity) : 0,
+        minHoursAway: Number.isFinite(Number(args.minHoursAway)) ? Number(args.minHoursAway) : 0,
+        maxHoursAway: Number.isFinite(Number(args.maxHoursAway)) ? Number(args.maxHoursAway) : 24
+      };
+      let raw;
+      try {
+        raw = await client.querySmartMoney(filters);
+      } catch (err) {
+        return { ok: false, error: { code: 'SMART_MONEY_FAILED', message: err?.message || String(err) } };
+      }
+      const rows = Array.isArray(raw) ? raw : [];
+      const result = rows.map((r) => ({
+        gameId: r.gameId || null,
+        league: r.league || null,
+        market: r.market || null,
+        selection: r.selection || null,
+        subSelection: r.subSelection || null,
+        site: r.site || null,
+        url: r.url || null,
+        // The sharp-money signal the website shows but no other MCP tool returns.
+        volumeUsd: typeof r.totalLiquidArb === 'number' ? r.totalLiquidArb : null,
+        oddsRange:
+          Number.isFinite(Number(r.minArbOdds)) && Number.isFinite(Number(r.maxArbOdds))
+            ? { min: r.minArbOdds, max: r.maxArbOdds }
+            : null,
+        isLive: Boolean(r.isLive),
+        start: r.start || null,
+        sportsbookCount: Array.isArray(r.sportsbookData) ? r.sportsbookData.length : 0
+      }));
+      // Sort by volume descending so the biggest sharp action surfaces first.
+      result.sort((a, b) => (b.volumeUsd || 0) - (a.volumeUsd || 0));
+      return {
+        ok: true,
+        count: result.length,
+        result,
+        resultMeta: { leagues, volumeTotalUsd: result.reduce((s, r) => s + (r.volumeUsd || 0), 0) }
+      };
+    },
+
     // quick_screen: Accepts any book(s) via the `books` param and runs
     // sharp_plays + player_context for each (league, market) pair.
     // Defaults to ['NoVigApp'].
