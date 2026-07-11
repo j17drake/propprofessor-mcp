@@ -7,8 +7,10 @@ const {
   calculateRiskScore,
   getConfidenceTier,
   getConfidenceTierStable,
+  getKaiCall,
   clearTierCache,
-  clearScoreTimeline
+  clearScoreTimeline,
+  tierCacheKey
 } = require('../lib/propprofessor-risk-score');
 
 describe('gradeRiskToTierAndCall — unified lookup', () => {
@@ -484,6 +486,41 @@ describe('tier hysteresis cache — per-call reset contract', () => {
     clearTierCache();
     const fresh = getConfidenceTierStable(baseItem());
     assert.equal(fresh, 'TIER 1');
+  });
+});
+
+describe('tierCacheKey — distinct keys for distinct plays (audit finding #1)', () => {
+  it('two different totals lines on the same game produce different keys', () => {
+    const under166 = { row: { gameId: 'NBA:PREMATCH:LAL:BOS:1234', selection: 'Under', market: 'Total', league: 'NBA', line: 166.5 } };
+    const under168 = { row: { gameId: 'NBA:PREMATCH:LAL:BOS:1234', selection: 'Under', market: 'Total', league: 'NBA', line: 168.5 } };
+    const k1 = tierCacheKey(under166);
+    const k2 = tierCacheKey(under168);
+    assert.notEqual(k1, k2, 'different lines must produce different cache keys');
+  });
+
+  it('two different spreads on the same game produce different keys', () => {
+    const a = { row: { gameId: 'NBA:PREMATCH:LAL:BOS:1234', selection: 'Lakers', market: 'Spread', league: 'NBA', line: -3.5 } };
+    const b = { row: { gameId: 'NBA:PREMATCH:LAL:BOS:1234', selection: 'Lakers', market: 'Spread', league: 'NBA', line: -4.5 } };
+    assert.notEqual(tierCacheKey(a), tierCacheKey(b));
+  });
+
+  it('playId is the canonical key when present (line baked in)', () => {
+    const a = { row: { playId: 'NBA:PREMATCH:LAL:BOS:1234::Total::Under 166.5' } };
+    const b = { row: { playId: 'NBA:PREMATCH:LAL:BOS:1234::Total::Under 168.5' } };
+    const ka = tierCacheKey(a);
+    const kb = tierCacheKey(b);
+    assert.ok(ka && ka.startsWith('playId:'), 'playId keys are prefixed playId:');
+    assert.notEqual(ka, kb);
+  });
+
+  it('returns null when both gameId and playId are missing (no matchup fallback)', () => {
+    const noKey = { row: { awayTeam: 'LAL', homeTeam: 'BOS', selection: 'Under', market: 'Total', league: 'NBA' } };
+    assert.equal(tierCacheKey(noKey), null, 'must not fall back to matchup string (collision risk)');
+  });
+
+  it('returns null when selection is missing even if gameId is present', () => {
+    const noSel = { row: { gameId: 'NBA:PREMATCH:LAL:BOS:1234', market: 'Total', league: 'NBA' } };
+    assert.equal(tierCacheKey(noSel), null);
   });
 });
 
