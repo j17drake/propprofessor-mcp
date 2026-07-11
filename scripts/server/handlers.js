@@ -693,6 +693,36 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       error.status = 400;
       throw error;
     }
+    // When no market is requested, fan out across the league's default
+    // markets (Moneyline/Spread/Total, or soccer variants) and merge — so
+    // the agent gets every market line for a game (incl. the sharp Total
+    // the website's +EV feed hides) in one call instead of N.
+    if (!args.market) {
+      const markets = getDefaultMarketsForLeague(league);
+      const perMarket = await Promise.all(
+        markets.map((m) => runGetPlayDetailsImpl(client, { ...args, market: m }))
+      );
+      const combined = [];
+      const metaList = [];
+      for (const r of perMarket) {
+        if (r && Array.isArray(r.result)) combined.push(...r.result);
+        if (r && r.resultMeta) metaList.push(r.resultMeta);
+      }
+      const merged = {
+        ok: true,
+        result: combined,
+        resultMeta: {
+          queryGameIds: gameIds,
+          matchedRows: combined.length,
+          marketsQueried: markets,
+          perMarket: metaList
+        }
+      };
+      const verbosity = String(args.verbosity || 'full').toLowerCase();
+      if (verbosity === 'minimal') return formatGetPlayDetailsMinimal(merged);
+      if (verbosity === 'standard') return formatGetPlayDetailsStandard(merged);
+      return merged;
+    }
     const marketResolution = resolveMarkets(args, league);
     let market = marketResolution.single;
     const requestedBooks = normalizeBookList(args.books);
