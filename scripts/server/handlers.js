@@ -996,7 +996,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     //   3. Strip "Over "/"Under " prefix and re-try (total case).
     //   4. Fall back to home/away includes.
     const detailRows = Array.isArray(detailResult?.result) ? detailResult.result : [];
-    const matchingRow = findBestMatch(detailRows, selection, requestedPlayId);
+    const matchingRow = findBestMatch(detailRows, selection, requestedPlayId, books[0] || '');
 
     // If research was started before we had the row, re-run it with
     // gameTime now that we know the start. Skip the round-trip when the

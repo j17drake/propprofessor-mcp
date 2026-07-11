@@ -106,6 +106,64 @@ test('nested selection match', () => {
   assert.strictEqual(result.gameId, 'nested');
 });
 
+test('nested total container must not return wrong-line odds (166.5 vs 173.5)', () => {
+  // Repro of the 2026-07-11 WNBA bug: get_play_details returns one container row
+  // per market (participant "Under 173.5", odds -143) with every line nested
+  // under selections[]. A request for "Under 166.5" must NOT resolve to the
+  // container's -143 — it must yield 166.5's own odds (+125).
+  const rows = [
+    {
+      gameId: 'wnba-aces-mercury',
+      participant: 'Under 173.5',
+      selection: 'Under 173.5',
+      odds: -143,
+      consensusBookCount: 9,
+      executionQuality: 'best',
+      selections: {
+        '166.5': {
+          selection1: 'Over 166.5',
+          selection2: 'Under 166.5',
+          odds: {
+            NoVigApp: { book: 'NoVigApp', odds1: -163, odds2: 125, liquidity1: 841, liquidity2: 442 }
+          }
+        },
+        '173.5': {
+          selection1: 'Over 173.5',
+          selection2: 'Under 173.5',
+          odds: {
+            NoVigApp: { book: 'NoVigApp', odds1: 138, odds2: -143, liquidity1: 0, liquidity2: 0 }
+          }
+        }
+      }
+    }
+  ];
+  const result = findBestMatch(rows, 'Under 166.5', '', 'NoVigApp');
+  assert.ok(result, 'expected a match');
+  assert.strictEqual(result.selection, 'Under 166.5', 'selection must be the exact requested line, not the container');
+  assert.strictEqual(result.odds, 125, 'odds must be 166.5 Under (+125), NOT the container 173.5 (-143)');
+  assert.strictEqual(result.consensusBookCount, 9, 'consensus/edge context from container is preserved');
+});
+
+test('nested total where request IS the container line returns the row as-is', () => {
+  const rows = [
+    {
+      gameId: 'g1',
+      participant: 'Under 173.5',
+      odds: -143,
+      selections: {
+        '173.5': {
+          selection1: 'Over 173.5',
+          selection2: 'Under 173.5',
+          odds: { NoVigApp: { book: 'NoVigApp', odds1: 138, odds2: -143 } }
+        }
+      }
+    }
+  ];
+  const result = findBestMatch(rows, 'Under 173.5', '', 'NoVigApp');
+  assert.strictEqual(result.odds, -143, 'container line matches as-is');
+  assert.strictEqual(result.nestedMatchLine, undefined, 'no synthetic row when line == container');
+});
+
 test('home team includes fallback', () => {
   const rows = [{ homeTeam: 'Lakers', awayTeam: 'Celtics', gameId: 'lal-bos' }];
   const result = findBestMatch(rows, 'Celtics');
