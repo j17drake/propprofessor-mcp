@@ -1227,7 +1227,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             freshnessSource: matchingRow.freshnessSource || null,
             movementLabel: matchingRow.movementLabel,
             kaiCall: matchingRow.kaiCall,
-            screenScore: matchingRow.screenScore
+            screenScore: matchingRow.screenScore,
+            screenUrl:
+              `https://app.propprofessor.com/screen?market=${encodeURIComponent(market)}` +
+              `&game=${encodeURIComponent(gameId)}` +
+              `&league=${encodeURIComponent(league)}` +
+              `&participant=${encodeURIComponent(selection)}`
           }
         : null,
       research: research

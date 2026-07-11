@@ -178,6 +178,24 @@ describe('validate_play handler', () => {
     assert.equal(typeof result.screenFreshness.oldestAgeMs, 'number');
   });
 
+  it('includes a clickable screenUrl deep-link for resolved plays', async () => {
+    const handlers = createMcpHandlers({ client: makeClient() });
+    handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'NBA:game-1',
+      selection: 'Lakers',
+      book: 'NoVigApp'
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(result.play, 'play should be resolved');
+    assert.match(
+      result.play.screenUrl,
+      /^https:\/\/app\.propprofessor\.com\/screen\?market=Moneyline&game=NBA%3Agame-1&league=NBA&participant=Lakers$/
+    );
+  });
+
   it('prefers playId when matching a validate_play row', async () => {
     const handlers = createMcpHandlers({ client: makeClient() });
     handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
