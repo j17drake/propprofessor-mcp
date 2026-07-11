@@ -862,6 +862,41 @@ describe('game-conflict resolution (resolveGameConflicts)', () => {
     assert.equal(out[1].conflictFlag, undefined);
   });
 
+  it('audit finding #6: missing consensusEdge loses to a real-edge opposing side (not the other way around)', () => {
+    // Previously `?? -999` made missing-edge the WORST possible pick, so a
+    // TIER 1 missing-edge side would lose to a TIER 3 with real edge. Now
+    // missing sorts below any real edge, but a TIER 1 missing-edge still
+    // beats a TIER 3 real-edge (because tier is the primary sort key).
+    const ranked = [
+      {
+        gameId: 'NBA:edge1',
+        game: 'Lakers vs Celtics',
+        selection: 'Lakers',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 1',
+        kaiCall: 'BET'
+        // no consensusEdge
+      },
+      {
+        gameId: 'NBA:edge1',
+        game: 'Lakers vs Celtics',
+        selection: 'Celtics',
+        market: 'Moneyline',
+        confidenceTier: 'TIER 2',
+        kaiCall: 'CONSIDER',
+        consensusEdge: 0.5,
+        screenScore: 5
+      }
+    ];
+    const out = resolveGameConflicts(ranked);
+    const lakers = out.find((r) => r.selection === 'Lakers');
+    const celtics = out.find((r) => r.selection === 'Celtics');
+    assert.equal(lakers.confidenceTier, 'TIER 1', 'TIER 1 with missing edge still wins the conflict');
+    assert.equal(lakers.conflictFlag, undefined, 'winner is not flagged');
+    assert.equal(celtics.confidenceTier, 'TIER 3', 'TIER 2 with real edge gets demoted one tier');
+    assert.equal(celtics.conflictWith, 'Lakers', 'points at the missing-edge winner');
+  });
+
   it('ignores totals — Under 168.5 and Under 171.5 on the same game are not conflicting sides', () => {
     const ranked = [
       {
