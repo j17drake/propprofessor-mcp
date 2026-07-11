@@ -724,6 +724,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       ? ALL_SCREEN_BOOKS
       : uniqueBooks([...requestedBooks, ...sharpBookSetDetail]);
 
+    // excludeBooks lets the agent mirror the website's account Settings
+    // (Hide Offshore Books / Hide Sweepstakes / per-book hides) so MCP odds
+    // match what the user sees. Off by default — pass the account's hidden
+    // book set to filter them out before the backend query + ranking.
+    const excludeSet = new Set(normalizeBookList(args.excludeBooks).map((b) => b.toLowerCase()));
+    const applyExcludes = (list) =>
+      excludeSet.size ? list.filter((b) => !excludeSet.has(String(b).toLowerCase())) : list;
+    const augmentedBooksExcluded = applyExcludes(augmentedBooks);
+
     // Fetch full screen data (with history hydration — this is the detailed view)
     let payload;
     try {
@@ -732,7 +741,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         league,
         games: gameIds,
         participants: [],
-        books: augmentedBooks,
+        books: augmentedBooksExcluded,
         is_live: false
       });
     } catch (err) {
@@ -756,7 +765,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       response = await buildRankedScreenResponseShared({
         client,
         payloads: [payload],
-        args: { ...args, compact: false, skipHistory: false, historySportsbooks: augmentedBooks },
+        args: { ...args, compact: false, skipHistory: false, historySportsbooks: augmentedBooksExcluded },
         league,
         focusBook,
         rankRows: (hydratedRows, { debug } = {}) =>
@@ -3320,16 +3329,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const league = args.league || 'NBA';
       const marketResolution = resolveMarkets(args, league);
       const market = marketResolution.single;
+      // excludeBooks mirrors the website's "Hide Offshore Books" / "Hide
+      // Sweepstakes" account settings so line-shopping skips those books.
+      const excludeSet = new Set(normalizeBookList(args.excludeBooks).map((b) => b.toLowerCase()));
+      const includeBooks = Array.isArray(args.books) ? args.books : undefined;
+      const queryBooks = includeBooks
+        ? excludeSet.size
+          ? includeBooks.filter((b) => !excludeSet.has(String(b).toLowerCase()))
+          : includeBooks
+        : includeBooks;
       const payload = await client.queryScreenOddsBestComps({
         market,
         league,
         games: Array.isArray(args.games) ? args.games : [],
         participants: Array.isArray(args.participants) ? args.participants : [],
-        books: Array.isArray(args.books) ? args.books : undefined,
+        books: queryBooks,
         is_live: false
       });
       const rows = extractScreenRows(payload);
-      const result = findBestPrice(rows, { game: args.game, market, selection: args.selection, books: args.books });
+      const result = findBestPrice(rows, { game: args.game, market, selection: args.selection, books: queryBooks });
       if (marketResolution.aliasesUsed.length) {
         result.markets_alias_used = marketResolution.aliasesUsed;
       }
