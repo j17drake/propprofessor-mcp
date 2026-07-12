@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+**Tool consolidation (33→30) + response cache + agent self-documentation.**
+
+### What changed
+- **Tool consolidation.** `recommended_bets`, `sharp_plays`, `tonight_bets` folded into `quick_screen` mode presets (`mode: 'recommended'|'sharp'|'tonight'`). 33→30 registered tools. All stale references removed from README, docs, tests, and handlers.
+- **Response cache.** `quick_screen` now caches aggregate responses — repeat calls with identical args return instantly (<5ms) instead of re-fanning out across leagues. Validation bypasses cache.
+- **Self-documenting tools.** Top 5 tools now include `PITFALL` hints in their descriptions so agents learn footguns from `tools/list` without a pre-loaded skill.
+- **`get_started` overhaul.** Replaced 120-line static prose workflows with concise numbered agent prompts (4-8 steps per user type) + a `pitfall` field. Preserved `honest_scope` + `edge_cases`.
+- **`llms.txt`.** Added at repo root for AI agent discovery.
+- **`install:verify`.** `npm run install:verify` runs 53 non-API tests in <1s with no credentials.
+- **Dead code removal.** `tonight_bets` handler deleted (zero callers). `ask()` fallback and `daily-snapshot.js` now route through `quick_screen(mode='recommended')`.
+
+### Migration notes
+`recommended_bets`, `sharp_plays`, and `tonight_bets` are no longer registered tools. Use `quick_screen` with the `mode` parameter instead:
+- `recommended_bets({ leagues, book })` → `quick_screen({ mode: 'recommended', leagues, book })`
+- `sharp_plays({ league, market })` → `quick_screen({ mode: 'sharp', leagues: [league], markets: [market] })`
+- `tonight_bets({ book })` → `quick_screen({ mode: 'tonight', book })`
+
 **Sharp-play alerts (on-demand) + authoritative `finalVerdict`.**
 
 ### What changed

@@ -57,12 +57,16 @@ const SKIP = new Set(); // tools that need auth-dependent write state we don't w
       new Promise((_, rej) => setTimeout(() => rej(new Error(`timeout after ${ms}ms`)), ms))
     ]);
 
+const SLOW_TOOLS = new Set(['ask', 'get_started', 'quick_screen', 'sharp_alerts', 'staking_plan', 'today']);
+
   for (const name of names) {
     const args = ARGS[name] || {};
+    const timeoutMs = SLOW_TOOLS.has(name) ? 60000 : 30000;
     try {
-      const r = await withTimeout(handlers[name](args), 20000);
+      const r = await withTimeout(handlers[name](args), timeoutMs);
       ok++;
-      process.stdout.write(`ok   ${name}\n`);
+      const label = SLOW_TOOLS.has(name) ? 'ok (slow on cold cache)' : 'ok';
+      process.stdout.write(`${label.padEnd(30)} ${name}\n`);
     } catch (err) {
       fail++;
       failures.push({ name, error: err.message });

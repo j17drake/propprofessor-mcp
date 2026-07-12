@@ -1,0 +1,30 @@
+# PropProfessor MCP
+
+A Model Context Protocol server that gives AI agents access to sharp sports betting signal — live odds across 36 sportsbooks, consensus edge detection, sharp money movement tracking, and player injury research.
+
+## Quick start
+- Install: `npm install -g propprofessor-mcp`
+- Auth: `node scripts/pp-login.js` (one-time browser login)
+- Wire: add to your MCP client config
+- Verify: `npm run install:verify` (53 tests, no credentials needed, <1s)
+
+## Key tools for agents
+- `today()` — one-call: sharp slate + your pending picks + recent stats
+- `ask({ query })` — natural language router (e.g. "best WNBA plays tonight")
+- `quick_screen({ book, leagues })` — scan all leagues × markets with sharp consensus
+- `validate_play({ league, gameId, playId, market })` — BET/CONSIDER/PASS verdict
+- `place_bet({ league, gameId, playId, selection, market, book, stake })` — validate + log
+- `resolve_pick({ id, result })` — settle after game ends
+- `get_started({ user_type })` — concise agent prompt for casual/intermediate/sharp
+
+## Critical pitfalls
+- Always pass `playId` to `validate_play` — bare selection strings can fail with lookup_failed
+- Market names vary by league (e.g. WNBA "Total Points", Soccer "Draw No Bet")
+- First `quick_screen` call is slow (multi-league fan-out) — repeat calls hit cache
+- tier/kaiCall/edge/screenScore are signal-quality ratings, NOT win-probability predictions
+- Use `get_market_registry({ sport })` to discover correct market names for your league+book combo
+
+## More info
+- README: https://github.com/j17drake/propprofessor-mcp#readme
+- Agent guide: docs/agent-guide.md
+- Backtesting: docs/BACKTESTING.md
