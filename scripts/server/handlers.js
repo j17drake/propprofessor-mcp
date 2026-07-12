@@ -77,6 +77,7 @@ const {
 const { resolveHistoryForEntity } = require('../../lib/propprofessor-history');
 const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
 const { computeMovementDisposition } = require('../../lib/propprofessor-movement-disposition');
+const { reconcileValidateOverride } = require('../../lib/validate-reconcile');
 const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
 const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
 const {
@@ -422,10 +423,24 @@ function applyValidatedFields(target, validationResult) {
   // was built on a consensus that evaporated between screen and validate.
   target.validatedConsensusDrift = Boolean(validationResult.consensusDrift);
   target.validatedDriftReason = validationResult.driftReason || null;
-  target.validatedMovementDisposition = verdict.movementDisposition || target.movementDisposition;
+  // Reconcile the validate re-derivation against the screen snapshot. The
+  // validate path re-fetches and re-derives executionQuality + movementDisposition
+  // a few seconds later; it must NOT silently override a clean screen signal
+  // unless consensus actually drifted (a real, explainable change). See
+  // lib/validate-reconcile.js.
+  const reconcile = reconcileValidateOverride({
+    screenExec: target.executionQuality,
+    screenDisposition: target.movementDisposition,
+    validateExec: play.executionQuality || target.executionQuality,
+    validateDisposition: verdict.movementDisposition || target.movementDisposition,
+    consensusDrift: Boolean(validationResult.consensusDrift)
+  });
+  target.validatedMovementDisposition = reconcile.movementDisposition;
+  target.validatedExecQuality = reconcile.executionQuality;
+  target.validatedReconcileOverridden = reconcile.overridden;
+  target.validatedReconcileReason = reconcile.reason;
   target.validatedRiskFlags = verdict.riskFlags || [];
   target.validatedActionableSummary = verdict.actionableSummary || null;
-  target.validatedExecQuality = play.executionQuality || target.executionQuality;
   target.validatedConsensusSupport = verdict.consensusSupport || null;
 
   if (gameCtx) {
@@ -458,7 +473,9 @@ function applyFinalVerdict(target) {
   let verdict = validatedVerdict || target.displayTier || target.kaiCall || 'PASS';
 
   const riskFlags = target.validatedRiskFlags || [];
-  const execBad = target.validatedExecQuality === 'bad';
+  // A 'bad' that was reconciled back to the screen signal (overridden, no
+  // drift) is NOT a real execution failure — do not hard-PASS on it.
+  const execBad = target.validatedExecQuality === 'bad' && target.validatedReconcileOverridden !== true;
   if ((riskFlags.includes('movement adverse') || execBad) && verdict === 'BET') {
     verdict = 'PASS';
   }
@@ -523,6 +540,65 @@ function promoteFinalVerdictToDisplay(target) {
   if (target.finalConfidenceTier) {
     target.confidenceTier = target.finalConfidenceTier;
   }
+}
+
+/**
+ * Strip heavy post-validation fields from the quick_screen response when
+ * lite=true. The lite 'fields' array only controls screen_ranked output;
+ * validatedGameContext, redundant validatedEdge/Clv/Odds, and the separate
+ * research array are appended after that pass and balloon the payload even
+ * in lite mode (4 leagues × 19 candidates = ~118K chars, truncated).
+ *
+ * This function collapses research into the candidate rows directly and
+ * drops objects that duplicate what validatedActionableSummary already says.
+ */
+function stripLiteResponse(response) {
+  // 1. Collapse research into candidates: look up each row's risk info
+  //    and attach it inline, then drop the separate research array.
+  const researchByGame = new Map();
+  for (const r of response.research || []) {
+    if (r.player && r.game) {
+      researchByGame.set(`${r.game}:${r.player.toLowerCase()}`, r);
+    }
+  }
+  for (const entry of response.results || []) {
+    for (const c of entry.candidates || []) {
+      const player = (c.selection || '').toLowerCase();
+      const game = c.game || '';
+      const key = `${game}:${player}`;
+      const research = researchByGame.get(key);
+      if (research) {
+        c.riskFlag = research.riskFlag || c.riskFlag || null;
+        c.riskSummary = research.riskSummary || c.riskSummary || null;
+      }
+      // Strip heavy validated bloat — actionableSummary already captures the signal.
+      delete c.validatedGameContext;
+      delete c.validatedEdge;
+      delete c.validatedClv;
+      delete c.validatedOdds;
+      delete c.priceDrift;
+      delete c.finalWarnings;
+      delete c.screenUrl;
+      delete c.rationale;
+      // validatedConsensusSupport is a free-text string, keep it (small).
+      // validatedUnverified, validatedConsensusDrift, validatedDriftReason:
+      // keep them — they're compact flags the agent needs.
+    }
+  }
+  // 2. Drop the separate research array (now inlined on candidates).
+  response.research = undefined;
+  // 3. Trim activeSlate to per-league summaries instead of per-market entries.
+  if (Array.isArray(response.activeSlate)) {
+    const leagueCounts = {};
+    for (const s of response.activeSlate) {
+      leagueCounts[s.league] = (leagueCounts[s.league] || 0) + (s.count || 0);
+    }
+    response.activeSlate = Object.entries(leagueCounts).map(([league, count]) => ({
+      league,
+      count
+    }));
+  }
+  return response;
 }
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
@@ -2456,6 +2532,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       else if (verbosity === 'standard') formattedResponse = formatQuickScreenStandard(screenResponse);
       else formattedResponse = screenResponse;
 
+      // lite: strip post-validation bloat AND collapse research inline.
+      // The lite fields array only controls screen_ranked; validatedGameContext,
+      // validatedEdge/Odds, and the separate research array blow up the payload
+      // (4 leagues × 19 candidates = ~118K, truncated). This pass drops ~60%
+      // of the response size while keeping every actionable field.
+      if (lite && formattedResponse.ok) {
+        stripLiteResponse(formattedResponse);
+      }
+
       if (args._aggregateCacheKey && formattedResponse.ok) {
         responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs);
       }
@@ -4012,4 +4097,4 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   return handlers;
 }
 
-module.exports = { createMcpHandlers, mapWithConcurrency };
+module.exports = { createMcpHandlers, mapWithConcurrency, applyValidatedFields, applyFinalVerdict };
