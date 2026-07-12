@@ -1996,6 +1996,31 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         ];
       }
 
+      // === response cache (aggregate level) ===
+      // Cache the FULL quick_screen response keyed on the request shape.
+      // Per-league screen_ranked calls are already cached individually, but
+      // the fan-out loop still burns time iterating leagues. This cache
+      // short-circuits the entire call when args haven't changed.
+      // Bypassed when validate:true (must re-fetch for fresh validation).
+      const canCacheAggregate = !args.validate;
+      if (canCacheAggregate) {
+        const aggregateCacheKey = JSON.stringify({
+          _qs: 1,
+          leagues: (leagues || []).slice().sort(),
+          markets: (markets || []).slice().sort(),
+          books: (targetBooks || []).slice().sort(),
+          limit,
+          cardWindow: args.cardWindow || 'today'
+        });
+        const cached = responseCache.get(aggregateCacheKey);
+        if (cached) {
+          return { ...cached, resultMeta: { ...cached.resultMeta, cached: true } };
+        }
+        // Store the key on a temp so the return path can cache the response
+        args._aggregateCacheKey = aggregateCacheKey;
+      }
+      // === end response cache ===
+
       const allAliasesUsed = [];
 
       const resolvedMarketsByLeague = {};
@@ -2426,9 +2451,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
       // Apply verbosity formatting
       const verbosity = String(args.verbosity || 'full').toLowerCase();
-      if (verbosity === 'minimal') return formatQuickScreenMinimal(screenResponse);
-      if (verbosity === 'standard') return formatQuickScreenStandard(screenResponse);
-      return screenResponse;
+      let formattedResponse;
+      if (verbosity === 'minimal') formattedResponse = formatQuickScreenMinimal(screenResponse);
+      else if (verbosity === 'standard') formattedResponse = formatQuickScreenStandard(screenResponse);
+      else formattedResponse = screenResponse;
+
+      if (args._aggregateCacheKey && formattedResponse.ok) {
+        responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs);
+      }
+      return formattedResponse;
     },
 
     // ─── Betting ────────────────────────────────────────────────────
