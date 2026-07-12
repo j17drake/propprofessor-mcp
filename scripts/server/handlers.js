@@ -3600,7 +3600,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
 
       const result = await handlers.recommended_bets({
-        ...(parsed.league ? { leagues: [parsed.league] } : {}),
+        ...(parsed.league ? { leagues: [parsed.league] } : { leagues: ['WNBA', 'NBA', 'MLB', 'NFL'] }),
         ...(parsed.market ? { markets: [parsed.market] } : {})
       });
       return {
