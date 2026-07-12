@@ -11,22 +11,12 @@ describe('verbosity parameter in tool definitions', () => {
   const VERBOSITY_ENUM = ['minimal', 'standard', 'full'];
 
   const toolsWithVerbosity = [
-    'recommended_bets',
-    'sharp_plays',
     'screen_ranked',
     'all_slates',
     'staking_plan',
     'ev_candidates',
     'ufc_card'
   ];
-
-  it('should define verbosity param on recommended_bets', () => {
-    const tool = toolMap['recommended_bets'];
-    assert.ok(tool, 'recommended_bets tool should exist');
-    assert.ok(tool.inputSchema.properties.verbosity, 'verbosity param should exist');
-    assert.deepStrictEqual(tool.inputSchema.properties.verbosity.enum, VERBOSITY_ENUM);
-    assert.strictEqual(tool.inputSchema.properties.verbosity.type, 'string');
-  });
 
   it('should have correct enum values for verbosity', () => {
     for (const name of toolsWithVerbosity) {

@@ -31,26 +31,6 @@ const RESPONSE_SCHEMAS = {
       resultMeta: { type: 'object' }
     }
   },
-  recommended_bets: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      totalRecommended: { type: 'integer' },
-      summary: { type: 'string' },
-      leagues: { type: 'array', items: { type: 'object' } },
-      emptyLeagues: { type: 'array', items: { type: 'string' } },
-      tierFilter: { type: 'array', items: { type: 'string' } }
-    }
-  },
-  sharp_plays: {
-    type: 'object',
-    properties: {
-      ok: { type: 'boolean' },
-      count: { type: 'integer' },
-      result: { type: 'array', items: { type: 'object' } },
-      resultMeta: { type: 'object' }
-    }
-  },
   sharp_consensus: {
     type: 'object',
     properties: {
