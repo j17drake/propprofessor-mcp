@@ -35,26 +35,24 @@ describe('get_started tool definition', () => {
 describe('get_started handler', () => {
   const handlers = createMcpHandlers();
 
-  it('returns workflow for casual user type', async () => {
+  it('returns prompt for casual user type', async () => {
     const result = await handlers.get_started({ user_type: 'casual' });
     assert.ok(result.summary);
-    assert.ok(Array.isArray(result.steps));
-    assert.ok(result.steps.length > 0);
-    assert.ok(Array.isArray(result.tools_to_use));
-    assert.ok(result.tools_to_use.includes('quick_screen'));
-    assert.ok(Array.isArray(result.avoid));
-    assert.ok(result.avoid.includes('sharp_consensus'));
-    assert.ok(result.avoid.includes('sharp_consensus'));
+    assert.ok(Array.isArray(result.prompt));
+    assert.ok(result.prompt.length > 0);
+    assert.ok(Array.isArray(result.key_tools));
+    assert.ok(result.key_tools.includes('quick_screen'));
+    assert.ok(typeof result.pitfall === 'string');
   });
 
-  it('returns workflow for sharp user type', async () => {
+  it('returns prompt for sharp user type', async () => {
     const result = await handlers.get_started({ user_type: 'sharp' });
     assert.ok(result.summary);
-    assert.ok(Array.isArray(result.steps));
-    assert.ok(result.tools_to_use.includes('quick_screen'));
-    assert.ok(result.tools_to_use.includes('sharp_consensus'));
-    assert.ok(result.tools_to_use.includes('staking_plan'));
-    assert.deepEqual(result.avoid, []);
+    assert.ok(Array.isArray(result.prompt));
+    assert.ok(result.key_tools.includes('quick_screen'));
+    assert.ok(result.key_tools.includes('sharp_consensus'));
+    assert.ok(result.key_tools.includes('staking_plan'));
+    assert.ok(typeof result.pitfall === 'string');
   });
 
   it('defaults to intermediate when user_type is missing', async () => {
@@ -68,24 +66,23 @@ describe('get_started handler', () => {
   });
 
   it('each workflow has all required fields', async () => {
-      for (const userType of ['casual', 'intermediate', 'sharp']) {
-        const result = await handlers.get_started({ user_type: userType });
-        assert.ok(typeof result.summary === 'string', `${userType} should have summary string`);
-        assert.ok(Array.isArray(result.steps), `${userType} should have steps array`);
-        assert.ok(result.steps.length >= 2, `${userType} should have at least 2 steps`);
-        assert.ok(Array.isArray(result.tools_to_use), `${userType} should have tools_to_use array`);
-        assert.ok(result.tools_to_use.length >= 1, `${userType} should recommend at least 1 tool`);
-        assert.ok(Array.isArray(result.avoid), `${userType} should have avoid array`);
-      }
-    });
+    for (const userType of ['casual', 'intermediate', 'sharp']) {
+      const result = await handlers.get_started({ user_type: userType });
+      assert.ok(typeof result.summary === 'string', `${userType} should have summary string`);
+      assert.ok(Array.isArray(result.prompt), `${userType} should have prompt array`);
+      assert.ok(result.prompt.length >= 2, `${userType} should have at least 2 steps`);
+      assert.ok(Array.isArray(result.key_tools), `${userType} should have key_tools array`);
+      assert.ok(result.key_tools.length >= 1, `${userType} should recommend at least 1 tool`);
+      assert.ok(typeof result.pitfall === 'string', `${userType} should have pitfall string`);
+    }
+  });
 
-    it('appends a today_briefing field (live or graceful error)', async () => {
-      const result = await handlers.get_started({ user_type: 'intermediate' });
-      assert.ok('today_briefing' in result, 'get_started should attach a today_briefing block');
-      // today() failure must not break get_started — it returns {ok:false,error}
-      assert.ok(
-        result.today_briefing && typeof result.today_briefing === 'object',
-        'today_briefing should always be an object'
-      );
-    });
+  it('appends a today_briefing field (live or graceful error)', async () => {
+    const result = await handlers.get_started({ user_type: 'intermediate' });
+    assert.ok('today_briefing' in result, 'get_started should attach a today_briefing block');
+    assert.ok(
+      result.today_briefing && typeof result.today_briefing === 'object',
+      'today_briefing should always be an object'
+    );
+  });
 });

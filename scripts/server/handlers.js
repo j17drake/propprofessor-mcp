@@ -3651,123 +3651,43 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const workflows = {
         casual: {
           summary: 'For casual bettors who just want top picks.',
-          steps: [
-            'Call quick_screen with kaiCall=["BET"] and sortBy="start" to get only Bet-tier plays ordered by soonest game. Use verbosity="minimal" for plain English.',
-            'Present the top 3-5 plays to the user.',
-            'If they want more detail on a specific play, call player_context to check injury risk.'
+          prompt: [
+            '1. Call today({ leagues: [...], book: "NoVigApp" }) for a one-call briefing — sharp slate + your pending picks + recent stats.',
+            '2. For quick picks: quick_screen({ book: "NoVigApp", kaiCall: ["BET"], sortBy: "start", verbosity: "minimal" }). Present the top 3-5 plays.',
+            '3. Before recommending: player_context({ player, sport }) for injury/availability flags.',
+            '4. Skip sharp_consensus and ev_candidates — those are for advanced users.'
           ],
-          tools_to_use: ['quick_screen', 'player_context'],
-          avoid: ['sharp_consensus', 'ev_candidates'],
-          tool_descriptions: [
-            {
-              name: 'quick_screen',
-              one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
-              when_to_call:
-                'Default starting point. Use kaiCall=["BET"] to filter to strong plays, sortBy="start" to order by game time, verbosity="minimal" for quick English picks.'
-            },
-            {
-              name: 'player_context',
-              one_liner: 'Injury / availability check for a specific player.',
-              when_to_call: 'After quick_screen returns a play you want to validate before showing the user.'
-            }
-          ]
+          key_tools: ['today', 'quick_screen', 'player_context'],
+          pitfall: 'tier/kaiCall/edge are signal-quality ratings, not win predictions. TIER 1 means sharp books agree — it does not mean the side will win.'
         },
         intermediate: {
-          summary: 'For bettors who understand edge and tier but want guidance.',
-          steps: [
-            'Call quick_screen with kaiCall=["BET", "CONSIDER"] and sortBy="start" to get structured plays ordered by soonest game. Use verbosity="standard" for edge, tier, risk, and research in one call.',
-            'If riskScore >= 7, warn the user.',
-            'For largest edge regardless of game time, use sortBy="edge" (default direction: desc).',
-            'Optionally call find_best_price to line shop.',
-            'For each top play, call player_context to check injury risk.'
+          summary: 'For bettors who understand edge and tier.',
+          prompt: [
+            '1. Call today() for a one-call briefing (slate + your pending picks + stats).',
+            '2. For deeper scanning: quick_screen({ leagues: [...], book: "NoVigApp", kaiCall: ["BET"], sortBy: "start", verbosity: "standard" }).',
+            '3. Before recommending any play: validate_play({ league, gameId, playId, market, book }) — always pass playId from the screen row.',
+            '4. Check player_context({ player, sport }) for injury flags on final picks.',
+            '5. Optionally: find_best_price({ league, market, game, selection }) to line-shop.',
+            '6. To bet: place_bet({ league, gameId, playId, selection, market, book, stake }). It validates first and rejects PASS plays.',
+            '7. After games settle: resolve_pick({ id, result }) for each logged pick.'
           ],
-          tools_to_use: ['quick_screen', 'player_context', 'find_best_price', 'league_presets'],
-          avoid: ['sharp_consensus'],
-          tool_descriptions: [
-            {
-              name: 'quick_screen',
-              one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
-              when_to_call:
-                'Default starting point. Use verbosity="standard" for structured plays with edge, tier, risk, and research. Use kaiCall=["BET"] to filter to strong plays. Use sortBy="start" to order by game time, or sortBy="edge" for largest edge first.'
-            },
-            {
-              name: 'validate_play',
-              one_liner:
-                'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
-              when_to_call:
-                'End-of-pipeline validation before recommending. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.'
-            },
-            {
-              name: 'find_best_price',
-              one_liner: 'Line-shop a specific play across all books.',
-              when_to_call: 'When the user has a book in mind and wants the best execution price.'
-            },
-            {
-              name: 'player_context',
-              one_liner: 'Injury / availability check.',
-              when_to_call: 'When validate_play is unavailable or you want a deeper injury scan.'
-            }
-          ]
+          key_tools: ['today', 'quick_screen', 'validate_play', 'player_context', 'place_bet', 'resolve_pick', 'find_best_price'],
+          pitfall: 'Always pass playId to validate_play — bare selection strings fail. Use league-specific market names (get_market_registry for the mapping).'
         },
         sharp: {
-          summary: 'For sharp bettors who want full control and movement data.',
-          steps: [
-            'Call quick_screen with kaiCall=["BET"] and sortBy="start" to get Bet-only plays ordered by soonest game. Use verbosity="full" for complete data — edge, tier, risk, line history, and research.',
-            'For lowest risk first, use sortBy="riskScore" (default: asc).',
-            'Use sharp_consensus to check multi-window movement.',
-            'Use quick_screen with mode=\"sharp\" to find plays with independent sharp support.',
-            'Call get_play_details for line history on specific plays.',
-            'Use staking_plan for Kelly sizing.',
-            'Check player_context for injury risk on final picks.'
+          summary: 'For sharp bettors who want full data and control.',
+          prompt: [
+            '1. Call today() for a one-call briefing.',
+            '2. For full data: quick_screen({ leagues: [...], book: "NoVigApp", kaiCall: ["BET"], sortBy: "edge", verbosity: "full" }).',
+            '3. Use quick_screen({ mode: "sharp" }) for multi-sharp-book confirmation.',
+            '4. Use sharp_consensus({ league, market }) for multi-window movement analysis.',
+            '5. Validate every play with validate_play — movementDisposition is the single field to trust.',
+            '6. get_play_details({ league, gameIds: [...] }) for full line history on specific plays.',
+            '7. staking_plan({ picks: [...] }) for Kelly sizing.',
+            '8. place_bet + resolve_pick for tracking.'
           ],
-          tools_to_use: [
-            'quick_screen',
-            'sharp_consensus',
-            'get_play_details',
-            'staking_plan',
-            'player_context',
-            'find_best_price'
-          ],
-          avoid: [],
-          tool_descriptions: [
-            {
-              name: 'quick_screen',
-              one_liner: 'One-call play discovery: sharp consensus + target-book price + player research.',
-              when_to_call:
-                'Default starting point. Use verbosity="full" for complete edge, tier, risk, line history, and research in one call. kaiCall=["BET"] filters to strong plays. sortBy supports: start, edge, tier, consensusBookCount, riskScore.'
-            },
-            {
-              name: 'all_slates',
-              one_liner: 'Multi-league ranked consolidation.',
-              when_to_call: 'Daily discovery. Use instead of looping screen_ranked over each league.'
-            },
-            {              name: 'sharp_consensus',
-              one_liner: 'Multi-window (1h-48h) sharp movement analysis.',
-              when_to_call: 'When you need to see whether a move is sustained or just a one-off.'
-            },
-            {
-              name: 'get_play_details',
-              one_liner: 'Line history for a specific game.',
-              when_to_call: 'When you have a gameId and need the full odds trail.'
-            },
-            {
-              name: 'validate_play',
-              one_liner:
-                'One-call verdict with verdictSummary — agents read verdictSummary.actionableSummary instead of cross-referencing 5 fields.',
-              when_to_call:
-                'End-of-pipeline validation. Returns movementDisposition, riskFlags, and actionableSummary in verdictSummary.'
-            },
-            {
-              name: 'staking_plan',
-              one_liner: 'Kelly-sized stake allocations.',
-              when_to_call: 'After the user has decided which plays to take. Returns per-play dollar stakes.'
-            },
-            {
-              name: 'player_context',
-              one_liner: 'Injury / availability check.',
-              when_to_call: 'Final pre-flight before any bet recommendation.'
-            }
-          ]
+          key_tools: ['today', 'quick_screen', 'sharp_consensus', 'validate_play', 'get_play_details', 'staking_plan', 'place_bet', 'resolve_pick'],
+          pitfall: 'movementDisposition is the single field to check: supportive_clean = BET, supportive_bouncy = CONSIDER, adverse = PASS. Do not cross-reference movementGrade + movementLabel separately.'
         }
       };
 
