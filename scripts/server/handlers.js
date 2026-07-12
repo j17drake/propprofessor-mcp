@@ -3476,7 +3476,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return result;
     },
 
-    // ─── Meta ──────────────────────────────────────────────────────
     async ask(args = {}) {
       const query = String(args.query || '').trim();
       if (!query) {
@@ -3490,10 +3489,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       const parsed = parseNaturalLanguagePropQuery(query);
 
+      // We need the handlers instance to call quick_screen/validate_play etc.
+      const handlers = this;
+
       // Check if this is a validation query ("should I bet X?") with a player
       const isValidationQuery = /\b(should i bet|is .* safe|validate|check .* play)\b/i.test(query);
 
       if (isValidationQuery && parsed.player) {
+        const result = await handlers.validate_play({
+          ...(parsed.league ? { league: parsed.league } : {}),
+          selection: parsed.player,
+          ...(parsed.book ? { book: parsed.book } : {})
+        });
         return {
           ok: true,
           raw: parsed.raw,
@@ -3513,11 +3520,73 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               ...(parsed.book ? { book: parsed.book } : {})
             }
           },
-          workflow:
-            'This looks like a validation query. Call quick_screen first to get the gameId, then call validate_play with the gameId and selection. Or if you already have a gameId from a prior call, use it directly.'
+          workflow: 'Validated via validate_play - see verdict.',
+          result: result
         };
       }
 
+      if (parsed.book) {
+        const result = await handlers.quick_screen({
+          books: [parsed.book],
+          ...(parsed.league ? { leagues: [parsed.league] } : {}),
+          ...(parsed.market ? { markets: [parsed.market] } : {})
+        });
+        return {
+          ok: true,
+          raw: parsed.raw,
+          parsed: {
+            league: parsed.league,
+            book: parsed.book,
+            market: parsed.market,
+            side: parsed.side,
+            line: parsed.line,
+            player: parsed.player
+          },
+          suggestedTool: {
+            tool: 'quick_screen',
+            args: {
+              books: [parsed.book],
+              ...(parsed.league ? { leagues: [parsed.league] } : {}),
+              ...(parsed.market ? { markets: [parsed.market] } : {})
+            }
+          },
+          workflow: 'Executed quick_screen.',
+          result: result
+        };
+      }
+
+      if (parsed.player) {
+        const result = await handlers.player_context({
+          player: parsed.player,
+          ...(parsed.league ? { sport: parsed.league } : {})
+        });
+        return {
+          ok: true,
+          raw: parsed.raw,
+          parsed: {
+            league: parsed.league,
+            book: parsed.book,
+            market: parsed.market,
+            side: parsed.side,
+            line: parsed.line,
+            player: parsed.player
+          },
+          suggestedTool: {
+            tool: 'player_context',
+            args: {
+              player: parsed.player,
+              ...(parsed.league ? { sport: parsed.league } : {})
+            }
+          },
+          workflow: 'Executed player_context.',
+          result: result
+        };
+      }
+
+      const result = await handlers.recommended_bets({
+        ...(parsed.league ? { leagues: [parsed.league] } : {}),
+        ...(parsed.market ? { markets: [parsed.market] } : {})
+      });
       return {
         ok: true,
         raw: parsed.raw,
@@ -3529,29 +3598,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           line: parsed.line,
           player: parsed.player
         },
-        suggestedTool: parsed.book
-          ? {
-              tool: 'quick_screen',
-              args: {
-                books: [parsed.book],
-                ...(parsed.league ? { leagues: [parsed.league] } : {}),
-                ...(parsed.market ? { markets: [parsed.market] } : {})
-              }
-            }
-          : parsed.player
-            ? {
-                tool: 'player_context',
-                args: { player: parsed.player, ...(parsed.league ? { sport: parsed.league } : {}) }
-              }
-            : {
-                tool: 'recommended_bets',
-                args: {
-                  ...(parsed.league ? { leagues: [parsed.league] } : {}),
-                  ...(parsed.market ? { markets: [parsed.market] } : {})
-                }
-              },
-        workflow:
-          'Parsed the natural language query. Call the suggested tool with the suggested args to get results back. You can also modify the args before calling — the parser is a suggestion, not a mandate.'
+        suggestedTool: {
+          tool: 'recommended_bets',
+          args: {
+            ...(parsed.league ? { leagues: [parsed.league] } : {}),
+            ...(parsed.market ? { markets: [parsed.market] } : {})
+          }
+        },
+        workflow: 'Executed recommended_bets.',
+        result: result
       };
     },
 
