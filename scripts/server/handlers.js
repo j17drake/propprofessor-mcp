@@ -3768,7 +3768,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // agent that ONLY reads get_started (and skips individual tool
       // descriptions) still sees it. Tier and kaiCall are signal-quality
       // ratings, not win-probability predictions.
-      return {
+      const out = {
         ...workflow,
         honest_scope:
           'TIER 1-4, kaiCall (BET/CONSIDER/PASS), edge, and screenScore are quality ratings on what sharp books are doing — NOT predictions about which side will win. TIER 1 means sharp books agree; it does not mean the side will win. Use to inform handicapping, not to outsource decisions.',
@@ -3780,6 +3780,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           'empty_slate: If quick_screen returns 0 candidates across all leagues, run health_status first. If auth is valid, the slate is genuinely empty. Do not force recommendations.'
         ]
       };
+
+      // Append a live today-briefing so an agent calling get_started gets the
+      // current slate + pending picks + stats in the same response. Failures
+      // are non-fatal — get_started still returns the workflow.
+      try {
+        out.today_briefing = await handlers.today({ user_type: userType });
+      } catch (err) {
+        out.today_briefing = { ok: false, error: err.message };
+      }
+
+      return out;
     },
 
     // ─── Picks ─────────────────────────────────────────────────────

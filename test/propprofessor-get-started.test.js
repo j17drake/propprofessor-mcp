@@ -69,14 +69,24 @@ describe('get_started handler', () => {
   });
 
   it('each workflow has all required fields', async () => {
-    for (const userType of ['casual', 'intermediate', 'sharp']) {
-      const result = await handlers.get_started({ user_type: userType });
-      assert.ok(typeof result.summary === 'string', `${userType} should have summary string`);
-      assert.ok(Array.isArray(result.steps), `${userType} should have steps array`);
-      assert.ok(result.steps.length >= 2, `${userType} should have at least 2 steps`);
-      assert.ok(Array.isArray(result.tools_to_use), `${userType} should have tools_to_use array`);
-      assert.ok(result.tools_to_use.length >= 1, `${userType} should recommend at least 1 tool`);
-      assert.ok(Array.isArray(result.avoid), `${userType} should have avoid array`);
-    }
-  });
+      for (const userType of ['casual', 'intermediate', 'sharp']) {
+        const result = await handlers.get_started({ user_type: userType });
+        assert.ok(typeof result.summary === 'string', `${userType} should have summary string`);
+        assert.ok(Array.isArray(result.steps), `${userType} should have steps array`);
+        assert.ok(result.steps.length >= 2, `${userType} should have at least 2 steps`);
+        assert.ok(Array.isArray(result.tools_to_use), `${userType} should have tools_to_use array`);
+        assert.ok(result.tools_to_use.length >= 1, `${userType} should recommend at least 1 tool`);
+        assert.ok(Array.isArray(result.avoid), `${userType} should have avoid array`);
+      }
+    });
+
+    it('appends a today_briefing field (live or graceful error)', async () => {
+      const result = await handlers.get_started({ user_type: 'intermediate' });
+      assert.ok('today_briefing' in result, 'get_started should attach a today_briefing block');
+      // today() failure must not break get_started — it returns {ok:false,error}
+      assert.ok(
+        result.today_briefing && typeof result.today_briefing === 'object',
+        'today_briefing should always be an object'
+      );
+    });
 });
