@@ -396,7 +396,9 @@ pp-query doctor
 
 ## 📈 Backtesting
 
-Two complementary ways to validate the signal:
+**TL;DR:** The infrastructure is in place. Real outcome data hasn't accumulated yet.
+
+Two paths to validate the signal:
 
 **1. Synthetic engine validation** — runs generated scenarios (sharp_move,
 stable_no_edge, adverse) through the full pipeline to confirm the tier system
@@ -406,31 +408,30 @@ actually differentiates quality:
 node scripts/backtest-synthetic.js
 ```
 
-**2. Real outcome backtest** — the PropProfessor API does **not** serve
-historical settled results, so real backtesting is snapshot-based: take a
-pre-game odds snapshot, then record outcomes as games settle. Per-play
-outcomes (`{odds, stake, result}`) feed the metrics engine, which returns
-**P&L, ROI, Sharpe, and max drawdown** — the numbers a bettor actually needs:
+**2. Real outcome backtest** — snapshot-based, since the PropProfessor API does
+not serve historical settled results. Take a pre-game odds snapshot daily, then
+resolve outcomes as games settle:
 
 ```bash
-# capture today's slate
-node scripts/backtest.js --snapshot MLB Moneyline
-# later, after games settle, score the resolved snapshot
-node scripts/backtest.js --metrics 2026-06-10-mlb-moneyline.resolved.json
+# capture today's recommended plays
+node scripts/daily-snapshot.js
+# after games settle, apply win/loss/push via CSV
+node scripts/resolve-outcomes.js --csv results.csv
+# compute P&L, ROI, Sharpe, max drawdown from resolved data
+node scripts/backtest.js --metrics data/snapshots.jsonl
 ```
 
-TIER 1 hit rate sits around chance (~50%) — expected, because the system
-measures signal quality, not predictive power. The value is in the
-**consensus + movement quality**, not a win-probability oracle. The synthetic
-tier-validation run currently shows a TIER 1 hit rate of **51.4% over N=296
-simulated samples — NOT real settled bets**. These numbers validate the
-ranking engine, they do not prove profitability. See
-[docs/BACKTESTING.md](docs/BACKTESTING.md).
+The pipeline (`daily-snapshot.js` → settle games → `resolve-outcomes.js` →
+`backtest.js --metrics`) is built and tested (8 pipeline tests, 0 fail). What's
+missing: **real settled-results data**. The synthetic tier-validation run shows
+a TIER 1 hit rate of **51.4% over N=296 simulated samples** — these validate
+the ranking engine, they do NOT prove profitability.
 
-> **Credibility note:** any published "profitable" numbers must come from
-> resolved snapshots you've tracked — there is no bundled historical results
-> feed. Don't trust a win rate you can't trace to settled bets. Profitability
-> is currently UNPROVEN: no settled-results backtest has been published yet.
+> **Honesty:** tier/kaiCall/edge/screenScore are signal-quality ratings, not
+> win-probability predictions. Profitability is UNPROVEN — no settled-results
+> backtest has been published yet. The system surfaces what sharp books are
+> doing; it doesn't come with a bundled historical results feed. Don't trust a
+> win rate you can't trace to settled bets. See [docs/BACKTESTING.md](docs/BACKTESTING.md).
 
 ## ❓ FAQ
 
