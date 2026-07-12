@@ -27,7 +27,7 @@ const ARGS = {
   fantasy_optimizer: { fantasyApps: ['PrizePicks'], leagues: ['NBA'] },
   mlb_game_context: { gameId: 'MLB:PREMATCH:NYY:BOS:123' },
   ufc_card: { event: 'UFC 300' },
-  smart_bet: { league: 'NBA', market: 'Moneyline', selection: 'Lakers' },
+  smart_bet: { league: 'NBA', market: 'Moneyline', selection: 'Lakers', book: 'NoVigApp' },
   smart_money: { league: 'NBA', sportsbooks: ['Pinnacle', 'Circa'] },
   tonight_bets: { leagues: ['WNBA'], book: 'NoVigApp' },
   validate_play: { league: 'WNBA', gameId: 'WNBA:PREMATCH:NYL:LV:123', selection: 'Liberty', market: 'Moneyline', book: 'NoVigApp' },

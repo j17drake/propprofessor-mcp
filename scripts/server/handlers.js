@@ -2442,19 +2442,35 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             const marketResults = await mapWithConcurrency(
               leagueMarkets,
               async (market) => {
-                const screenResult = await handlers.screen_ranked({
-                  league,
-                  market,
-                  books: args.books,
-                  limit: limit * 2,
-                  is_live: false,
-                  includeAll: false,
-                  debug: false,
-                  compact: Boolean(args.compact),
-                  fields: Array.isArray(args.fields) ? args.fields : undefined,
-                  include: Array.isArray(args.include) ? args.include : undefined,
-                  skipHistory: args.skipHistory === true
-                });
+                // Live backend can stall on a single league/market call. Don't
+                // let one hung call hang the whole recommended_bets response —
+                // time it out and contribute 0 rows for that market.
+                const withTimeout = (p, ms) =>
+                  Promise.race([
+                    p,
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('screen timeout')), ms))
+                  ]);
+                let screenResult;
+                try {
+                  screenResult = await withTimeout(
+                    handlers.screen_ranked({
+                      league,
+                      market,
+                      books: args.books,
+                      limit: limit * 2,
+                      is_live: false,
+                      includeAll: false,
+                      debug: false,
+                      compact: Boolean(args.compact),
+                      fields: Array.isArray(args.fields) ? args.fields : undefined,
+                      include: Array.isArray(args.include) ? args.include : undefined,
+                      skipHistory: args.skipHistory === true
+                    }),
+                    25000
+                  );
+                } catch (e) {
+                  return [];
+                }
                 const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
                 return rows.map((r) => ({ ...r, _market: market }));
               },
