@@ -230,9 +230,9 @@ Agent: quick_screen({ books: ["Fliff"] })
 | You say                              | `ask` calls                                            | Returns                           |
 | ------------------------------------ | ------------------------------------------------------ | --------------------------------- |
 | "best plays on Novig"                | `quick_screen(books=["NovigApp"])`                     | Playable bets with player context |
-| "what should I bet today"            | `recommended_bets()`                                   | TIER 1 & TIER 2 across 10 leagues |
+| "what should I bet today"            | `quick_screen(mode="recommended")`                     | TIER 1 & TIER 2 across major leagues |
 | "Tatum over 29.5 points"             | `player_context(player="Tatum", sport="NBA")`          | Injury/news risk check            |
-| "show me MLB sharp plays"            | `sharp_plays(leagues=["MLB"])`                         | Multi-sharp consensus plays       |
+| "show me MLB sharp plays"            | `quick_screen(leagues=["MLB"], mode="sharp")`           | Multi-sharp consensus plays       |
 | "line shop Celtics ML"               | `find_best_price(league="NBA", market="Moneyline", …)` | Best price across 36 books        |
 | "validate that Warriors spread play" | `validate_play(league="NBA", gameId="…", …)`           | BET/CONSIDER/PASS verdict         |
 
@@ -248,7 +248,6 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `get_market_registry` | List available markets for a sport, with per-book market names (e.g. Soccer → Draw No Bet)                  |
 | `quick_screen`        | Best plays on any book with sharp consensus + player context                                                |
 | `smart_bet`           | One-call: play details + validate_play verdict + best price + staking                                       |
-| `recommended_bets`    | Top flagged movements with tier, risk, and plain English rationale                                          |
 | `player_context`      | Injury/availability check on a specific player                                                              |
 | `validate_play`       | One-call verdict: re-fetches odds, checks injury news, returns BET/CONSIDER/PASS + playId + drift detection |
 | `mlb_game_context`    | Starting pitchers, park factor, hourly weather, lineup lock for an MLB game                                 |
@@ -259,7 +258,6 @@ Agent: quick_screen({ books: ["Fliff"] })
 
 | Tool              | What it does                                                                            |
 | ----------------- | --------------------------------------------------------------------------------------- |
-| `sharp_plays`     | Plays with **independent sharp confirmation** across Pinnacle/Circa/BookMaker/BetOnline |
 | `sharp_consensus` | Multi-window (1h–48h) sharp movement — is the move sustained?                           |
 | `screen_ranked`   | Full ranked data for a (league, market) pair with consensus and movement metadata       |
 | `all_slates`      | Consolidated ranked list across multiple leagues in one call                            |
@@ -337,7 +335,7 @@ Every tool carries a `category` field that groups it by purpose — agents can u
 | Category     | Count | Purpose                                          | Tools                                                                                                       |
 | ------------ | ----- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
 | `discovery`  | 6     | Find plays (scout, multi-league, DFS, +EV)       | `all_slates`, `ask`, `ev_candidates`, `fantasy_optimizer`, `get_market_registry`, `sharp_consensus`  |
-| `screen`     | 8     | Score / rank plays for a target book             | `quick_screen`, `recommended_bets`, `screen_ranked`, `sharp_plays`, `smart_bet`, `staking_plan`, `tonight_bets`, `ufc_card` |
+| `screen`     | 5     | Score / rank plays for a target book             | `quick_screen`, `screen_ranked`, `smart_bet`, `staking_plan`, `ufc_card` |
 | `drill_down` | 3     | Deep dive on a specific play                     | `find_best_price`, `get_play_details`, `validate_play`                                                      |
 | `research`   | 3     | Context data (player news, game weather, alerts) | `get_alerts`, `mlb_game_context`, `player_context`                                                          |
 | `tracking`   | 4     | Personal bet log                                 | `get_pick_history`, `get_pick_stats`, `log_pick`, `resolve_pick`                                            |
@@ -352,7 +350,7 @@ A handful of params accept both a clean canonical name and a legacy alias — ev
 | ------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `live`             | `is_live`                                       | 13 tools — `is_live` is snake_case only on the MCP surface; the upstream backend still uses `is_live` on the wire |
 | `gameIds`          | `game_ids`                                      | `get_play_details` only                                                                                           |
-| `targetBooks`      | `book`, `books`, `targetBook`, `targetBooksCsv` | `sharp_plays` only — service layer's `resolveTargetBooks()` accepts all 5 names                                   |
+| `targetBooks`      | `book`, `books`, `targetBook`, `targetBooksCsv` | `quick_screen` — service layer's `resolveTargetBooks()` accepts all 5 names                                   |
 
 Deprecated aliases are documented in each schema's `description` field and are normalized to the canonical key at dispatch time. No code change required for existing callers.
 
