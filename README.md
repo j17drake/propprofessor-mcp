@@ -477,6 +477,7 @@ Release: push a `v*` tag → CI runs lint + tests on Node 20 + 22 → auto-creat
 - [MAINTAINERS.md](MAINTAINERS.md) — release process
 - [docs/METHODOLOGY.md](docs/METHODOLOGY.md) — full ranking methodology
 - [docs/BACKTESTING.md](docs/BACKTESTING.md) — tier validation
+- [docs/agent-guide.md](docs/agent-guide.md) — the 5 patterns every AI agent needs
 - [docs/MARKET-BOOK-AVAILABILITY.md](docs/MARKET-BOOK-AVAILABILITY.md) — book/market matrix
 - [docs/AGENT_PROMPT.md](docs/AGENT_PROMPT.md) — system prompt for agents
 - [docs/RELEASES.md](docs/RELEASES.md) — full release history
