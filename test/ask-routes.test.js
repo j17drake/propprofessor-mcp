@@ -38,10 +38,10 @@ describe('ask() executes the suggested tool, not just suggests it', () => {
   });
 
   describe('ask() - route execution tests', () => {
-    let callCount = { quick_screen: 0, validate_play: 0, player_context: 0, recommended_bets: 0 };
+    let callCount = { quick_screen: 0, validate_play: 0, player_context: 0 };
 
     function makeHandlers() {
-      callCount = { quick_screen: 0, validate_play: 0, player_context: 0, recommended_bets: 0 };
+      callCount = { quick_screen: 0, validate_play: 0, player_context: 0 };
       const handlers = createMcpHandlers({ client: {} });
       // Stub the relevant tools so the test doesn't hit the live API
       handlers.quick_screen = async (args) => {
@@ -55,10 +55,6 @@ describe('ask() executes the suggested tool, not just suggests it', () => {
       handlers.player_context = async (args) => {
         callCount.player_context++;
         return { ok: true, player: args.player, riskFlag: 'low' };
-      };
-      handlers.recommended_bets = async (args) => {
-        callCount.recommended_bets++;
-        return { ok: true, count: 2, plays: [] };
       };
       return handlers;
     }
@@ -92,11 +88,11 @@ describe('ask() executes the suggested tool, not just suggests it', () => {
       assert.equal(result.suggestedTool?.tool, 'player_context');
     });
 
-    it('no book + no player + no validation falls through to recommended_bets', async () => {
+    it('no book + no player + no validation falls through to quick_screen', async () => {
       const handlers = makeHandlers();
       const result = await handlers.ask({ query: 'what is sharp today' });
       assert.equal(result.ok, true);
-      assert.equal(callCount.recommended_bets, 1);
+      assert.equal(callCount.quick_screen, 1);
       assert.equal(result.suggestedTool?.tool, 'quick_screen');
     });
 

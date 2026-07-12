@@ -114,12 +114,15 @@ async function defaultGetPlays({ leagues, market } = {}) {
   // eslint-disable-next-line global-require
   const { createPropProfessorClient } = require('../lib/propprofessor-api');
   const handlers = createMcpHandlers({ client: createPropProfessorClient() });
-  const res = await handlers.recommended_bets({
+  const res = await handlers.quick_screen({
+    mode: 'recommended',
     leagues: Array.isArray(leagues) && leagues.length ? leagues : undefined,
     market: market || undefined,
-    limit: 50
+    limit: 50,
+    validate: false,
+    includeResearch: false
   });
-  return playsFromHandlerResult(res, { source: 'recommended_bets' });
+  return playsFromHandlerResult(res, { source: 'quick_screen' });
 }
 
 /**

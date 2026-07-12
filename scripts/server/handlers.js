@@ -3594,9 +3594,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         };
       }
 
-      const result = await handlers.recommended_bets({
-        ...(parsed.league ? { leagues: [parsed.league] } : { leagues: ['WNBA', 'NBA', 'MLB', 'NFL'] }),
-        ...(parsed.market ? { markets: [parsed.market] } : {})
+      const result = await handlers.quick_screen({
+        mode: 'recommended',
+        ...(parsed.league ? { leagues: [parsed.league] } : {}),
+        ...(parsed.market ? { markets: [parsed.market] } : {}),
+        validate: false,
+        includeResearch: false
       });
       return {
         ok: true,
