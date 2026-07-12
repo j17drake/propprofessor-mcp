@@ -1459,9 +1459,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     }
 
-    // Store in cache
+    // Store in cache — but NEVER pin a transient empty/errored response.
+    // The live backend intermittently returns 0 rows (rate-limit / refresh);
+    // caching that would serve an empty slate for the full TTL and make
+    // back-to-back calls look broken ("5 plays then 0"). Only cache real data.
     if (cacheKey) {
-      responseCache.set(cacheKey, response, responseCacheTtlMs);
+      const hasResults = Array.isArray(response.result) && response.result.length > 0;
+      const hasError = response.error || (response.resultMeta && response.resultMeta.error);
+      if (hasResults && !hasError) {
+        responseCache.set(cacheKey, response, responseCacheTtlMs);
+      }
     }
 
     return response;
@@ -1580,9 +1587,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           markets_alias_used: marketResolution.aliasesUsed
         };
       }
-      // Store in cache
+      // Store in cache — but NEVER pin a transient empty/errored response
+      // (see runLeagueScreen for rationale; same flaky-backend guard).
       if (cacheKey) {
-        responseCache.set(cacheKey, screenResult, responseCacheTtlMs);
+        const hasResults = Array.isArray(screenResult.result) && screenResult.result.length > 0;
+        const hasError = screenResult.error || (screenResult.resultMeta && screenResult.resultMeta.error);
+        if (hasResults && !hasError) {
+          responseCache.set(cacheKey, screenResult, responseCacheTtlMs);
+        }
       }
       return screenResult;
     }
