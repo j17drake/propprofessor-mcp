@@ -32,6 +32,20 @@ Your AI agent gets 31 tools that surface the same signal feed professional betto
 
 The pipeline extracts odds, hydrates line history, ranks by movement quality + consensus strength, assigns a tier and risk score, and returns everything your agent needs to present an informed recommendation. The betting decision stays with the human.
 
+## ⚡ Quickstart (30 seconds)
+
+1. **Install:** `npm install -g propprofessor-mcp` (or clone + `npm install` for dev)
+2. **Wire your MCP client** (Claude Desktop / Cursor / Hermes) — add to its MCP config:
+   ```json
+   {"mcpServers": {"propprofessor": {"command": "propprofessor-mcp", "args": []}}}
+   ```
+3. **Auth (one-time):** `node scripts/pp-login.js` — opens a browser for PropProfessor login and persists cookies for the server to use.
+4. **Ask your agent:** _"What are tonight's sharpest plays on Fliff?"_
+
+That's it — your agent now sees 31 tools.
+
+> Prefer the CLI? `node scripts/query-propprofessor.js list` shows every command. `node scripts/query-propprofessor.js smart` shows live sharp-money volumes. Run `node scripts/query-propprofessor.js doctor` if anything misbehaves.
+
 ## 🏛 Architecture
 
 PropProfessor MCP follows a layered data pipeline:
@@ -252,6 +266,7 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `get_alerts`      | Line movement and steam move alerts since last check                                    |
 | `ev_candidates`   | Fast +EV discovery — validate on `/screen` afterward                                    |
 | `ufc_card`        | UFC card shortlist with official plays, best looks, and pass notes                      |
+| `smart_money`     | Sharp action $ volume + per-side odds range per game (the signal the +EV feed hides)    |
 
 ### Research & Bet Management
 
