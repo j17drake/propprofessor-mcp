@@ -8,12 +8,12 @@ describe('propprofessor-tool-definitions', () => {
   describe('default (full) mode', () => {
     it('returns all 30 tools by default', () => {
       const tools = buildToolDefinitions();
-      assert.equal(tools.length, 33);
+      assert.equal(tools.length, 30);
     });
 
     it('returns all 30 tools when mode is explicitly "full"', () => {
       const tools = buildToolDefinitions({ mode: 'full' });
-      assert.equal(tools.length, 33);
+      assert.equal(tools.length, 30);
       for (const tool of tools) {
         assert.equal(typeof tool.name, 'string', `${tool.name}: name missing`);
         assert.equal(typeof tool.description, 'string', `${tool.name}: description missing`);
@@ -27,7 +27,7 @@ describe('propprofessor-tool-definitions', () => {
   describe('lite mode', () => {
     it('returns only the 13 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 16);
+      assert.equal(tools.length, 14);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {
@@ -45,7 +45,6 @@ describe('propprofessor-tool-definitions', () => {
       assert.ok(!names.has('ev_candidates'), 'ev_candidates should be full-only');
       assert.ok(!names.has('fantasy_optimizer'), 'fantasy_optimizer should be full-only');
       assert.ok(!names.has('screen_ranked'), 'screen_ranked should be full-only (quick_screen covers it)');
-      assert.ok(!names.has('sharp_plays'), 'sharp_plays should be full-only (quick_screen covers it)');
       assert.ok(!names.has('staking_plan'), 'staking_plan should be full-only');
       assert.ok(!names.has('ufc_card'), 'ufc_card should be full-only');
       assert.ok(!names.has('manage_hidden_bets'), 'admin tools should be full-only');
@@ -59,7 +58,6 @@ describe('propprofessor-tool-definitions', () => {
       const names = new Set(buildToolDefinitions({ mode: 'lite' }).map((t) => t.name));
       // Discover → validate → track
       assert.ok(names.has('ask'), 'ask (router) is essential');
-      assert.ok(names.has('recommended_bets'), 'recommended_bets is the main tool');
       assert.ok(names.has('quick_screen'), 'quick_screen bundles screen+research');
       assert.ok(names.has('validate_play'), 'validate_play is the pre-bet check');
       assert.ok(names.has('find_best_price'), 'find_best_price is line-shopping');
@@ -99,13 +97,13 @@ describe('propprofessor-tool-definitions', () => {
       // bump the count or leave it stale.
       const expected = {
         discovery: 6,
-        screen: 8,
+        screen: 5,
         alerts: 1,
         drill_down: 3,
         research: 4,
         tracking: 5,
         admin: 2,
-        meta: 4,
+        meta: 4
       };
       const actual = {};
       for (const cat of Object.values(TOOL_CATEGORIES)) {
@@ -128,7 +126,7 @@ describe('propprofessor-tool-definitions', () => {
     });
   });
 
-  describe('validate defaults to true on quick_screen and recommended_bets', () => {
+  describe('validate defaults to true on quick_screen', () => {
     it('quick_screen validate default is true', () => {
       const tools = buildToolDefinitions();
       const qs = tools.find((t) => t.name === 'quick_screen');
@@ -137,17 +135,6 @@ describe('propprofessor-tool-definitions', () => {
         qs.inputSchema.properties.validate.default,
         true,
         'quick_screen validate should default to true'
-      );
-    });
-
-    it('recommended_bets validate default is true', () => {
-      const tools = buildToolDefinitions();
-      const rb = tools.find((t) => t.name === 'recommended_bets');
-      assert.ok(rb, 'recommended_bets tool definition exists');
-      assert.strictEqual(
-        rb.inputSchema.properties.validate.default,
-        true,
-        'recommended_bets validate should default to true'
       );
     });
   });

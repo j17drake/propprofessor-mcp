@@ -1943,6 +1943,33 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Reset per-call tier hysteresis so each screen call starts clean
       // (prevents cross-call tier drift from stale cache state).
       clearTierCache();
+
+      // === mode presets (folded-in retired tools) ===
+      // quick_screen always screens through handlers.sharp_plays internally,
+      // so 'sharp' is the same as the default broad scan — the mode flag
+      // exists for agent ergonomics / backward-compat routing. The other two
+      // presets mirror the retired recommended_bets and tonight_bets tools.
+      // Explicit args always win over these preset defaults.
+      const mode = args.mode;
+      if (mode === 'recommended') {
+        if (!(Array.isArray(args.leagues) && args.leagues.length) && !args.league) {
+          args.leagues = ['WNBA', 'NBA', 'MLB', 'NFL'];
+        }
+        if (!(Array.isArray(args.targetTiers) && args.targetTiers.length)) {
+          args.targetTiers = ['TIER 1', 'TIER 2'];
+        }
+        if (args.validate === undefined) args.validate = true;
+      } else if (mode === 'tonight') {
+        if (!(Array.isArray(args.kaiCall) && args.kaiCall.length)) {
+          args.kaiCall = ['BET', 'CONSIDER'];
+        }
+        if (!args.sortBy) args.sortBy = 'start';
+        if (!args.sortDir) args.sortDir = 'asc';
+        if (args.includeResearch === undefined) args.includeResearch = true;
+        if (!Number.isFinite(Number(args.limit))) args.limit = 5;
+      }
+      // ('sharp' === default sharp_plays-backed scan; no override needed.)
+
       const targetBooks =
         Array.isArray(args.books) && args.books.length ? args.books : args.book ? [args.book] : ['NoVigApp'];
       const leagues =
