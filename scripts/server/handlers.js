@@ -3800,6 +3800,85 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       });
     },
 
+    // One-call validate + log workflow. Replaces the 2-call
+    // validate_play -> log_pick pattern. If validate_play returns PASS the
+    // bet is rejected up front (no log spam for non-bets).
+    async place_bet(args = {}) {
+      if (!args.league || !args.selection || !args.market) {
+        const error = new Error('league, selection, and market are required');
+        error.code = 'VALIDATION_ERROR';
+        error.category = 'validation';
+        error.status = 400;
+        throw error;
+      }
+
+      const validation = await handlers.validate_play({
+        league: args.league,
+        gameId: args.gameId,
+        selection: args.selection,
+        market: args.market,
+        book: args.book
+      });
+
+      if (!validation || !validation.ok || !validation.verdict) {
+        return {
+          ok: false,
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: `validate_play did not return a verdict: ${(validation && validation.error && validation.error.message) || 'unknown'}`
+          }
+        };
+      }
+
+      if (validation.verdict === 'PASS') {
+        return {
+          ok: false,
+          error: {
+            code: 'BET_REJECTED',
+            message: `validate_play returned PASS — this play is not a bet. reasons: ${(validation.reasons || []).join('; ')}`
+          },
+          validation: {
+            verdict: validation.verdict,
+            tier: validation.tier,
+            reasons: validation.reasons
+          }
+        };
+      }
+
+      const logged = await handlers.log_pick({
+        game: validation.play && validation.play.game ? validation.play.game : args.gameId,
+        league: args.league,
+        market: args.market,
+        selection: args.selection,
+        odds: validation.play && Number.isFinite(validation.play.odds) ? validation.play.odds : args.odds,
+        stake: args.stake,
+        confidenceTier: validation.tier,
+        kaiCall: validation.verdict,
+        notes: args.notes
+      });
+
+      if (!logged || !logged.ok) {
+        return {
+          ok: false,
+          error: {
+            code: 'LOG_FAILED',
+            message: (logged && logged.error && logged.error.message) || 'log_pick failed'
+          },
+          validation: { verdict: validation.verdict, tier: validation.tier, reasons: validation.reasons }
+        };
+      }
+
+      return {
+        ok: true,
+        verdict: validation.verdict,
+        tier: validation.tier,
+        pickId: logged.pick && logged.pick.id,
+        pick: logged.pick,
+        validation: { verdict: validation.verdict, tier: validation.tier, reasons: validation.reasons },
+        workflow: `Validated (${validation.verdict}), logged as pick ${logged.pick && logged.pick.id}. Settle with resolve_pick(id="${logged.pick && logged.pick.id}") after the game.`
+      };
+    },
+
     async get_pick_history(args = {}) {
       return getPickHistory({
         status: args.status,

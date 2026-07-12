@@ -275,6 +275,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'log_pick',
         'manage_hidden_bets',
         'mlb_game_context',
+        'place_bet',
         'player_context',
         'quick_screen',
         'recommended_bets',

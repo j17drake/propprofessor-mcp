@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 31 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 32 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -42,7 +42,7 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
 3. **Auth (one-time):** `node scripts/pp-login.js` — opens a browser for PropProfessor login and persists cookies for the server to use.
 4. **Ask your agent:** _"What are tonight's sharpest plays on Fliff?"_
 
-That's it — your agent now sees 31 tools.
+That's it — your agent now sees 32 tools.
 
 > Prefer the CLI? `node scripts/query-propprofessor.js list` shows every command. `node scripts/query-propprofessor.js smart` shows live sharp-money volumes. Run `node scripts/query-propprofessor.js doctor` if anything misbehaves.
 
@@ -67,7 +67,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **31 tools** — organized into situational, analytical, and research tiers
+- **32 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 
@@ -276,6 +276,7 @@ Agent: quick_screen({ books: ["Fliff"] })
 | `staking_plan`                        | Fractional Kelly sizing (TIER 1: 2%, TIER 2: 1% of bankroll)                    |
 | `fantasy_optimizer`                   | DFS-style fantasy picks (PrizePicks, Underdog — requires Fantasy Optimizer sub) |
 | `log_pick` / `resolve_pick`           | Track your own bet outcomes                                                     |
+| `place_bet`                         | Validate + log a play in ONE call; returns a pickId for settlement              |
 | `get_pick_history` / `get_pick_stats` | View logged bets and win rate / P&L                                             |
 | `manage_hidden_bets`                  | Hide/unhide bets on the fantasy table                                           |
 | `clear_score_timeline`                | Reset tier trajectory tracking for a fresh session                              |

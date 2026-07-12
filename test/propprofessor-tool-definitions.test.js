@@ -8,12 +8,12 @@ describe('propprofessor-tool-definitions', () => {
   describe('default (full) mode', () => {
     it('returns all 30 tools by default', () => {
       const tools = buildToolDefinitions();
-      assert.equal(tools.length, 31);
+      assert.equal(tools.length, 32);
     });
 
     it('returns all 30 tools when mode is explicitly "full"', () => {
       const tools = buildToolDefinitions({ mode: 'full' });
-      assert.equal(tools.length, 31);
+      assert.equal(tools.length, 32);
       for (const tool of tools) {
         assert.equal(typeof tool.name, 'string', `${tool.name}: name missing`);
         assert.equal(typeof tool.description, 'string', `${tool.name}: description missing`);
@@ -27,7 +27,7 @@ describe('propprofessor-tool-definitions', () => {
   describe('lite mode', () => {
     it('returns only the 13 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 14);
+      assert.equal(tools.length, 15);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {
@@ -103,7 +103,7 @@ describe('propprofessor-tool-definitions', () => {
         alerts: 1,
         drill_down: 3,
         research: 4,
-        tracking: 4,
+        tracking: 5,
         admin: 2,
         meta: 3
       };
