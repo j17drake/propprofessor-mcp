@@ -4,6 +4,24 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
 
+describe('recommended_bets default league set', () => {
+  it('defaults to 4 major leagues (not all 10) when none passed', async () => {
+    const handlers = createMcpHandlers({ client: {} });
+    const leaguesSeen = [];
+    handlers.screen_ranked = async (args) => {
+      leaguesSeen.push(args.league);
+      return { ok: true, result: [] };
+    };
+    await handlers.recommended_bets({ book: 'NoVigApp', limit: 2 });
+    const expected = ['WNBA', 'NBA', 'MLB', 'NFL'];
+    for (const l of expected) {
+      assert.ok(leaguesSeen.includes(l), `should scan ${l}`);
+    }
+    const uniqueLeagues = [...new Set(leaguesSeen)];
+    assert.equal(uniqueLeagues.length, 4, `expected exactly 4 leagues, got ${uniqueLeagues.length}: ${uniqueLeagues}`);
+  });
+});
+
 describe('recommended_bets resilience (no single hung call hangs the tool)', () => {
   it('returns (does not hang) when every screen_ranked call stalls', async () => {
     const handlers = createMcpHandlers({ client: {} });

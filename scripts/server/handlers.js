@@ -2409,7 +2409,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Reset per-call tier hysteresis so each screen call starts clean
       // (prevents cross-call tier drift from stale cache state).
       clearTierCache();
-      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : Array.from(DEFAULT_LEAGUES);
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : ['WNBA', 'NBA', 'MLB', 'NFL'];
       // Resolve markets using aliases for each league
       const allAliasesUsed = [];
       const resolvedMarketsByLeague = {};
