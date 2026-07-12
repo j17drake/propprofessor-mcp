@@ -102,3 +102,34 @@ This is expected behavior — the API is not a historical database.
 - `lib/propprofessor-risk-score.js` — tier calculation logic
 - `lib/propprofessor-screen-utils.js` — row extraction
 - `scripts/export-ranked-screen.js` — snapshot exporter for manual tracking
+- `lib/propprofessor-backtest-metrics.js` — P&L / ROI / Sharpe / max-drawdown engine
+
+## Scoring real outcomes (P&L / ROI / Sharpe / drawdown)
+
+The synthetic script validates the *engine*. To score *real money*, resolve a
+snapshot with per-play outcomes and run the metrics engine:
+
+```bash
+# 1. Capture a pre-game snapshot
+node scripts/backtest.js --snapshot MLB Moneyline
+
+# 2. After games settle, attach per-play outcomes to the snapshot file:
+#    resolved.plays = [{ "participant": "Yankees", "odds": -140, "stake": 100, "result": "won" }, ...]
+
+# 3. Score it
+node scripts/backtest.js --metrics 2026-06-10-mlb-moneyline.resolved.json
+```
+
+`computeBacktestMetrics(plays)` returns:
+
+| Field        | Meaning                                                       |
+| ------------ | ------------------------------------------------------------- |
+| `profit`     | Net P&L in dollars (sum of per-play profit)                  |
+| `roi`        | `profit / totalStaked * 100`                                 |
+| `winRate`    | Decided bets won / (won + lost)                              |
+| `sharpe`     | Mean per-play return ÷ sample stdev (null if < 2 plays)      |
+| `maxDrawdown`| Largest peak-to-trough drop in the cumulative P&L curve      |
+
+> The PropProfessor API does **not** provide historical settled results, so
+> there is no bundled "profitable" history. Any published numbers must come
+> from snapshots you resolved yourself.

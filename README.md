@@ -398,13 +398,37 @@ pp-query doctor
 
 ## 📈 Backtesting
 
-Validated via synthetic scenarios (sharp_move, stable_no_edge, adverse) and daily snapshots of pre-game odds:
+Two complementary ways to validate the signal:
+
+**1. Synthetic engine validation** — runs generated scenarios (sharp_move,
+stable_no_edge, adverse) through the full pipeline to confirm the tier system
+actually differentiates quality:
 
 ```bash
 node scripts/backtest-synthetic.js
 ```
 
-TIER 1 hit rate sits around chance (~50%) — expected, because the system measures signal quality, not predictive power. See [docs/BACKTESTING.md](docs/BACKTESTING.md).
+**2. Real outcome backtest** — the PropProfessor API does **not** serve
+historical settled results, so real backtesting is snapshot-based: take a
+pre-game odds snapshot, then record outcomes as games settle. Per-play
+outcomes (`{odds, stake, result}`) feed the metrics engine, which returns
+**P&L, ROI, Sharpe, and max drawdown** — the numbers a bettor actually needs:
+
+```bash
+# capture today's slate
+node scripts/backtest.js --snapshot MLB Moneyline
+# later, after games settle, score the resolved snapshot
+node scripts/backtest.js --metrics 2026-06-10-mlb-moneyline.resolved.json
+```
+
+TIER 1 hit rate sits around chance (~50%) — expected, because the system
+measures signal quality, not predictive power. The value is in the
+**consensus + movement quality**, not a win-probability oracle. See
+[docs/BACKTESTING.md](docs/BACKTESTING.md).
+
+> **Credibility note:** any published "profitable" numbers must come from
+> resolved snapshots you've tracked — there is no bundled historical results
+> feed. Don't trust a win rate you can't trace to settled bets.
 
 ## ❓ FAQ
 
