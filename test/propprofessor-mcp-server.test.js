@@ -287,6 +287,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'smart_bet',
         'smart_money',
         'staking_plan',
+        'today',
         'tonight_bets',
         'ufc_card',
         'validate_play'

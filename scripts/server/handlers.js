@@ -3903,6 +3903,62 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return getPickStats({ days: args.days });
     },
 
+    // One-call daily briefing: current sharp slate + your pending picks +
+    // your recent stats. Replaces the 3-call pattern (quick_screen +
+    // get_pick_history + get_pick_stats) with a single call.
+    async today(args = {}) {
+      const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues
+        : args.league ? [args.league]
+        : ['NBA', 'WNBA', 'MLB', 'NFL'];
+      const book = args.book || 'NoVigApp';
+
+      const [slateRes, pendingRes, statsRes] = await Promise.all([
+        handlers.quick_screen({
+          leagues,
+          book,
+          limit: args.limit || 10,
+          validate: false,
+          includeResearch: false,
+          lite: true
+        }).catch(() => ({ ok: true, results: [] })),
+        handlers.get_pick_history({ status: 'pending' }).catch(() => ({ ok: true, picks: [] })),
+        handlers.get_pick_stats({ days: args.statsDays || 30 }).catch(() => ({ ok: true, stats: null }))
+      ]);
+
+      const slate = (slateRes.results || []).flatMap((e) =>
+        (e.candidates || []).map((c) => ({
+          game: c.game,
+          market: c.market,
+          selection: c.selection,
+          odds: c.odds,
+          tier: c.confidenceTier,
+          kai: c.kaiCall,
+          edge: c.consensusEdge
+        }))
+      );
+
+      const pendingPicks = (pendingRes.picks || []).map((p) => ({
+        id: p.id,
+        selection: p.selection,
+        league: p.league,
+        market: p.market,
+        odds: p.odds,
+        stake: p.stake,
+        status: p.status
+      }));
+
+      return {
+        ok: true,
+        asOf: new Date().toISOString(),
+        leagues,
+        book,
+        slate,
+        pendingPicks,
+        stats: statsRes.stats || null,
+        summary: `${slate.length} sharp plays, ${pendingPicks.length} pending picks, ${statsRes.stats && statsRes.stats.winRate ? statsRes.stats.winRate : 'n/a'} lifetime win rate`
+      };
+    },
+
     // ─── Alerts ─────────────────────────────────────────────────────
     async get_alerts(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : Array.from(DEFAULT_LEAGUES);

@@ -23,7 +23,7 @@ Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires
 
 ## 🚀 Overview
 
-Your AI agent gets 32 tools that surface the same signal feed professional bettors use:
+Your AI agent gets 33 tools that surface the same signal feed professional bettors use:
 
 - **Screen & rank** — query live odds across 36 sportsbooks, ranked by consensus edge and movement
 - **Detect sharp coordination** — Pinnacle, Circa, BookMaker, and BetOnline moving together? That's a signal
@@ -42,7 +42,7 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
 3. **Auth (one-time):** `node scripts/pp-login.js` — opens a browser for PropProfessor login and persists cookies for the server to use.
 4. **Ask your agent:** _"What are tonight's sharpest plays on Fliff?"_
 
-That's it — your agent now sees 32 tools.
+That's it — your agent now sees 33 tools.
 
 > Prefer the CLI? `node scripts/query-propprofessor.js list` shows every command. `node scripts/query-propprofessor.js smart` shows live sharp-money volumes. Run `node scripts/query-propprofessor.js doctor` if anything misbehaves.
 
@@ -67,7 +67,7 @@ PropProfessor MCP follows a layered data pipeline:
 ### MCP Server (stdio)
 
 - **JSON-RPC over stdio** — standard MCP transport with Content-Length framing (NDJSON optional)
-- **32 tools** — organized into situational, analytical, and research tiers
+- **33 tools** — organized into situational, analytical, and research tiers
 - **Server-side validation** — enforces input schemas at the server, not trusting the client
 - **Categorized errors** — auth, backend, transport, validation, internal — each with structured recovery hints
 
@@ -242,7 +242,8 @@ Agent: quick_screen({ books: ["Fliff"] })
 
 | Tool                  | What it does                                                                                                |
 | --------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `ask`                 | Parse natural language into the right tool + args                                                           |
+| `ask`                 | Parse natural language into the right tool + args, then execute it (one-call answer)                       |
+| `today`               | One-call daily briefing: sharp slate + your pending picks + recent stats                                  |
 | `get_started`         | Returns recommended workflow for casual/intermediate/sharp users                                            |
 | `get_market_registry` | List available markets for a sport, with per-book market names (e.g. Soccer → Draw No Bet)                  |
 | `quick_screen`        | Best plays on any book with sharp consensus + player context                                                |

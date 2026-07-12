@@ -8,12 +8,12 @@ describe('propprofessor-tool-definitions', () => {
   describe('default (full) mode', () => {
     it('returns all 30 tools by default', () => {
       const tools = buildToolDefinitions();
-      assert.equal(tools.length, 32);
+      assert.equal(tools.length, 33);
     });
 
     it('returns all 30 tools when mode is explicitly "full"', () => {
       const tools = buildToolDefinitions({ mode: 'full' });
-      assert.equal(tools.length, 32);
+      assert.equal(tools.length, 33);
       for (const tool of tools) {
         assert.equal(typeof tool.name, 'string', `${tool.name}: name missing`);
         assert.equal(typeof tool.description, 'string', `${tool.name}: description missing`);
@@ -27,7 +27,7 @@ describe('propprofessor-tool-definitions', () => {
   describe('lite mode', () => {
     it('returns only the 13 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 15);
+      assert.equal(tools.length, 16);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {
@@ -105,7 +105,7 @@ describe('propprofessor-tool-definitions', () => {
         research: 4,
         tracking: 5,
         admin: 2,
-        meta: 3
+        meta: 4,
       };
       const actual = {};
       for (const cat of Object.values(TOOL_CATEGORIES)) {
