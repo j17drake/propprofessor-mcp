@@ -46,8 +46,8 @@ node scripts/backtest.js Tennis Moneyline 14
 
 ## Understanding the output
 
-```
-Backtesting MLB Moneyline for the last 30 days...
+```text
+Backtesting MLB Moneyline for the last 30 days... (ILLUSTRATIVE — synthetic output)
 
 Tier		Total	Wins	Losses	Push	Hit Rate
 ----		-----	----	------	----	--------
@@ -59,12 +59,12 @@ TIER 4		6	1	5	0	16.7%
 ✓ Backtest complete.
 ```
 
-- **Total**: Number of resolved bets in that tier
-- **Wins / Losses / Push**: Outcome breakdown
-- **Hit Rate**: Wins ÷ (Wins + Losses), excluding pushes
-
-A healthy tier system shows monotonically decreasing hit rates from TIER 1 to
-TIER 4.
+> The table above is an **illustrative sample of the output format**, not a
+> real result. It does not come from settled bets and says nothing about
+> profitability. The `/screen` endpoint returns live odds, not resolved
+> outcomes, so the metric fields (Wins / Losses / Hit Rate here) are only
+> populated when you supply a resolved snapshot yourself — see
+> "Scoring real outcomes" below.
 
 ## Limitations
 
@@ -89,12 +89,18 @@ This is expected behavior — the API is not a historical database.
 3. **Manual tracking.** Run the script daily, log the TIER assignments, then
    check outcomes manually after games settle.
 
-## What to look for
+## What to look for (on your own resolved data)
 
-- **TIER 1 hit rate > 60%**: Strong signal. Trust the methodology.
-- **TIER 1 hit rate ≈ TIER 3**: Tier system isn't differentiating. Review
-  risk-score weights.
-- **TIER 4 hit rate > TIER 2**: Red flags are wrong. Revisit movement grading.
+These thresholds apply once you have **real resolved outcomes** from snapshots
+you tracked — they are NOT statements about the tool's profitability:
+
+- **TIER 1 hit rate > 60%**: Your tracked sample differentiates well. The signal is doing its job as a quality rating.
+- **TIER 1 hit rate ≈ TIER 3**: Tier system isn't differentiating in your sample. Review risk-score weights.
+- **TIER 4 hit rate > TIER 2**: Red flags are wrong in your sample. Revisit movement grading.
+
+> Profitability is **UNPROVEN**. No settled-results backtest has been published
+> yet (a results pipeline is being built separately). Treat any hit-rate or
+> ROI number as a candidate metric to validate yourself, not as proof of edge.
 
 ## Related files
 
@@ -106,8 +112,8 @@ This is expected behavior — the API is not a historical database.
 
 ## Scoring real outcomes (P&L / ROI / Sharpe / drawdown)
 
-The synthetic script validates the *engine*. To score *real money*, resolve a
-snapshot with per-play outcomes and run the metrics engine:
+The synthetic script validates the *engine*. To score *real resolved
+outcomes*, resolve a snapshot with per-play outcomes and run the metrics engine:
 
 ```bash
 # 1. Capture a pre-game snapshot

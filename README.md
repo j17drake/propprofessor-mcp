@@ -19,7 +19,7 @@ PropProfessor MCP is a Model Context Protocol server that lets AI agents see wha
 
 Connect it to Claude Desktop, Cursor, Cline, Hermes, or any MCP client. Requires a [PropProfessor](https://propprofessor.com) account.
 
-> **Honest scope:** This is a **sharp-money signal feed**, not a betting oracle. The ranking pipeline detects _what sharp books are doing_ — it does **not** predict outcomes. TIER 1 hit rate sits around chance (~50%). Use it to inform your own handicapping, not to outsource decisions.
+> **Honest scope — no profitability claim:** PropProfessor MCP is a sharp-signal DISCOVERY and RATING tool. `tier` / `kaiCall` / `edge` / `screenScore` are signal-quality ratings, not win-probability predictions. Profitability is UNPROVEN — no settled-results backtest has been published yet. Use it to find candidate plays and validate them yourself; do not treat outputs as a guaranteed winning system. The ranking pipeline surfaces _what sharp books are doing_; the betting decision stays with you.
 
 ## 🚀 Overview
 
@@ -423,12 +423,16 @@ node scripts/backtest.js --metrics 2026-06-10-mlb-moneyline.resolved.json
 
 TIER 1 hit rate sits around chance (~50%) — expected, because the system
 measures signal quality, not predictive power. The value is in the
-**consensus + movement quality**, not a win-probability oracle. See
+**consensus + movement quality**, not a win-probability oracle. The synthetic
+tier-validation run currently shows a TIER 1 hit rate of **51.4% over N=296
+simulated samples — NOT real settled bets**. These numbers validate the
+ranking engine, they do not prove profitability. See
 [docs/BACKTESTING.md](docs/BACKTESTING.md).
 
 > **Credibility note:** any published "profitable" numbers must come from
 > resolved snapshots you've tracked — there is no bundled historical results
-> feed. Don't trust a win rate you can't trace to settled bets.
+> feed. Don't trust a win rate you can't trace to settled bets. Profitability
+> is currently UNPROVEN: no settled-results backtest has been published yet.
 
 ## ❓ FAQ
 
