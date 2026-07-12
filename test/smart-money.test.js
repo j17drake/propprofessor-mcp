@@ -81,4 +81,29 @@ describe('smart_money tool (Task 6)', () => {
     assert.equal(result.count, 0);
     assert.equal(result.resultMeta.volumeTotalUsd, 0);
   });
+
+  it('audit fix 2026-07-11: does not pass sportsbooks: undefined to backend (causes 400 "Invalid sportsbooks value")', async () => {
+    let capturedFilters = null;
+    const client = {
+      querySmartMoney: async (filters) => {
+        capturedFilters = filters;
+        return [];
+      }
+    };
+    const handlers = createMcpHandlers({ client });
+    await handlers.smart_money({ leagues: ['MLB'] });
+    // The handler must NOT include `sportsbooks: undefined` (or any falsy value)
+    // in the filter — the live backend rejects with HTTP 400.
+    assert.equal('sportsbooks' in capturedFilters, false,
+      'sportsbooks key must be absent (not undefined) so client defaults apply');
+    assert.equal('marketTypes' in capturedFilters, false, 'marketTypes also omitted when not set');
+  });
+
+  it('passes sportsbooks when explicitly provided', async () => {
+    let capturedFilters = null;
+    const client = { querySmartMoney: async (f) => { capturedFilters = f; return []; } };
+    const handlers = createMcpHandlers({ client });
+    await handlers.smart_money({ leagues: ['MLB'], sportsbooks: ['DraftKings', 'FanDuel'] });
+    assert.deepEqual(capturedFilters.sportsbooks, ['DraftKings', 'FanDuel']);
+  });
 });

@@ -1873,17 +1873,22 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues
         : args.league ? [args.league]
         : ['NBA', 'MLB', 'NHL', 'WNBA', 'NFL'];
-      const filters = {
-        leagues,
-        userState: String(args.userState || 'tx').toLowerCase(),
-        hideNCAAPlayerProps: Boolean(args.hideNCAAPlayerProps),
-        sportsbooks: Array.isArray(args.sportsbooks) && args.sportsbooks.length ? args.sportsbooks : undefined,
-        marketTypes: Array.isArray(args.marketTypes) && args.marketTypes.length ? args.marketTypes : undefined,
-        periodTypes: Array.isArray(args.periodTypes) && args.periodTypes.length ? args.periodTypes : undefined,
-        minLiquidity: Number.isFinite(Number(args.minLiquidity)) ? Number(args.minLiquidity) : 0,
-        minHoursAway: Number.isFinite(Number(args.minHoursAway)) ? Number(args.minHoursAway) : 0,
-        maxHoursAway: Number.isFinite(Number(args.maxHoursAway)) ? Number(args.maxHoursAway) : 24
-      };
+      const filters = { leagues, userState: String(args.userState || 'tx').toLowerCase() };
+      // Only pass fields when the user explicitly set them. If we pass
+      // `sportsbooks: undefined`, the spread in client.querySmartMoney drops
+      // the key (good), but if we pass an empty array `[]`, the backend
+      // rejects with "Invalid sportsbooks value" — the backend requires
+      // either a valid list or no key at all. So: only set when non-empty.
+      if (Array.isArray(args.sportsbooks) && args.sportsbooks.length) filters.sportsbooks = args.sportsbooks;
+      if (Array.isArray(args.marketTypes) && args.marketTypes.length) filters.marketTypes = args.marketTypes;
+      if (Array.isArray(args.periodTypes) && args.periodTypes.length) filters.periodTypes = args.periodTypes;
+      if (Number.isFinite(Number(args.minLiquidity))) filters.minLiquidity = Number(args.minLiquidity);
+      if (Number.isFinite(Number(args.minHoursAway))) filters.minHoursAway = Number(args.minHoursAway);
+      if (Number.isFinite(Number(args.maxHoursAway))) filters.maxHoursAway = Number(args.maxHoursAway);
+      // Audit fix (2026-07-11): if no explicit user choice, the client
+      // provides sensible defaults for hideNCAAPlayerProps. We don't
+      // override it when the user didn't pass it.
+      if (args.hideNCAAPlayerProps !== undefined) filters.hideNCAAPlayerProps = Boolean(args.hideNCAAPlayerProps);
       let raw;
       try {
         raw = await client.querySmartMoney(filters);
