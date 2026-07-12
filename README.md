@@ -7,7 +7,7 @@
   <a href="https://github.com/j17drake/propprofessor-mcp/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/j17drake/propprofessor-mcp/ci.yml?branch=main&label=ci" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/tests-1396%20passing-44cc11" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-passing-44cc11" alt="Tests" />
   <img src="https://img.shields.io/badge/coverage-82%25-44cc11" alt="Coverage" />
   <img src="https://img.shields.io/badge/node-18%2B-44cc11" alt="Node" />
   <a href="LICENSE">
@@ -43,6 +43,8 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
 4. **Ask your agent:** _"What are tonight's sharpest plays on Fliff?"_
 
 That's it — your agent now sees 30 tools.
+
+> **Verify your install:** `npm run install:verify` runs the non-API test suite (53 tests, no credentials needed).
 
 > Prefer the CLI? `node scripts/query-propprofessor.js list` shows every command. `node scripts/query-propprofessor.js smart` shows live sharp-money volumes. Run `node scripts/query-propprofessor.js doctor` if anything misbehaves.
 
