@@ -30,7 +30,7 @@ describe('backtest metrics (real P&L / ROI / Sharpe / drawdown)', () => {
   describe('computeBacktestMetrics — fixture', () => {
     const fixture = JSON.parse(
       fs.readFileSync(
-        path.join(__dirname, '..', 'backtest-data', '2026-06-10-mlb-moneyline.resolved.json'),
+        path.join(__dirname, 'fixtures', 'mlb-moneyline-resolved.json'),
         'utf8'
       )
     );

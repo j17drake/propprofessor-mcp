@@ -1,0 +1,17 @@
+{
+  "meta": { "league": "MLB", "market": "Moneyline", "date": "2026-06-10", "totalRows": 3 },
+  "summary": { "TIER 1": 1, "TIER 2": 1, "TIER 3": 1 },
+  "byTier": {
+    "TIER 1": [{ "participant": "Yankees", "odds": -140 }],
+    "TIER 2": [{ "participant": "Dodgers", "odds": -110 }],
+    "TIER 3": [{ "participant": "Braves", "odds": 155 }]
+  },
+  "resolved": {
+    "resolvedAt": "2026-06-11T06:00:00.000Z",
+    "plays": [
+      { "participant": "Yankees", "odds": -140, "stake": 100, "result": "won" },
+      { "participant": "Dodgers", "odds": -110, "stake": 100, "result": "lost" },
+      { "participant": "Braves", "odds": 155, "stake": 100, "result": "won" }
+    ]
+  }
+}
