@@ -77,7 +77,7 @@ describe('server-side stderr error logging', () => {
         // We mount it via the toolDefinitions override.
         // Since the existing toolDefinitions list is fixed, we use a real tool
         // name and replace its handler with one that throws.
-        recommended_bets: async () => {
+        quick_screen: async () => {
           throw new Error('downstream API call failed');
         }
       }
@@ -89,7 +89,7 @@ describe('server-side stderr error logging', () => {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'recommended_bets', arguments: {} }
+      params: { name: 'quick_screen', arguments: {} }
     });
 
     // The tool call returned a structured error response (not a JSON-RPC
@@ -100,7 +100,7 @@ describe('server-side stderr error logging', () => {
     assert.equal(result.result.isError, true, 'isError flag set on the result');
 
     const output = stderr.text();
-    assert.ok(output.includes('tool=recommended_bets'), `stderr should include tool name, got: ${output}`);
+    assert.ok(output.includes('tool=quick_screen'), `stderr should include tool name, got: ${output}`);
     assert.ok(
       output.includes('message=downstream API call failed'),
       `stderr should include the error message, got: ${output}`
@@ -115,7 +115,7 @@ describe('server-side stderr error logging', () => {
     const secret = 'ya29.' + 'A'.repeat(40);
     const server = createMcpServer({
       handlers: {
-        recommended_bets: async () => {
+        quick_screen: async () => {
           const e = new Error(`Upstream call failed: bearer ${secret}`);
           throw e;
         }
@@ -128,7 +128,7 @@ describe('server-side stderr error logging', () => {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'recommended_bets', arguments: {} }
+      params: { name: 'quick_screen', arguments: {} }
     });
 
     const output = stderr.text();
@@ -139,7 +139,7 @@ describe('server-side stderr error logging', () => {
   it('does not write to stderr on successful tool calls', async () => {
     const server = createMcpServer({
       handlers: {
-        recommended_bets: async () => ({ ok: true, result: [] })
+        quick_screen: async () => ({ ok: true, result: [] })
       }
     });
     await send(server, { jsonrpc: '2.0', id: 1, method: 'initialize' });
@@ -149,19 +149,19 @@ describe('server-side stderr error logging', () => {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'recommended_bets', arguments: {} }
+      params: { name: 'quick_screen', arguments: {} }
     });
 
     assert.equal(stderr.text(), '', 'no stderr on success');
   });
 
   it('does not write to stderr when arg validation fails (expected client error)', async () => {
-    // recommended_bets requires `leagues: Array<string>`. Pass an empty object
+    // quick_screen is being called with an invalid leagues type (string, not array).
     // so the server-side validator rejects the call before reaching the
     // handler. This should NOT produce a stderr line — it's a client error.
     const server = createMcpServer({
       handlers: {
-        recommended_bets: async () => {
+        quick_screen: async () => {
           throw new Error('handler should not be called for invalid args');
         }
       }
@@ -173,7 +173,7 @@ describe('server-side stderr error logging', () => {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'recommended_bets', arguments: { leagues: 'not-an-array' } }
+      params: { name: 'quick_screen', arguments: { leagues: 'not-an-array' } }
     });
 
     assert.equal(result.result.isError, true, 'validation should fail');

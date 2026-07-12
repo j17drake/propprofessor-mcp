@@ -38,7 +38,7 @@ ask({ query: "best WNBA play on NoVigApp tonight" })
 
 ## Pattern 2 — Validate a play before recommending it
 
-After you have a candidate (from `today`, `quick_screen`, or `recommended_bets`),
+After you have a candidate (from `today` or `quick_screen`),
 run `validate_play` to get a verdict with a plain-English `actionableSummary`.
 
 ```
@@ -121,7 +121,7 @@ player_context({ player: "Ohtani", league: "MLB" })   # injury / availability
 For sharp-money confirmation across Pinnacle/Circa/BookMaker/BetOnline:
 
 ```
-sharp_plays({ league: "NBA", market: "Moneyline" })
+quick_screen({ leagues: ["NBA"], book: "NoVigApp", mode: "sharp" })
 smart_money({ league: "NBA", sportsbooks: ["Pinnacle","Circa"] })
 ```
 
@@ -132,12 +132,16 @@ smart_money({ league: "NBA", sportsbooks: ["Pinnacle","Circa"] })
 - **Don't call `log_pick` directly.** Use `place_bet` — it validates first and
   won't spam your history with PASS-grade non-bets.
 - **Don't trust `TIER 1` as a win guarantee.** It's a sharp-agreement rating.
+  Always validate the play, check player_context for injuries, and confirm the
+  odds are still in your range before placing a bet.
+- **Don't call retired tools.** `recommended_bets`, `sharp_plays`, and
+  `tonight_bets` are gone. Use `quick_screen` with `mode` presets instead.
 - **Don't skip `validate_play` before recommending.** The `actionableSummary`
   is what makes a recommendation defensible.
 - **Don't fabricate odds.** Use `find_best_price` to get real numbers per book.
 
 ## Tool count
 
-33 tools total (full mode). Lite mode (15 tools) is the curated set for
+30 tools total (full mode). Lite mode (14 tools) is the curated set for
 resource-constrained agents — it includes `ask`, `today`, `quick_screen`,
-`validate_play`, `place_bet`, `recommended_bets`, and the tracking tools.
+`validate_play`, `place_bet`, `quick_screen`, and the tracking tools.

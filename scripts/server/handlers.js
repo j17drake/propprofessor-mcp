@@ -3654,13 +3654,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           player: parsed.player
         },
         suggestedTool: {
-          tool: 'recommended_bets',
+          tool: 'quick_screen',
           args: {
+            mode: 'recommended',
             ...(parsed.league ? { leagues: [parsed.league] } : {}),
             ...(parsed.market ? { markets: [parsed.market] } : {})
           }
         },
-        workflow: 'Executed recommended_bets.',
+        workflow: 'Executed quick_screen (mode=recommended).',
         result: result
       };
     },
@@ -3755,7 +3756,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             'Call quick_screen with kaiCall=["BET"] and sortBy="start" to get Bet-only plays ordered by soonest game. Use verbosity="full" for complete data — edge, tier, risk, line history, and research.',
             'For lowest risk first, use sortBy="riskScore" (default: asc).',
             'Use sharp_consensus to check multi-window movement.',
-            'Use sharp_plays to find plays with independent sharp support.',
+            'Use quick_screen with mode=\"sharp\" to find plays with independent sharp support.',
             'Call get_play_details for line history on specific plays.',
             'Use staking_plan for Kelly sizing.',
             'Check player_context for injury risk on final picks.'
@@ -3763,7 +3764,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           tools_to_use: [
             'quick_screen',
             'sharp_consensus',
-            'sharp_plays',
             'get_play_details',
             'staking_plan',
             'player_context',
@@ -3782,13 +3782,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               one_liner: 'Multi-league ranked consolidation.',
               when_to_call: 'Daily discovery. Use instead of looping screen_ranked over each league.'
             },
-            {
-              name: 'sharp_plays',
-              one_liner: 'Plays with independent sharp confirmation across Pinnacle/Circa/BookMaker/BetOnline.',
-              when_to_call: 'When the user wants the highest-conviction multi-sharp plays only.'
-            },
-            {
-              name: 'sharp_consensus',
+            {              name: 'sharp_consensus',
               one_liner: 'Multi-window (1h-48h) sharp movement analysis.',
               when_to_call: 'When you need to see whether a move is sustained or just a one-off.'
             },

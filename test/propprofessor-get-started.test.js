@@ -53,7 +53,6 @@ describe('get_started handler', () => {
     assert.ok(Array.isArray(result.steps));
     assert.ok(result.tools_to_use.includes('quick_screen'));
     assert.ok(result.tools_to_use.includes('sharp_consensus'));
-    assert.ok(result.tools_to_use.includes('sharp_plays'));
     assert.ok(result.tools_to_use.includes('staking_plan'));
     assert.deepEqual(result.avoid, []);
   });

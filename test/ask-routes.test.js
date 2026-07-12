@@ -97,7 +97,7 @@ describe('ask() executes the suggested tool, not just suggests it', () => {
       const result = await handlers.ask({ query: 'what is sharp today' });
       assert.equal(result.ok, true);
       assert.equal(callCount.recommended_bets, 1);
-      assert.equal(result.suggestedTool?.tool, 'recommended_bets');
+      assert.equal(result.suggestedTool?.tool, 'quick_screen');
     });
 
     it('missing query throws MISSING_PARAMS (preserves existing contract)', async () => {
