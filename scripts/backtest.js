@@ -28,6 +28,7 @@ const { createPropProfessorClient } = require('../lib/propprofessor-api');
 const { extractScreenRows } = require('../lib/screen-parser');
 const { getConfidenceTier } = require('../lib/propprofessor-risk-score');
 const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
+const { computeBacktestMetrics } = require('../lib/propprofessor-backtest-metrics');
 
 // Defense-in-depth league guard. The cron wrapper
 // (scripts/backtest-daily-snapshot.js) validates, but anyone calling
@@ -79,6 +80,7 @@ function parseArgs(argv) {
     snapshot:
       flags.snapshot !== undefined ? (flags.snapshot === true || flags.snapshot === '' ? true : flags.snapshot) : false,
     resolve: flags.resolve || null,
+    metrics: flags.metrics || null,
     wins: parseInt(flags.wins, 10) || 0,
     losses: parseInt(flags.losses, 10) || 0,
     pushes: parseInt(flags.pushes, 10) || 0
@@ -240,10 +242,42 @@ async function aggregate({ league, market, days }) {
 }
 
 // ---------------------------------------------------------------------------
+// Metrics: P&L / ROI / Sharpe / drawdown from a resolved snapshot's plays
+// ---------------------------------------------------------------------------
+
+function reportMetrics(file) {
+  const fpath = path.isAbsolute(file) ? file : path.join(DATA_DIR, file);
+  if (!fs.existsSync(fpath)) {
+    console.error(`Snapshot not found: ${fpath}`);
+    return { ok: false, error: 'file_not_found' };
+  }
+  const snapshot = JSON.parse(fs.readFileSync(fpath, 'utf8'));
+  const plays = snapshot.resolved && snapshot.resolved.plays;
+  if (!Array.isArray(plays) || plays.length === 0) {
+    console.error(`Snapshot ${path.basename(fpath)} has no per-play outcomes to score.`);
+    console.error('Resolve with per-play outcomes first (set resolved.plays = [{odds, stake, result}]).');
+    return { ok: false, error: 'no_plays' };
+  }
+
+  const m = computeBacktestMetrics(plays);
+  console.log(`\\nBacktest Metrics — ${path.basename(fpath)}`);
+  console.log(`  Bets:      ${m.bets} (${m.wins}W / ${m.losses}L / ${m.pushes}P)`);
+  console.log(`  Win rate:  ${m.winRate === null ? 'n/a' : m.winRate + '%'}`);
+  console.log(`  P&L:       $${m.profit.toFixed(2)}`);
+  console.log(`  ROI:       ${m.roi === null ? 'n/a' : m.roi.toFixed(1) + '%'}`);
+  console.log(`  Sharpe:    ${m.sharpe === null ? 'n/a' : m.sharpe}`);
+  console.log(`  Max DD:    $${m.maxDrawdown.toFixed(2)}`);
+  return { ok: true, metrics: m };
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
 async function main(opts) {
+  if (opts.metrics) {
+    return reportMetrics(opts.metrics);
+  }
   if (opts.resolve) {
     return resolveSnapshot(opts.resolve, { wins: opts.wins, losses: opts.losses, pushes: opts.pushes });
   }
