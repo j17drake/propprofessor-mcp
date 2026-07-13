@@ -155,4 +155,57 @@ describe('computeMovementDisposition', () => {
     assert.equal(computeMovementDisposition(undefined), 'insufficient');
     assert.equal(computeMovementDisposition({}), 'insufficient');
   });
+
+  it('upgrades insufficient_history to supportive_bouncy when sharp money confirmed', () => {
+    assert.equal(
+      computeMovementDisposition({
+        movementGrade: 'yellow',
+        movementLabel: 'insufficient_history',
+        recentSharpMoveDirection: 'insufficient_history',
+        fullWindowSharpMoveDirection: 'insufficient_history',
+        sharpBookMovementConfirmed: true,
+        sharpBookMovementSource: 'Pinnacle'
+      }),
+      'supportive_bouncy'
+    );
+  });
+
+  it('still returns insufficient when not sharp-confirmed (no regression)', () => {
+    assert.equal(
+      computeMovementDisposition({
+        movementGrade: 'yellow',
+        movementLabel: 'insufficient_history',
+        recentSharpMoveDirection: 'insufficient_history',
+        fullWindowSharpMoveDirection: 'insufficient_history',
+        sharpBookMovementConfirmed: false
+      }),
+      'insufficient'
+    );
+  });
+
+  it('upgrades mixed-with-no-recent-direction to supportive_bouncy when sharp confirmed', () => {
+    assert.equal(
+      computeMovementDisposition({
+        movementGrade: 'yellow',
+        movementLabel: 'mixed',
+        recentSharpMoveDirection: 'insufficient_history',
+        fullWindowSharpMoveDirection: 'insufficient_history',
+        sharpBookMovementConfirmed: true
+      }),
+      'supportive_bouncy'
+    );
+  });
+
+  it('does NOT override adverse_recent even when sharp confirmed', () => {
+    assert.equal(
+      computeMovementDisposition({
+        movementGrade: 'yellow',
+        movementLabel: 'supportive',
+        recentSharpMoveDirection: 'adverse',
+        fullWindowSharpMoveDirection: 'supportive',
+        sharpBookMovementConfirmed: true
+      }),
+      'adverse_recent'
+    );
+  });
 });
