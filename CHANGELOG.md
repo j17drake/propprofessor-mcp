@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- fix: movementDisposition now upgrades `insufficient` to `supportive_bouncy` when `sharpBookMovementConfirmed` is true (independent sharp book moved on the side) — previously sharp-confirmed plays on thin-history slates were mislabeled "can't tell". Adverse dispositions are untouched.
+
 **cardWindow timezone fix + agent-access hardening.**
 
 ### What changed
