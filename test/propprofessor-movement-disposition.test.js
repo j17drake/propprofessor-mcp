@@ -196,6 +196,36 @@ describe('computeMovementDisposition', () => {
     );
   });
 
+  it('upgrades both-windows-mixed to supportive_bouncy when sharp confirmed (production shape)', () => {
+    // Production tennis rows report recentDir AND fullDir both 'mixed'
+    // (not 'insufficient_history'). The mixed branch must still honor
+    // sharpBookMovementConfirmed via the shared insufficient() helper.
+    assert.equal(
+      computeMovementDisposition({
+        movementGrade: 'yellow',
+        movementLabel: 'mixed',
+        recentSharpMoveDirection: 'mixed',
+        fullWindowSharpMoveDirection: 'mixed',
+        sharpBookMovementConfirmed: true,
+        sharpBookMovementSource: 'Pinnacle'
+      }),
+      'supportive_bouncy'
+    );
+  });
+
+  it('keeps both-windows-mixed as insufficient when not sharp-confirmed', () => {
+    assert.equal(
+      computeMovementDisposition({
+        movementGrade: 'yellow',
+        movementLabel: 'mixed',
+        recentSharpMoveDirection: 'mixed',
+        fullWindowSharpMoveDirection: 'mixed',
+        sharpBookMovementConfirmed: false
+      }),
+      'insufficient'
+    );
+  });
+
   it('does NOT override adverse_recent even when sharp confirmed', () => {
     assert.equal(
       computeMovementDisposition({
