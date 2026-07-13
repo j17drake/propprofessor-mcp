@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+**cardWindow timezone fix + agent-access hardening.**
+
+### What changed
+- **`cardWindow:'today'`/`'next'` now use local timezone (America/Chicago), not UTC.** Previously the date key was built from `toISOString()` (UTC), so any game tipping after the UTC midnight flip (≈7pm CT) got a *next-day* UTC key and was silently filtered out of `today`. A live Tier 1 could vanish from the scan. Fixed in both the `screen` tool path and the `quick_screen` aggregate path (incl. the next-day merge) via a new `localDateKey(ms, tz)` helper in `lib/mcp-runtime-config.js`.
+- **`get_play_details` accepts a singular `book` alias.** Agents (and the skill docs) pass `book` (singular); the schema only allowed `books` (array) and rejected it with `VALIDATION_ERROR`. The handler now coerces `book` → `books:[book]`. Both forms work.
+- **`today()` slate rows now include `gameId`.** The one-call briefing omitted `gameId`, so an agent couldn't chain straight into `validate_play` (which requires it). Rows now carry `gameId` for direct chaining.
+
+### Tests
+- `test/local-date-key.test.js` — `localDateKey` timezone math (late-night local game stays on same local day).
+- `test/card-window-timezone.test.js` — replicates the fixed filter predicate contract.
+- `test/get-play-details-book-alias.test.js` — `book` schema gate + coercion.
+- `test/today-gameid.test.js` — `gameId` passes through `today()` → slate.
+
 **Tool consolidation (33→30) + response cache + agent self-documentation.**
 
 ### What changed
