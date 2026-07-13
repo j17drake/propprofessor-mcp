@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- fix: mapCandidateRow now recomputes movementDisposition via computeMovementDisposition instead of copying a pre-tag stamp, so the sharp-confirmation upgrade (insufficient -> supportive_bouncy) actually applies in quick_screen / screen output. Previously the disposition was stamped before sharpBookMovementConfirmed was set, leaving sharp-backed thin-history plays as "insufficient".
 - fix: movementDisposition now upgrades `insufficient` to `supportive_bouncy` when `sharpBookMovementConfirmed` is true (independent sharp book moved on the side) — previously sharp-confirmed plays on thin-history slates were mislabeled "can't tell". Adverse dispositions are untouched.
 
 **cardWindow timezone fix + agent-access hardening.**
