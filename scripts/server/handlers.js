@@ -34,6 +34,7 @@ const {
   createCanonicalScreenCache,
   parseGameStartMs
 } = require('../../lib/propprofessor-shared-utils');
+const { getLocalTimezone, localDateKey } = require('../../lib/mcp-runtime-config');
 
 /**
  * Get default markets for a given league and book.
@@ -1644,14 +1645,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           .trim()
           .toLowerCase();
         if (cardWindow === 'today' || cardWindow === 'next') {
+          const tz = getLocalTimezone();
           const nowMs = Date.now();
-          const todayKey = new Date(nowMs).toISOString().slice(0, 10);
-          const nextKey = new Date(nowMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          const todayKey = localDateKey(nowMs, tz);
+          const nextKey = localDateKey(nowMs + 24 * 60 * 60 * 1000, tz);
           screenResult.result = screenResult.result.filter((row) => {
             if (!row) return true; // keep rows without row data
             const startMs = parseGameStartMs(row.start);
             if (!startMs) return true; // keep rows without parseable start time
-            const startDateKey = new Date(startMs).toISOString().slice(0, 10);
+            const startDateKey = localDateKey(startMs, tz);
             return cardWindow === 'today' ? startDateKey === todayKey : startDateKey === nextKey;
           });
         }
