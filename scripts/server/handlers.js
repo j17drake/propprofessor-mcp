@@ -3958,6 +3958,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const slate = (slateRes.results || []).flatMap((e) =>
         (e.candidates || []).map((c) => ({
           game: c.game,
+          gameId: c.gameId,
           market: c.market,
           selection: c.selection,
           odds: c.odds,
