@@ -25,4 +25,56 @@ describe('mapCandidateRow screenUrl', () => {
     const out = mapCandidateRow({ selection: 'Lakers' });
     assert.equal(out.screenUrl, null);
   });
+
+  it('recomputes movementDisposition via computeMovementDisposition (honors sharpBookMovementConfirmed)', () => {
+    const out = mapCandidateRow({
+      gameId: 'Tennis:PREMATCH:Rodionov:Tabur:1783937400',
+      market: 'Moneyline',
+      selection: 'Rodionov',
+      movementGrade: 'yellow',
+      movementLabel: 'insufficient_history',
+      recentSharpMoveDirection: 'insufficient_history',
+      fullWindowSharpMoveDirection: 'insufficient_history',
+      sharpBookMovementConfirmed: true,
+      sharpBookMovementSource: 'Pinnacle',
+      confidenceTier: 'TIER 2',
+      consensusBookCount: 16
+    });
+    assert.equal(out.movementDisposition, 'supportive_bouncy');
+    assert.equal(out.sharpBookMovementConfirmed, true);
+  });
+
+  it('does not trust a stale incoming movementDisposition when the flag is present', () => {
+    // Incoming row carries a stale 'insufficient' stamp (pre-tag) — mapper must override it.
+    const out = mapCandidateRow({
+      gameId: 'Tennis:PREMATCH:Rodionov:Tabur:1783937400',
+      market: 'Moneyline',
+      selection: 'Rodionov',
+      movementDisposition: 'insufficient',
+      movementGrade: 'yellow',
+      movementLabel: 'insufficient_history',
+      recentSharpMoveDirection: 'insufficient_history',
+      fullWindowSharpMoveDirection: 'insufficient_history',
+      sharpBookMovementConfirmed: true
+    });
+    assert.equal(out.movementDisposition, 'supportive_bouncy');
+  });
+
+  it('recomputed disposition drives staleMovementWarning correctly', () => {
+    const out = mapCandidateRow({
+      gameId: 'G:1',
+      market: 'Moneyline',
+      selection: 'X',
+      movementDisposition: 'adverse_full', // stale incoming — must be ignored
+      movementGrade: 'red',
+      movementLabel: 'adverse',
+      recentSharpMoveDirection: 'adverse',
+      fullWindowSharpMoveDirection: 'adverse',
+      sharpBookMovementConfirmed: false,
+      confidenceTier: 'TIER 1',
+      consensusBookCount: 12
+    });
+    assert.equal(out.movementDisposition, 'adverse_full');
+    assert.equal(out.staleMovementWarning, true);
+  });
 });
