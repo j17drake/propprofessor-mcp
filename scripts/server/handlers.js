@@ -2175,10 +2175,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // the user didn't explicitly ask for 'today', fall through to 'next' so
       // we surface tomorrow's action instead of a near-empty response.
       if (cardWindow === 'today' || cardWindow === 'next') {
+        const tz = getLocalTimezone();
         let targetDateKey =
           cardWindow === 'today'
-            ? new Date().toISOString().slice(0, 10)
-            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+            ? localDateKey(Date.now(), tz)
+            : localDateKey(Date.now() + 24 * 60 * 60 * 1000, tz);
 
         const filterBy = (key) => {
           for (const entry of allCandidates) {
@@ -2186,7 +2187,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             entry.candidates = entry.candidates.filter((row) => {
               const startMs = parseGameStartMs(row.start);
               if (!startMs) return true; // keep rows without parseable start time
-              return new Date(startMs).toISOString().slice(0, 10) === key;
+              return localDateKey(startMs, tz) === key;
             });
           }
         };
@@ -2211,14 +2212,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           const totalLive = allCandidates.reduce((sum, e) => sum + (e.candidates?.length || 0), 0);
           // Always check tomorrow — if there are ANY tomorrow candidates,
           // merge them in instead of replacing today.
-          const nextKey = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          const nextKey = localDateKey(Date.now() + 24 * 60 * 60 * 1000, tz);
           const nextCandidates = [];
           for (const entry of fullCandidatesSnapshot) {
             if (!entry.candidates || !entry.candidates.length) continue;
             const nextRows = entry.candidates.filter((row) => {
               const startMs = parseGameStartMs(row.start);
               if (!startMs) return true;
-              return new Date(startMs).toISOString().slice(0, 10) === nextKey;
+              return localDateKey(startMs, tz) === nextKey;
             });
             if (nextRows.length > 0) {
               nextCandidates.push({
@@ -3325,6 +3326,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // ─── Play Detail & Validation Handlers ──────────────────────────────────
 
     async get_play_details(args = {}) {
+      if (!args.books && args.book) {
+        args.books = [args.book];
+      }
       const canonicalKey = canonicalizeScreenArgs(args);
       if (canonicalKey) {
         return await canonicalScreenCache.memoize(async () => {
