@@ -438,9 +438,11 @@ describe('formatQuickScreenMinimal — parseable flag', () => {
     assert.equal(typeof out.summary, 'string');
   });
 
-  it('omits plays when parseable is omitted', () => {
+  it('always includes plays array by default (parseable=true is the new default)', () => {
     const out = formatQuickScreenMinimal(response);
-    assert.equal(out.plays, undefined);
+    assert.ok(Array.isArray(out.plays), 'plays should always be included');
+    assert.equal(out.plays.length, 1);
+    assert.equal(out.plays[0].selection, 'Gauff');
     assert.equal(typeof out.summary, 'string');
   });
 });
