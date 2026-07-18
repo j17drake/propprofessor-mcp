@@ -133,7 +133,7 @@ function createMcpServer({
       // both forms are guaranteed to be valid here.
       const normalizedArgs = normalizeArgs(toolName, params?.arguments || {});
       try {
-        const result = await handler(normalizedArgs);
+        const result = await handler.call(handlers, normalizedArgs);
         return createJsonRpcSuccess(id, {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
           structuredContent: result

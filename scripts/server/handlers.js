@@ -109,7 +109,8 @@ const {
   formatGetPlayDetailsMinimal,
   formatGetPlayDetailsStandard,
   formatQuickScreenMinimal,
-  formatQuickScreenStandard
+  formatQuickScreenStandard,
+  formatQuickScreenBets
 } = require('../../lib/propprofessor-formatter');
 const { filterRowsByKaiCall, filterRowsByMinEV } = require('../../lib/propprofessor-row-filter');
 const { sortRows } = require('../../lib/propprofessor-sort-utils');
@@ -443,6 +444,7 @@ function applyValidatedFields(target, validationResult) {
   target.validatedRiskFlags = verdict.riskFlags || [];
   target.validatedActionableSummary = verdict.actionableSummary || null;
   target.validatedConsensusSupport = verdict.consensusSupport || null;
+  target.rationale = verdict.rationale || null;
 
   if (gameCtx) {
     target.validatedGameContext = gameCtx;
@@ -541,6 +543,13 @@ function promoteFinalVerdictToDisplay(target) {
   if (target.finalConfidenceTier) {
     target.confidenceTier = target.finalConfidenceTier;
   }
+  // GUARD: a PASS verdict always forces TIER 4 regardless of any
+  // stale TIER 1/2/3 that may have leaked from the screen snapshot.
+  // Without this, promoteFinalVerdictToDisplay would ship TIER 1 + PASS
+  // (structurally impossible per gradeRiskToTierAndCall's contract).
+  if (target.finalVerdict === 'PASS') {
+    target.confidenceTier = 'TIER 4';
+  }
 }
 
 /**
@@ -602,13 +611,58 @@ function stripLiteResponse(response) {
   return response;
 }
 
+/**
+ * Strip BET/CONSIDER/PASS verdict fields from candidate rows.
+ * Keeps tier-based signal (confidenceTier, edge, movement, risk) while
+ * removing the oscillating verdict layer that confuses agents and users.
+ *
+ * Applied per-row; call after validation merge but before response assembly.
+ */
+const VERDICT_FIELDS = [
+  'kaiCall',
+  'displayTier',
+  'finalVerdict',
+  'finalConfidenceTier',
+  'validatedTier',
+  'validatedVerdict',
+  'validatedConfidenceTier',
+  'validatedConsensusDrift',
+  'validatedDriftReason',
+  'validatedUnverified',
+  'validatedReconcileOverridden',
+  'validatedReconcileReason',
+  'validatedRiskFlags',
+  'rationale',
+];
+
+function stripVerdictFields(candidate) {
+  for (const field of VERDICT_FIELDS) {
+    delete candidate[field];
+  }
+}
+
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
-  const { getCacheTtlMs, getCacheMaxEntries } = require('../../lib/mcp-runtime-config');
+  const { getCacheTtlMs, getCacheMaxEntries, getCacheMaxEntrySizeBytes } = require('../../lib/mcp-runtime-config');
   const { LruCache } = require('../../lib/propprofessor-lru-cache');
+
+  // --- helpers ---
+
+  /**
+   * Hint the JS engine that now is a good time to run GC.
+   * Only fires when the process was started with --expose-gc.
+   * Quick-screen fan-out allocates hundreds of MB across concurrent HTTP
+   * calls; without an explicit hint the engine may hold young-generation
+   * objects far longer than needed, ballooning RSS by 500+ MB per call.
+   */
+  const _maybeGc = typeof global.gc === 'function'
+    ? () => { try { global.gc(); } catch (_) { /* best-effort */ } }
+    : () => {};
 
   // Single shared response cache — backed directly by LruCache (lib/propprofessor-lru-cache.js).
   // TTL is applied per-set since LruCache supports per-entry TTL.
-  const responseCache = new LruCache(getCacheMaxEntries());
+  // maxEntrySizeBytes caps per-entry size to prevent a single giant quick_screen
+  // response (validation + research across 10 leagues) from dominating the heap.
+  const responseCache = new LruCache(getCacheMaxEntries(), getCacheMaxEntrySizeBytes());
   const responseCacheTtlMs = getCacheTtlMs();
 
   // Canonical screen cache for stable (gameId, market, book) tuples.
@@ -963,6 +1017,32 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       if (Object.keys(matrix).length) row.oddsMatrix = matrix;
     }
+    // Stamp sharpBookMovementConfirmed on detail rows so validate_play
+    // re-derivations don't lose the sharp-book signal and downgrade
+    // movementDisposition to 'insufficient'. The detail query already
+    // includes the league's sharp books (line ~884); if the consensus
+    // movement label is supportive, the sharp books are onside.
+    for (const row of response.result) {
+      if (row.sharpBookMovementConfirmed) continue;
+      const label = String(row.movementLabel || '').toLowerCase();
+      if (label === 'supportive') {
+        // Check that a sharp book actually has odds for this row.
+        // SportsbookData carries hydrated per-book entries.
+        const sb = Array.isArray(row?.sportsbookData) ? row.sportsbookData : [];
+        const sharpBookNames = new Set(sharpBookSetDetail.map((b) => b.toLowerCase()));
+        const hasSharpBookOdds = sb.some(
+          (entry) => sharpBookNames.has(String(entry?.book || '').toLowerCase())
+        );
+        if (hasSharpBookOdds) {
+          row.sharpBookMovementConfirmed = true;
+          // Find the first sharp book with odds as the source.
+          const sourceEntry = sb.find(
+            (entry) => sharpBookNames.has(String(entry?.book || '').toLowerCase())
+          );
+          row.sharpBookMovementSource = sourceEntry?.book || sharpBookSetDetail[0] || null;
+        }
+      }
+    }
     // Drop the non-enumerable focusBookMissingRows from the response —
     // they've been merged into result.
     response.focusBookMissingRows = undefined;
@@ -1169,6 +1249,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     let reasonType = 'signal';
 
     // Consensus drift detection: compare the agent's snapshot against the re-fetched row.
+    // Drift is only meaningful when the consensus materially collapses — a 15→12 book
+    // swing is normal market noise, not a reason to downgrade. Use relative threshold:
+    // must lose >25% of books AND at least 4 books absolute to qualify as drift.
+    // This prevents the validateTop path from producing false PASSes that the standalone
+    // validate_play (which doesn't pass screenConsensusBookCount) never would.
     let consensusDrift = false;
     let driftReason = null;
     if (matchingRow) {
@@ -1177,10 +1262,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const currentCbk = Number(matchingRow.consensusBookCount || 0);
       const currentExec = String(matchingRow.executionQuality || '');
 
-      if (Number.isFinite(screenCbk) && screenCbk > 0 && screenCbk !== currentCbk) {
-        consensusDrift = true;
-        driftReason = 'consensus changed';
-      } else if (screenExec && screenExec !== 'unknown' && screenExec !== currentExec) {
+      if (Number.isFinite(screenCbk) && screenCbk > 0) {
+        const absDrop = screenCbk - currentCbk;
+        const pctDrop = screenCbk > 0 ? absDrop / screenCbk : 0;
+        // Only flag drift when the book count meaningfully collapsed:
+        // lost at least 4 books AND lost more than 25% of the screen consensus.
+        if (absDrop >= 4 && pctDrop > 0.25) {
+          consensusDrift = true;
+          driftReason = `consensus collapsed (${screenCbk} → ${currentCbk} books)`;
+        }
+      }
+      if (!consensusDrift && screenExec && screenExec !== 'unknown' && screenExec !== currentExec) {
         consensusDrift = true;
         driftReason = 'execution quality changed';
       }
@@ -1279,7 +1371,28 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // Combines movement disposition, verdict, risk flags, and execution quality
     // into a single "should I bet this" answer. This encodes the bet-card drill
     // so no agent-side skill doc is needed.
-    const _disposition = matchingRow ? computeMovementDisposition(matchingRow) : 'insufficient';
+    //
+    // BUGFIX: the re-fetched matchingRow from get_play_details often lacks
+    // sharpBookMovementConfirmed (set during quick_screen's sharp-book cross-
+    // reference, not in the detail endpoint). Without it, computeMovementDisposition
+    // returns 'insufficient' on thin-history slates where the screen correctly
+    // showed supportive_bouncy. Carry the screen snapshot's value if available.
+    const _rowForDisposition = matchingRow ? { ...matchingRow } : null;
+    if (_rowForDisposition && !_rowForDisposition.sharpBookMovementConfirmed && args.screenSharpBookConfirmed) {
+      _rowForDisposition.sharpBookMovementConfirmed = true;
+    }
+    const _disposition = _rowForDisposition ? computeMovementDisposition(_rowForDisposition) : 'insufficient';
+
+    // Tier downgrade for adverse movement: the screen ranker's tier is a
+    // pre-validation snapshot — it can't see what the re-fetch reveals. If
+    // validation finds adverse movement (adverse_recent or adverse_full),
+    // the play's tier must reflect that. Otherwise you get TIER 2 plays
+    // with validated "movement adverse" sitting above TIER 3 plays with
+    // validated "supportive_clean" — the tier lies.
+    if ((_disposition === 'adverse_recent' || _disposition === 'adverse_full') && tier !== 'TIER 4') {
+      tier = 'TIER 3';
+      reasons.push(`movement ${_disposition} — tier downgraded from screen snapshot`);
+    }
 
     const _statusMessages = {
       supportive_clean: 'all signals aligned — green movement, supportive direction, clean path',
@@ -1311,14 +1424,26 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     } else if (verdict === 'CONSIDER') {
       // Nuanced tiers within CONSIDER — not all thin plays are equal.
       const cbk = Number(matchingRow?.consensusBookCount || 0);
-      const edge = Number(matchingRow?.consensusEdge || 0);
+      // Fall back to screen snapshot's edge when the re-fetched row lacks it
+      // (the detail endpoint doesn't always compute consensusEdge).
+      const edge = Number(matchingRow?.consensusEdge || args.screenConsensusEdge || 0);
       const clv = Number(matchingRow?.clvProxyPct || 0);
       const riskFlagsSuffix = _riskFlags.length > 0 ? ` — ${_riskFlags.join(', ')}` : '';
 
-      if (cbk >= 8 && _disposition === 'supportive_clean' && edge > 1.5) {
+      if (cbk >= 10 && _disposition === 'supportive_clean') {
+        _actionableSummary = `Deep consensus (${cbk} books, ${edge.toFixed(1)}% edge). Clean movement — playable with standard sizing.`;
+      } else if (cbk >= 8 && _disposition === 'supportive_clean' && edge > 1.5) {
         _actionableSummary = `Strong signal across deep consensus (${cbk} books, ${edge.toFixed(1)}% edge). Playable with standard sizing.`;
+      } else if (cbk >= 8 && _disposition === 'supportive_bouncy' && edge > 1.0) {
+        _actionableSummary = `Deep consensus (${cbk} books, ${edge.toFixed(1)}% edge). Direction is right but path was rocky — standard sizing.`;
+      } else if (cbk >= 8 && _disposition === 'supportive_clean') {
+        _actionableSummary = `Deep consensus (${cbk} books). Clean movement, edge is thin (${edge.toFixed(1)}%) — reduce stake.`;
+      } else if (cbk >= 8 && _disposition === 'supportive_bouncy') {
+        _actionableSummary = `Deep consensus (${cbk} books). Bouncy movement, edge is thin (${edge.toFixed(1)}%) — reduce stake${riskFlagsSuffix}.`;
       } else if (cbk >= 5 && _disposition === 'supportive_clean' && edge > 0.5) {
         _actionableSummary = `Solid signal — ${cbk} books agree, clean movement. Standard sizing${riskFlagsSuffix}.`;
+      } else if (cbk >= 5 && _disposition === 'supportive_bouncy' && edge > 0.5) {
+        _actionableSummary = `Decent consensus (${cbk} books, ${edge.toFixed(1)}% edge). Bouncy but direction is right — reduce stake${riskFlagsSuffix}.`;
       } else if (cbk >= 3 && _disposition !== 'adverse_recent') {
         _actionableSummary = `Thin consensus (${cbk} books) but direction is right. Reduce stake or skip${riskFlagsSuffix}.`;
       } else if (cbk >= 1) {
@@ -1338,7 +1463,21 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       consensusSupport:
         matchingRow?.consensusBookCount > 0 ? `${matchingRow.consensusBookCount} books` : 'no consensus',
       riskFlags: _riskFlags,
-      actionableSummary: _actionableSummary
+      actionableSummary: _actionableSummary,
+      rationale: (() => {
+        const parts = [];
+        const sharpSource = matchingRow?.sharpBookMovementSource || null;
+        if (sharpSource) parts.push(`${sharpSource} confirms`);
+        if (_disposition === 'supportive_clean') parts.push('clean movement');
+        else if (_disposition === 'supportive_bouncy') parts.push('direction right, bouncy path');
+        else if (_disposition === 'adverse_recent' || _disposition === 'adverse_full') parts.push('movement went against');
+        const cbk = Number(matchingRow?.consensusBookCount || 0);
+        if (cbk >= 5) parts.push(`${cbk} books agree`);
+        const edgeVal = Number(matchingRow?.consensusEdge || args.screenConsensusEdge || 0);
+        if (edgeVal > 1) parts.push(`+${edgeVal.toFixed(1)}% edge`);
+        if (consensusDrift && driftReason) parts.push(`drift: ${driftReason}`);
+        return parts.length ? parts.join('. ') + '.' : null;
+      })()
     };
 
     return {
@@ -2037,6 +2176,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           args.targetTiers = ['TIER 1', 'TIER 2'];
         }
         if (args.validate === undefined) args.validate = true;
+        if (args.hideVerdict === undefined) args.hideVerdict = true;
       } else if (mode === 'tonight') {
         if (!(Array.isArray(args.kaiCall) && args.kaiCall.length)) {
           args.kaiCall = ['BET', 'CONSIDER'];
@@ -2070,7 +2210,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         args.compact = true;
         args.fields = [
           'game', 'selection', 'odds', 'edge', 'clv', 'confidenceTier',
-          'kaiCall', 'startCST', 'movementDisposition', 'riskFlag', 'screenScore'
+          'riskScore', 'startCST', 'movementDisposition', 'riskFlag', 'screenScore'
         ];
       }
 
@@ -2344,6 +2484,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     league: entry.league,
                     gameId: candidate.gameId,
                     selection: candidate.selection,
+                    playId: candidate.playId,
                     market: entry.market,
                     skipResearch: true,
                     lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6,
@@ -2354,7 +2495,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     // and downgrade a phantom BET. Without this, consensusDrift can
                     // never fire in the bundled validate path.
                     screenConsensusBookCount: candidate.consensusBookCount,
-                    screenExecutionQuality: candidate.executionQuality
+                    screenExecutionQuality: candidate.executionQuality,
+                    screenConsensusEdge: candidate.edge,
+                    // Carry sharpBookMovementConfirmed so the re-fetched row
+                    // doesn't lose the sharp-book confirmation and downgrade
+                    // movementDisposition to 'insufficient'.
+                    screenSharpBookConfirmed: candidate.sharpBookMovementConfirmed || false
                   });
                   if (candidate.gameId && result && result.ok) {
                     validationCache.set(qsCacheKey, result);
@@ -2433,6 +2579,19 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             );
             return c.finalVerdict === 'BET' && tierIdx <= floor;
           });
+        }
+      }
+
+      // === hideVerdict: strip BET/CONSIDER/PASS from output (agent ergonomics) ===
+      // Tier + edge + movement tells the full story. Verdict oscillates with
+      // transient execution quality / consensus drift and causes confusion
+      // (e.g. TIER 1 plays showing as CONSIDER). Validation still runs internally.
+      if (args.hideVerdict) {
+        for (const entry of allCandidates) {
+          if (!entry.candidates || !entry.candidates.length) continue;
+          for (const c of entry.candidates) {
+            stripVerdictFields(c);
+          }
         }
       }
 
@@ -2515,6 +2674,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         results: allCandidates,
         research: researchResults,
         warnings,
+        tierStats: (() => {
+          try {
+            const stats = getPickStats({ days: 90 });
+            return stats?.stats?.byTier || null;
+          } catch { return null; }
+        })(),
         _meta:
           (validateAll || validateTop > 0)
             ? {
@@ -2532,6 +2697,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const verbosity = String(args.verbosity || 'full').toLowerCase();
       let formattedResponse;
       if (verbosity === 'minimal') formattedResponse = formatQuickScreenMinimal(screenResponse);
+      else if (verbosity === 'bets') formattedResponse = formatQuickScreenBets(screenResponse);
       else if (verbosity === 'standard') formattedResponse = formatQuickScreenStandard(screenResponse);
       else formattedResponse = screenResponse;
 
@@ -2545,8 +2711,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
 
       if (args._aggregateCacheKey && formattedResponse.ok) {
-        responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs);
+        // Estimate the serialized size so the LRU cache can reject entries
+        // that exceed the per-entry cap.  JSON.stringify is O(n) but the
+        // response is about to be serialized for the MCP wire anyway, so
+        // this is sunk cost — the alternative is caching the blob and
+        // unbounded heap growth.
+        let estimatedSizeBytes = 0;
+        try {
+          estimatedSizeBytes = JSON.stringify(formattedResponse).length;
+        } catch (_) { /* non-serializable — skip caching */ }
+        responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs, estimatedSizeBytes);
       }
+      _maybeGc();
       return formattedResponse;
     },
 
@@ -2788,6 +2964,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     league: leagueEntry.league,
                     gameId: play.gameId,
                     selection: play.selection,
+                    playId: play.playId,
                     market: play.market || 'Moneyline',
                     skipResearch: true,
                     lookbackHours: Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6,
@@ -2796,7 +2973,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     // Pass the screen snapshot's consensus/exec so the validator
                     // can detect drift and downgrade a phantom BET.
                     screenConsensusBookCount: play.consensusBookCount,
-                    screenExecutionQuality: play.executionQuality
+                    screenExecutionQuality: play.executionQuality,
+                    screenConsensusEdge: play.edge,
+                    // Carry sharpBookMovementConfirmed so the re-fetched row
+                    // doesn't lose the sharp-book confirmation and downgrade
+                    // movementDisposition to 'insufficient'.
+                    screenSharpBookConfirmed: play.sharpBookMovementConfirmed || false
                   });
                   if (play.gameId && result && result.ok) {
                     validationCache.set(rbCacheKey, result);
@@ -2822,6 +3004,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           vr.play._validated = true;
           applyFinalVerdict(vr.play);
           promoteFinalVerdictToDisplay(vr.play);
+        }
+      }
+
+      // === hideVerdict: strip BET/CONSIDER/PASS from output ===
+      // recommended_bets defaults to hiding verdict (same philosophy as
+      // quick_screen mode='recommended'). Pass hideVerdict: false to opt out.
+      if (args.hideVerdict !== false) {
+        for (const entry of allRecommended) {
+          if (!entry.plays || !entry.plays.length) continue;
+          for (const p of entry.plays) {
+            stripVerdictFields(p);
+          }
         }
       }
 
@@ -3951,7 +4145,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           includeResearch: false,
           lite: true
         }).catch(() => ({ ok: true, results: [] })),
-        handlers.get_pick_history({ status: 'pending' }).catch(() => ({ ok: true, picks: [] })),
+        handlers.get_pick_history({ status: 'pending', days: 1 }).catch(() => ({ ok: true, picks: [] })),
         handlers.get_pick_stats({ days: args.statsDays || 30 }).catch(() => ({ ok: true, stats: null }))
       ]);
 

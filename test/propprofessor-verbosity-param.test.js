@@ -8,7 +8,7 @@ describe('verbosity parameter in tool definitions', () => {
   const tools = buildToolDefinitions();
   const toolMap = Object.fromEntries(tools.map((t) => [t.name, t]));
 
-  const VERBOSITY_ENUM = ['minimal', 'standard', 'full'];
+  const VERBOSITY_ENUM = ['minimal', 'standard', 'full', 'bets'];
 
   const toolsWithVerbosity = [
     'screen_ranked',
