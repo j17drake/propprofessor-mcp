@@ -141,7 +141,10 @@ test('nested total container must not return wrong-line odds (166.5 vs 173.5)', 
   assert.ok(result, 'expected a match');
   assert.strictEqual(result.selection, 'Under 166.5', 'selection must be the exact requested line, not the container');
   assert.strictEqual(result.odds, 125, 'odds must be 166.5 Under (+125), NOT the container 173.5 (-143)');
-  assert.strictEqual(result.consensusBookCount, 9, 'consensus/edge context from container is preserved');
+  // Cross-line matches intentionally zero container aggregates so a wrong-line
+  // consensus cannot poison validation. The nested line's own odds map here has
+  // only one book, so consensusBookCount must reflect that.
+  assert.strictEqual(result.consensusBookCount, 1, 'nested line book count replaces container aggregate to avoid consensus poisoning');
 });
 
 test('nested total where request IS the container line returns the row as-is', () => {

@@ -234,7 +234,8 @@ describe('propprofessor MCP server stdio contract', () => {
   // covered: ev_candidates, screen_raw, screen_ranked, screen, sharp_plays, ufc_card,
   it('responds to initialize and lists the expected tools', async () => {
     const proc = spawn(process.execPath, [serverPath], {
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PROPPROFESSOR_MCP_MODE: 'full' }
     });
 
     try {
