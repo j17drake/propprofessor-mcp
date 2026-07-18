@@ -32,18 +32,15 @@ const SERVER_NAME = 'propprofessor';
 const SERVER_VERSION = require('../package.json').version;
 const PROTOCOL_VERSION = '2024-11-05';
 
-// Tool surface mode: 'full' (default, 26 tools) or 'lite' (10 essentials).
-// Lite mode is opt-in via PROPPROFESSOR_MCP_MODE=lite — it cuts the tool
-// catalog an agent has to scan by ~60% and is the right choice for casual
-// and intermediate agents. Sharp users opt back into the full surface by
-// leaving the env var unset (or setting it to 'full').
+// Tool surface mode: 'lite' (default, 14 essentials) or 'full' (30 tools).
+// Lite mode is the recommended default — covers the full workflow without
+// overwhelming the agent's tool catalog. Power users opt into full mode by
+// setting PROPPROFESSOR_MCP_MODE=full.
 const VALID_MODES = new Set(['full', 'lite']);
 const TOOL_MODE = (() => {
   const raw = (process.env.PROPPROFESSOR_MCP_MODE || '').toLowerCase().trim();
   if (VALID_MODES.has(raw)) return raw;
-  // Default to full — preserves existing behavior for every MCP client
-  // already wired to this server. Lite mode is an opt-in choice.
-  return 'full';
+  return 'lite';
 })();
 
 function createMcpServer({

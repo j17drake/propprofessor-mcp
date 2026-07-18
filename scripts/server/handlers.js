@@ -3785,128 +3785,65 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       const parsed = parseNaturalLanguagePropQuery(query);
 
-      // We need the handlers instance to call quick_screen/validate_play etc.
-      const handlers = this;
+      // Parse only — no tool execution. Return the parsed components
+      // and suggested tool + args so the calling agent can decide what
+      // to call next. This keeps ask fast (no network calls) and gives
+      // the agent full control over the workflow.
 
-      // Check if this is a validation query ("should I bet X?") with a player
       const isValidationQuery = /\b(should i bet|is .* safe|validate|check .* play)\b/i.test(query);
 
+      let suggestedTool, suggestedArgs, workflow;
+
       if (isValidationQuery && parsed.player) {
-        const result = await handlers.validate_play({
+        suggestedTool = 'validate_play';
+        suggestedArgs = {
           ...(parsed.league ? { league: parsed.league } : {}),
           selection: parsed.player,
           ...(parsed.book ? { book: parsed.book } : {})
-        });
-        return {
-          ok: true,
-          raw: parsed.raw,
-          parsed: {
-            league: parsed.league,
-            book: parsed.book,
-            market: parsed.market,
-            side: parsed.side,
-            line: parsed.line,
-            player: parsed.player
-          },
-          suggestedTool: {
-            tool: 'validate_play',
-            args: {
-              ...(parsed.league ? { league: parsed.league } : {}),
-              selection: parsed.player,
-              ...(parsed.book ? { book: parsed.book } : {})
-            }
-          },
-          workflow: 'Validated via validate_play - see verdict.',
-          result: result
         };
-      }
-
-      if (parsed.book) {
-        const result = await handlers.quick_screen({
+        workflow = 'Call validate_play with the returned args to get a BET/CONSIDER/PASS verdict.';
+      } else if (parsed.book) {
+        suggestedTool = 'quick_screen';
+        suggestedArgs = {
           books: [parsed.book],
           ...(parsed.league ? { leagues: [parsed.league] } : {}),
           ...(parsed.market ? { markets: [parsed.market] } : {})
-        });
-        return {
-          ok: true,
-          raw: parsed.raw,
-          parsed: {
-            league: parsed.league,
-            book: parsed.book,
-            market: parsed.market,
-            side: parsed.side,
-            line: parsed.line,
-            player: parsed.player
-          },
-          suggestedTool: {
-            tool: 'quick_screen',
-            args: {
-              books: [parsed.book],
-              ...(parsed.league ? { leagues: [parsed.league] } : {}),
-              ...(parsed.market ? { markets: [parsed.market] } : {})
-            }
-          },
-          workflow: 'Executed quick_screen.',
-          result: result
         };
-      }
-
-      if (parsed.player) {
-        const result = await handlers.player_context({
+        workflow = 'Call quick_screen with the returned args to get ranked plays for this book.';
+      } else if (parsed.player) {
+        suggestedTool = 'player_context';
+        suggestedArgs = {
           player: parsed.player,
           ...(parsed.league ? { sport: parsed.league } : {})
-        });
-        return {
-          ok: true,
-          raw: parsed.raw,
-          parsed: {
-            league: parsed.league,
-            book: parsed.book,
-            market: parsed.market,
-            side: parsed.side,
-            line: parsed.line,
-            player: parsed.player
-          },
-          suggestedTool: {
-            tool: 'player_context',
-            args: {
-              player: parsed.player,
-              ...(parsed.league ? { sport: parsed.league } : {})
-            }
-          },
-          workflow: 'Executed player_context.',
-          result: result
         };
+        workflow = 'Call player_context with the returned args to check injury/news risk.';
+      } else {
+        suggestedTool = 'quick_screen';
+        suggestedArgs = {
+          mode: 'recommended',
+          ...(parsed.league ? { leagues: [parsed.league] } : {}),
+          ...(parsed.market ? { markets: [parsed.market] } : {})
+        };
+        workflow = 'Call quick_screen with the returned args for a broad recommended-bets scan.';
       }
 
-      const result = await handlers.quick_screen({
-        mode: 'recommended',
-        ...(parsed.league ? { leagues: [parsed.league] } : {}),
-        ...(parsed.market ? { markets: [parsed.market] } : {}),
-        validate: false,
-        includeResearch: false
-      });
       return {
         ok: true,
-        raw: parsed.raw,
+        query,
         parsed: {
           league: parsed.league,
           book: parsed.book,
           market: parsed.market,
           side: parsed.side,
           line: parsed.line,
-          player: parsed.player
+          player: parsed.player,
+          rawText: parsed.raw
         },
         suggestedTool: {
-          tool: 'quick_screen',
-          args: {
-            mode: 'recommended',
-            ...(parsed.league ? { leagues: [parsed.league] } : {}),
-            ...(parsed.market ? { markets: [parsed.market] } : {})
-          }
+          tool: suggestedTool,
+          args: suggestedArgs
         },
-        workflow: 'Executed quick_screen (mode=recommended).',
-        result: result
+        workflow
       };
     },
 

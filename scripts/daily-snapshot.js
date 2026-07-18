@@ -4,8 +4,8 @@
 /**
  * Daily snapshot pipeline for REAL backtest metrics.
  *
- * Captures the current recommended plays (from handlers.recommended_bets /
- * handlers.quick_screen) into a JSONL ledger at data/snapshots.jsonl — one
+ * Captures the current recommended plays (from handlers.quick_screen with
+ * mode='recommended') into a JSONL ledger at data/snapshots.jsonl — one
  * JSON object per line. Each line is a stable, idempotent record of a single
  * play at capture time: gameId, selection, market, league, book, odds, tier,
  * kaiCall, screenScore, timestamp (ISO), and a stable playId (sha256 of

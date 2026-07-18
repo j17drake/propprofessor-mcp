@@ -96,15 +96,13 @@ flowchart LR
         T[Tier + risk score]
     end
 
-    subgraph OUTPUT["29 MCP Tools"];
-        RB[recommended_bets]
-        SP[sharp_plays]
-        SC[sharp_consensus]
-        SR[screen_ranked]
+    subgraph OUTPUT["30 MCP Tools"];
         QS[quick_screen]
+        T[today]
         SB[smart_bet]
+        VP[validate_play]
         ASK[ask]
-        OTH[...23 more]
+        OTH[...25 more]
     end
 
     CLIENT[Your AI Agent<br/>Claude / Cursor / Cline / Hermes]
@@ -292,23 +290,23 @@ Every tool accepts:
 | `compact`         | `true` / `false`            | Strips line history and debug payloads — reduces response size by ~90% |
 | `fields`          | `["game", "edge", "tier"]`  | Return only specified fields per row                                   |
 
-`quick_screen` and `recommended_bets` additionally accept:
+`quick_screen` additionally accepts:
 
 | Parameter        | Values                  | What it does                                                                                                                              |
 | ---------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `cardWindow`     | `today` `next` `all`    | Date filter. `today` = today's slate plus any next-day matches merged in (flagged via `nextDayMerged` in the response). `next` = tomorrow only. `all` = every upcoming match, no date filtering. Default `today`. |
 | `maxPlaysPerGame`| `1`–`50` (default `2`)  | Max plays shown per game in `minimal` verbosity (highest `screenScore` first). Raise it (e.g. `10`) for full coverage of a game without a second call. `standard`/`full` verbosity always return every candidate regardless of this value. |
-| `parseable`      | `true`/`false` (default `false`) | When `true` on `minimal` verbosity, the response includes a structured `plays` array (one object per candidate) alongside the summary string, so agents can parse without re-calling at `standard`. |
+| `parseable`      | `true`/`false` (default `true`) | When `true`, `minimal` verbosity includes a structured `plays` array alongside the summary — agents get both. Set `false` for summary-only. |
 | `includeResearch`| `true`/`false` (default `true`) | Run player_context research on each returned play and attach `riskFlag` / `riskSummary` / `topTweet` in the `research` array. Research is scoped to the FINAL returned plays (post tier/kaiCall filter) and de-duplicated per game, so the `research` array always matches the plays you see — no full-slate payload blowup. Pass `false` to disable. |
 | `researchLimit` | `1`–`50` (default `50`) | Max final plays to run research on. Bounds payload size on large scans. |
 
-> **Player research is ON by default** in `quick_screen` and `recommended_bets` (pass `includeResearch: false` to disable). It's scoped to the final returned plays and de-duplicated per game, so `research` always maps 1:1 to what you got back. On a huge unfiltered scan, lower `researchLimit` or use `lite` if the response nears the transport cap.
+> **Player research is ON by default** in `quick_screen` (pass `includeResearch: false` to disable). It's scoped to the final returned plays and de-duplicated per game, so `research` always maps 1:1 to what you got back. On a huge unfiltered scan, lower `researchLimit` or use `lite` if the response nears the transport cap.
 
 > **`cardWindow` honesty:** when `today` is alive and next-day rows are merged, the response reports `cardWindow: "today"` (not tomorrow's date) plus `nextDayMerged: true` and `nextDayDate`. Earlier builds mislabeled this as tomorrow — that bug is fixed.
 
-> **Tier consistency:** as of 2.8.x, `tierCache` is cleared at the start of every MCP screen call (`quick_screen`, `recommended_bets`, `screen_ranked`, `validate_play`). A given play's tier is therefore stable within a call and recomputed fresh per call — no cross-call drift from stale hysteresis state.
+> **Tier consistency:** as of 2.8.x, `tierCache` is cleared at the start of every MCP screen call (`quick_screen`, `screen_ranked`, `validate_play`). A given play's tier is therefore stable within a call and recomputed fresh per call — no cross-call drift from stale hysteresis state.
 
-> **`verbosity: minimal` returns a plain-English SUMMARY STRING, not structured JSON** — agents that need to parse the response must use `standard`/`full`, OR pass `parseable: true` on `minimal` to get a structured `plays` array next to the summary.
+> **`verbosity: minimal` returns a plain-English summary string WITH a structured `plays` array** — agents get both human-readable text and machine-parseable data in one call. Each play in the array includes `league`, `market`, `game`, `selection`, `odds`, `confidenceTier`, `edge`, `startCST`, `movementDisposition`, and `screenScore`.
 
 ### Tool Surface Modes
 
@@ -316,10 +314,10 @@ Set `PROPPROFESSOR_MCP_MODE` at server boot to control how many tools the agent 
 
 | Mode   | Default | Tools exposed | Best for                                                                                                                                 |
 | ------ | ------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `full` | ✅ yes  | 29            | Sharp users — every discovery, screen, research tool                                                                                     |
-| `lite` | no      | 13            | Casual / intermediate agents — covers the full workflow (discover → drill-down → validate → track) without overwhelming the tool catalog |
+| `lite` | ✅ yes  | 14            | **Recommended for most users.** Covers the full workflow (discover → drill-down → validate → track) without overwhelming the tool catalog. |
+| `full` | no      | 30            | Power users — every discovery, screen, research, and admin tool. More tools but more noise for the agent to reason about.                 |
 
-Lite mode exposes: `ask`, `smart_bet`, `tonight_bets`, `recommended_bets`, `quick_screen`, `find_best_price`, `validate_play`, `get_play_details`, `player_context`, `log_pick`, `get_pick_history`, `resolve_pick`, `get_market_registry`.
+Lite mode exposes: `ask`, `smart_bet`, `quick_screen`, `today`, `find_best_price`, `validate_play`, `get_play_details`, `player_context`, `log_pick`, `get_pick_history`, `resolve_pick`, `get_market_registry`, `place_bet`, `sharp_alerts`.
 
 The `tools/list` response always includes a `_meta` block so agents can tell which mode is active:
 

@@ -22,8 +22,8 @@ describe('MCP server — tools/list _meta block', () => {
       params: {}
     });
     assert.ok(response.result._meta, '_meta block should be present');
-    assert.equal(response.result._meta.mode, 'full');
-    assert.equal(response.result._meta.toolCount, 30);
+    assert.equal(response.result._meta.mode, 'lite');
+    assert.equal(response.result._meta.toolCount, 14);
     assert.equal(response.result._meta.liteToolCount, 14);
     assert.equal(response.result._meta.fullToolCount, 30);
   });

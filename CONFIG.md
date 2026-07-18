@@ -12,7 +12,7 @@ Environment variables and book configuration for the PropProfessor MCP.
 | `PROPPROFESSOR_CACHE_MAX`                  | `50`                                                 | Max cache entries (LRU eviction)                                                                                                                                                                                                                                   |
 | `LOCAL_TIMEZONE`                           | `America/Chicago`                                    | Display timezone for CLI output                                                                                                                                                                                                                                    |
 | `PROPPROFESSOR_DEBUG`                      | (unset)                                              | Set to any value to enable debug logging to stderr                                                                                                                                                                                                                 |
-| `PROPPROFESSOR_MCP_MODE`                   | `full`                                               | Tool surface mode. `full` exposes all 28 tools; `lite` exposes the 12 essentials (ask, recommended_bets, quick_screen, find_best_price, validate_play, get_play_details, player_context, log_pick, get_pick_history, resolve_pick, get_market_registry, smart_bet) |
+| `PROPPROFESSOR_MCP_MODE`                   | `lite`                                               | Tool surface mode. `lite` (default) exposes the 14 essentials for agent-friendly workflows. `full` exposes all 30 tools for power users. |
 | `NITTER_BASE`                              | `http://localhost:8080`                              | Nitter instance for `player_context` tweet lookup                                                                                                                                                                                                                  |
 | `PROPPROFESSOR_MCP_STDIO_COALESCE_MS`      | `0`                                                  | Batch stdout writes (ms). `0` = passthrough (no change). `1`+ buffers and flushes on a timer. Reduces write syscalls during bursty JSON-RPC responses. Requires server restart.                                                                                    |
 | `PROPPROFESSOR_MCP_PREWARM`                | `1`                                                  | Pre-warm odds-history cache on session start. Set `0` to disable. League screens fire in parallel.                                                                                                                                                                 |
@@ -27,7 +27,7 @@ The MCP uses three book categories. These are passed as parameters to specific t
 
 ### 1. Target execution books (your betting books)
 
-Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `screen`:
+Books you actually place bets on. Pass to `quick_screen`, `smart_bet`:
 
 ```json
 { "targetBooks": ["Fliff", "NoVigApp", "Rebet"] }
@@ -35,7 +35,7 @@ Books you actually place bets on. Pass to `sharp_plays`, `recommended_bets`, `sc
 
 ### 2. Sharp comparison books (movement detection)
 
-Books whose line movement signals sharp action. Pass to `sharp_plays`, `sharp_consensus`, `screen_ranked`:
+Books whose line movement signals sharp action. Pass to `quick_screen` (mode='sharp'), `sharp_consensus`, `screen_ranked`:
 
 ```json
 { "sharpBooks": ["Pinnacle", "Circa", "BookMaker", "BetOnline"] }

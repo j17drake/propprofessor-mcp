@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
 const { parseNaturalLanguagePropQuery } = require('../lib/propprofessor-query-parser');
 
-describe('ask() executes the suggested tool, not just suggests it', () => {
+describe('ask() parses queries and suggests tools — parse-only, no execution', () => {
 
   describe('ask() - query extraction tests', () => {
     it('"best WNBA play on NoVigApp" extracts player and book', async () => {
@@ -37,63 +37,50 @@ describe('ask() executes the suggested tool, not just suggests it', () => {
     });
   });
 
-  describe('ask() - route execution tests', () => {
-    let callCount = { quick_screen: 0, validate_play: 0, player_context: 0 };
-
+  describe('ask() - route suggestion tests (parse-only)', () => {
     function makeHandlers() {
-      callCount = { quick_screen: 0, validate_play: 0, player_context: 0 };
       const handlers = createMcpHandlers({ client: {} });
-      // Stub the relevant tools so the test doesn't hit the live API
-      handlers.quick_screen = async (args) => {
-        callCount.quick_screen++;
-        return { ok: true, results: [{ league: args.leagues?.[0] || 'NBA', market: 'Moneyline', candidates: [{ game: 'G', selection: 'A', odds: -110, confidenceTier: 'TIER 1', kaiCall: 'BET' }] }] };
-      };
-      handlers.validate_play = async (args) => {
-        callCount.validate_play++;
-        return { ok: true, verdict: 'BET', tier: 'TIER 1', play: { odds: -110 } };
-      };
-      handlers.player_context = async (args) => {
-        callCount.player_context++;
-        return { ok: true, player: args.player, riskFlag: 'low' };
-      };
       return handlers;
     }
 
-    it('"best WNBA play on NoVigApp" actually invokes quick_screen and returns its result', async () => {
+    it('"best WNBA play on NoVigApp" suggests quick_screen with book', async () => {
       const handlers = makeHandlers();
       const result = await handlers.ask({ query: 'best WNBA play on NoVigApp' });
       assert.equal(result.ok, true);
-      assert.equal(callCount.quick_screen, 1, 'quick_screen should have been called');
-      assert.equal(callCount.validate_play, 0, 'validate_play should NOT have been called');
-      assert.ok(result.result?.results, 'should contain quick_screen result');
-      assert.equal(result.suggestedTool?.tool, 'quick_screen');
+      assert.equal(result.suggestedTool.tool, 'quick_screen');
+      assert.deepStrictEqual(result.suggestedTool.args.books, ['NoVigApp']);
+      assert.equal(result.parsed.book, 'NoVigApp');
+      assert.equal(result.parsed.league, 'WNBA');
+      // Parse-only: no result field
+      assert.equal(result.result, undefined, 'should NOT auto-execute');
     });
 
-    it('"should I bet Tatum" invokes validate_play, not quick_screen', async () => {
+    it('"should I bet Tatum" suggests validate_play', async () => {
       const handlers = makeHandlers();
       const result = await handlers.ask({ query: 'should I bet Tatum over 29.5' });
       assert.equal(result.ok, true);
-      assert.equal(callCount.validate_play, 1, 'validate_play should be called');
-      assert.equal(callCount.quick_screen, 0, 'quick_screen should NOT be called');
-      assert.equal(callCount.player_context, 0, 'player_context should NOT be called');
-      assert.equal(result.result.verdict, 'BET');
+      assert.equal(result.suggestedTool.tool, 'validate_play');
+      assert.equal(result.suggestedTool.args.selection, 'Tatum');
+      assert.equal(result.parsed.player, 'Tatum');
+      assert.equal(result.result, undefined, 'should NOT auto-execute');
     });
 
-    it('player-only query (Tatum over 29.5, no book) invokes player_context', async () => {
+    it('player-only query (Tatum over 29.5, no book) suggests player_context', async () => {
       const handlers = makeHandlers();
       const result = await handlers.ask({ query: 'Tatum over 29.5' });
       assert.equal(result.ok, true);
-      assert.equal(callCount.player_context, 1, 'player_context should be called');
-      assert.ok(result.result.player);
-      assert.equal(result.suggestedTool?.tool, 'player_context');
+      assert.equal(result.suggestedTool.tool, 'player_context');
+      assert.equal(result.suggestedTool.args.player, 'Tatum');
+      assert.equal(result.result, undefined, 'should NOT auto-execute');
     });
 
-    it('no book + no player + no validation falls through to quick_screen', async () => {
+    it('no book + no player + no validation suggests quick_screen in recommended mode', async () => {
       const handlers = makeHandlers();
       const result = await handlers.ask({ query: 'what is sharp today' });
       assert.equal(result.ok, true);
-      assert.equal(callCount.quick_screen, 1);
-      assert.equal(result.suggestedTool?.tool, 'quick_screen');
+      assert.equal(result.suggestedTool.tool, 'quick_screen');
+      assert.equal(result.suggestedTool.args.mode, 'recommended');
+      assert.equal(result.result, undefined, 'should NOT auto-execute');
     });
 
     it('missing query throws MISSING_PARAMS (preserves existing contract)', async () => {
