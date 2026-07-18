@@ -1,3 +1,12 @@
+## 2.8.0
+
+- `quick_screen` minimal formatter now includes `gameId`, `playId`, `selectionKey`, `finalConfidenceTier`, `displayTier`, `finalVerdict`, `hoursUntilStart`, `kaiCall`, `riskScore`, `consensusBookCount`, and `rationale` so agents can chain `quick_screen → validate_play` without special-casing verbosity.
+- `formatQuickScreenBets`/`standard` carry the same authoritative fields (`finalVerdict`, `displayTier`, validated movement, etc.) across all verbosity levels.
+- Sort tie-breaker now prefers near-even moneylines within equal tier/movement so usable -150/+130 lines surface before -300/+250.
+- `validate_play` adverse-movement tier downgrade code is present; regression test scaffold added (currently blocked by movement-shape fixture coverage — see test note).
+- Version bump only; changelog entry added.
+
+---
 # Changelog
 
 ## Unreleased

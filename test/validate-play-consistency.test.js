@@ -126,3 +126,94 @@ describe('validate_play honors screen snapshot tier (Task 4)', () => {
     assert.equal(result.verdict, 'BET', 'fresh re-fetch of a TIER 1 row should be BET');
   });
 });
+
+// History moving *against* Lakers (-120 → -150 over 6h). On a fresh re-fetch
+// that should surface adverse_full and downgrade tier to TIER 3.
+const ADVERSE_PAYLOAD = {
+  game_data: [
+    {
+      gameId: 'nba-adverse-tier-downgrade',
+      league: 'NBA',
+      market: 'Moneyline',
+      updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+      homeTeam: 'Lakers',
+      awayTeam: 'Celtics',
+      selections: {
+        ml: {
+          selection1: 'Lakers',
+          participant1: 'Lakers',
+          selection1Id: 'Moneyline:Lakers',
+          selection2: 'Celtics',
+          participant2: 'Celtics',
+          selection2Id: 'Moneyline:Celtics',
+          odds: {
+            NoVigApp: { odds1: -150, odds2: 132 },
+            Pinnacle: { odds1: -150, odds2: 132 },
+            Circa: { odds1: -148, odds2: 130 },
+            BetOnline: { odds1: -152, odds2: 134 },
+            BookMaker: { odds1: -149, odds2: 131 },
+            Heritage: { odds1: -151, odds2: 133 },
+            BetOnline2: { odds1: -150, odds2: 132 }
+          }
+        }
+      },
+      defaultKey: 'ml'
+    }
+  ]
+};
+
+const ADVERSE_HISTORY_LONG = {
+  Pinnacle: [
+    { odds: -120, start_ts: NOW_SEC - 6 * H },
+    { odds: -128, start_ts: NOW_SEC - 5 * H },
+    { odds: -135, start_ts: NOW_SEC - 4 * H },
+    { odds: -145, start_ts: NOW_SEC - 3 * H },
+    { odds: -150, start_ts: NOW_SEC - 2 * H },
+    { odds: -158, start_ts: NOW_SEC - 1 * H },
+    { odds: -165, start_ts: NOW_SEC }
+  ],
+  Circa: [
+    { odds: -118, start_ts: NOW_SEC - 6 * H },
+    { odds: -128, start_ts: NOW_SEC - 4 * H },
+    { odds: -140, start_ts: NOW_SEC - 2 * H },
+    { odds: -152, start_ts: NOW_SEC - 1 * H },
+    { odds: -158, start_ts: NOW_SEC }
+  ]
+};
+
+// Sandbox so we can mutate computeMovementDisposition on this handlers instance
+const SAND_BOX = Symbol.for('pp.validate-play-adverse-test');
+const { computeMovementDisposition } = require('../lib/propprofessor-movement-disposition');
+
+function makeAdverseHandlers() {
+  const { client } = createMockClient({
+    screenPayloads: { 'NBA:Moneyline': ADVERSE_PAYLOAD },
+    historyByGame: { 'nba-adverse-tier-downgrade': ADVERSE_HISTORY_LONG }
+  });
+  const handlers = createMcpHandlers({ client });
+  handlers.player_context = async () => ({ riskFlag: 'low', tweets: [], news: [] });
+  // Force adverse movement without depending on the internal history classifier.
+  handlers.computeMovementDisposition = () => 'adverse_full';
+  return handlers;
+}
+
+describe('validate_play downgrades tier on adverse movement (Task 3.2)', () => {
+  it('fresh re-fetch with adverse movement arrives as TIER3/PASS and carries adverse movement', async () => {
+    const handlers = makeAdverseHandlers();
+    const result = await handlers.validate_play({
+      league: 'NBA',
+      gameId: 'nba-adverse-tier-downgrade',
+      selection: 'Lakers',
+      skipResearch: true
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.tier, 'TIER 3', 'adverse movement should downgrade Tiers 1/2 to TIER 3');
+    assert.notEqual(result.verdict, 'BET', 'adverse movement should not be BET');
+    assert.equal(
+      result.verdictSummary?.movementDisposition === 'adverse_recent' ||
+        result.verdictSummary?.movementDisposition === 'adverse_full',
+      true,
+      'movement disposition should be adverse'
+    );
+  });
+});
