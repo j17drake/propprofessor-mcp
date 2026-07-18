@@ -65,13 +65,15 @@ describe('quick_screen verbosity field parity', () => {
   const standard = formatQuickScreenStandard(sample);
   const bets = formatQuickScreenBets(sample);
 
-  it('minimal row keeps identity fields', async () => {
-    const row = minimalRows(minimal)[0];
+  it('minimal response preserves one-call agent identity fields', async () => {
+    assert.equal(minimal.type, 'plays', 'minimal should preserve a machine-readable plays array');
+    const row = Array.isArray(minimal.plays) ? minimal.plays[0] : null;
+    assert.ok(row, 'minimal.plays[0] should exist');
     assert.ok(row.game || row.gameId, 'minimal should expose game or gameId');
     assert.ok(row.selection, 'minimal should expose selection');
-    assert.ok('tier' in row, 'minimal should expose tier');
+    assert.ok('confidenceTier' in row, 'minimal should expose confidenceTier');
     assert.ok('edge' in row, 'minimal should expose edge');
-    assert.ok('movement' in row, 'minimal should expose movement');
+    assert.ok('movementDisposition' in row, 'minimal should expose movementDisposition');
   });
 
   it('standard row keeps identity fields', async () => {
