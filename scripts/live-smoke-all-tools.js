@@ -40,8 +40,6 @@ const ARGS = {
   league_presets: {}
 };
 
-const SKIP = new Set(); // tools that need auth-dependent write state we don't want in smoke
-
 (async () => {
   const handlers = createMcpHandlers({ client: createPropProfessorClient() });
   const defs = buildToolDefinitions();
@@ -63,7 +61,7 @@ const SLOW_TOOLS = new Set(['ask', 'get_started', 'quick_screen', 'sharp_alerts'
     const args = ARGS[name] || {};
     const timeoutMs = SLOW_TOOLS.has(name) ? 60000 : 30000;
     try {
-      const r = await withTimeout(handlers[name](args), timeoutMs);
+      await withTimeout(handlers[name](args), timeoutMs);
       ok++;
       const label = SLOW_TOOLS.has(name) ? 'ok (slow on cold cache)' : 'ok';
       process.stdout.write(`${label.padEnd(30)} ${name}\n`);

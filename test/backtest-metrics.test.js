@@ -6,9 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   playProfit,
-  computeBacktestMetrics,
-  computeSharpe,
-  computeMaxDrawdown
+  computeBacktestMetrics
 } = require('../lib/propprofessor-backtest-metrics');
 
 describe('backtest metrics (real P&L / ROI / Sharpe / drawdown)', () => {

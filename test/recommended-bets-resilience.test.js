@@ -29,7 +29,7 @@ describe('recommended_bets resilience (no single hung call hangs the tool)', () 
     handlers.screen_ranked = () => new Promise(() => {});
 
     const start = Date.now();
-    const r = await handlers.recommended_bets({ leagues: ['NBA'], book: 'NoVigApp', limit: 2 });
+    await handlers.recommended_bets({ leagues: ['NBA'], book: 'NoVigApp', limit: 2 });
     const elapsed = Date.now() - start;
 
     // Either outcome is fine (ok:false or ok:true with empty) — the contract

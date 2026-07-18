@@ -17,7 +17,7 @@ const thinOdds = {
   DraftKings: { odds1: 150, odds2: -178 }
 };
 
-function makePayload(odds, selectionsKey) {
+function makePayload(odds, _selectionsKey) {
   const sel = {
     selection1: 'Minnesota Twins -1.5',
     participant1: 'Minnesota Twins -1.5',

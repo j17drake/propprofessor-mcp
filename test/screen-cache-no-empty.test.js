@@ -43,7 +43,7 @@ describe('screen cache does not pin empty responses', () => {
     const args = { leagues: ['WNBA'], book: 'NoVigApp', limit: 3, validate: false };
 
     const first = await handlers.quick_screen(args);
-    const second = await handlers.quick_screen(args);
+    await handlers.quick_screen(args);
 
     const firstCount = (first.results || []).reduce((s, l) => s + (l.count || (l.candidates || []).length || 0), 0);
     assert.ok(firstCount === 0, 'first call returned empty slate from WNBA fan-out');

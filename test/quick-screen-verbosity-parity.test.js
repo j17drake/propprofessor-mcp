@@ -12,9 +12,6 @@ const {
 // formatters must agree on the identity fields agents use to chain tool calls.
 // If one formatter emits `gameId` and another emits `game`, validation chaining
 // breaks silently.
-function minimalRows(response) {
-  return (response.results || []).flatMap((entry) => entry.plays || []);
-}
 
 const sample = {
   ok: true,

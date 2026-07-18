@@ -29,7 +29,7 @@ function scheduleResponse(date, games) {
  */
 function makeGame({
   gameId = 2024021234,
-  date = '2026-06-20',
+  _date = '2026-06-20',
   awayPlace = 'Boston',
   awayCommon = 'Bruins',
   awayAbbrev = 'BOS',

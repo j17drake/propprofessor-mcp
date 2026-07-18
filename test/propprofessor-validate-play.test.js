@@ -4,7 +4,6 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
 const { createMockClient } = require('./fixtures/mock-client');
-const { UFC_MONEYLINE_PAYLOAD } = require('./fixtures/screen-payloads');
 
 function makeClient({
   detailRows: _detailRows = [],

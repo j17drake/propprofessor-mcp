@@ -7,7 +7,7 @@ const { createMcpHandlers } = require('../scripts/propprofessor-mcp-server');
 describe('place_bet workflow (validate + log in one call)', () => {
   function makeHandlers({ validateVerdict = 'BET' } = {}) {
     const handlers = createMcpHandlers({ client: {} });
-    handlers.validate_play = async (args) => ({
+    handlers.validate_play = async () => ({
       ok: true,
       verdict: validateVerdict,
       tier: 'TIER 1',

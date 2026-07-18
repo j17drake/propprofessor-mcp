@@ -27,7 +27,9 @@ process.on('exit', () => {
   } else {
     try {
       fs.unlinkSync(TEST_CALIBRATION_FILE);
-    } catch {}
+    } catch {
+      // unlink may fail if the file was never written — safe to ignore
+    }
   }
 });
 

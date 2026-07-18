@@ -62,7 +62,7 @@ async function fetchUrl(url) {
       { timeout: CURL_TIMEOUT * 1000 }
     );
     return stdout;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

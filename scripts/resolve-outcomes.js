@@ -41,7 +41,6 @@
  */
 
 const fs = require('node:fs');
-const path = require('node:path');
 
 const { SNAPSHOT_FILE } = require('./daily-snapshot');
 

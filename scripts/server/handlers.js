@@ -88,7 +88,6 @@ const {
   DEFAULT_SHARP_BOOKS
 } = require('../../lib/propprofessor-sharp-consensus');
 const {
-  getConfidenceTier,
   getConfidenceTierStable,
   clearTierCache,
   clearScoreTimeline,
@@ -97,7 +96,6 @@ const {
 const { getPlayerContext } = require('../../lib/propprofessor-player-context');
 const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
 const { getGameContext } = require('../../lib/propprofessor-game-context');
-const { isPlayerSelection } = require('../../lib/propprofessor-selection-type');
 const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
 const {
   formatRecommendedBetsMinimal,

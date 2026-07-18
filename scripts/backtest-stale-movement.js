@@ -17,7 +17,6 @@ const { generateScenario, setRandomSeed, resetRandomSeed } = require('./backtest
 const { extractScreenRows } = require('../lib/screen-parser');
 const { rankLeagueScreenRows } = require('../lib/screen-ranker');
 const { clearTierCache, clearScoreTimeline } = require('../lib/propprofessor-risk-score');
-const { americanOddsToImpliedProbability } = require('../lib/propprofessor-shared-utils');
 
 // ── Targeted scenario: contrarian value ──
 
@@ -180,7 +179,7 @@ function runStaleBacktest({ scenarios = 1000, seed = 42 } = {}) {
         const bucket = isStale ? 'staleFlagged' : 'notFlagged';
         results[bucket][won ? 'wins' : 'losses']++;
       }
-    } catch (err) {
+    } catch {
       errorCount++;
     }
   }

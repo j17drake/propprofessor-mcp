@@ -96,7 +96,7 @@ describe('propprofessor-prewarm', () => {
 
       let screenCallCount = 0;
       const mockClient = {
-        queryScreenOddsBestComps: async ({ league }) => {
+        queryScreenOddsBestComps: async () => {
           screenCallCount += 1;
           // Return mock game data for each league
           return {
@@ -231,7 +231,7 @@ describe('propprofessor-prewarm', () => {
       let currentConcurrent = 0;
 
       const mockClient = {
-        queryScreenOddsBestComps: async ({ league }) => {
+        queryScreenOddsBestComps: async () => {
           currentConcurrent += 1;
           if (currentConcurrent > maxConcurrent) maxConcurrent = currentConcurrent;
           // Stagger delays so we can observe concurrency

@@ -7,7 +7,6 @@ const {
   calculateRiskScore,
   getConfidenceTier,
   getConfidenceTierStable,
-  getKaiCall,
   clearTierCache,
   clearScoreTimeline,
   tierCacheKey
