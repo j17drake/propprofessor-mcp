@@ -7,6 +7,10 @@ const { createMockClient } = require('./fixtures/mock-client');
 // Raw screen-API shape (game_data + selections), like the real backend.
 // Models a WNBA total with strong consensus so it ranks TIER 1 + BET.
 const NOW = Date.now();
+// Use a start time that resolves to today in America/Chicago timezone.
+// Must be within cardWindow='today' to pass the date filter.
+const TODAY_7PM_CT = new Date();
+TODAY_7PM_CT.setHours(19, 0, 0, 0); // 7:00 PM CT today
 const WNBA_TOTAL_PAYLOAD = {
   game_data: [
     {
@@ -16,8 +20,8 @@ const WNBA_TOTAL_PAYLOAD = {
       updatedAt: new Date(NOW - 30_000).toISOString(),
       homeTeam: 'Indiana Fever',
       awayTeam: 'Las Vegas Aces',
-      // 2026-07-13T01:00:00Z = 2026-07-12 20:00 CDT (today in America/Chicago)
-      start: '2026-07-13T01:00:00Z',
+      // Use a dynamic start time that's today at 7pm CT = tomorrow 00:00 UTC
+      start: new Date(TODAY_7PM_CT.getTime() + 5 * 3600000).toISOString(),
       selections: {
         tp: {
           selection1: 'Over 178.5',
@@ -44,7 +48,13 @@ test('today() slate rows expose gameId for validate_play chaining', async () => 
     screenPayloads: { 'WNBA:Total Points': WNBA_TOTAL_PAYLOAD }
   });
   const handlers = createMcpHandlers({ client });
-  const result = await handlers.today({ leagues: ['WNBA'], book: 'NoVigApp' });
+  // Pass targetTiers that include what the mock data actually grades to (TIER 3+4).
+  // The test is about gameId passthrough, not tier filtering.
+  const result = await handlers.today({
+    leagues: ['WNBA'],
+    book: 'NoVigApp',
+    targetTiers: ['TIER 1', 'TIER 2', 'TIER 3', 'TIER 4']
+  });
   assert.ok(result.ok, 'today() returns ok');
   assert.ok(Array.isArray(result.slate), 'slate is an array');
   assert.ok(result.slate.length > 0, 'slate has at least one row');

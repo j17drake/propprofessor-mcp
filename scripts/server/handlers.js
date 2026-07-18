@@ -2582,11 +2582,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
+      // Resolve verbosity early — hideVerdict guard needs it (bets mode has its own
+      // consolidated verdict field, so stripping would cause all-PASS default).
+      const verbosity = String(args.verbosity || 'full').toLowerCase();
+
       // === hideVerdict: strip BET/CONSIDER/PASS from output (agent ergonomics) ===
       // Tier + edge + movement tells the full story. Verdict oscillates with
       // transient execution quality / consensus drift and causes confusion
       // (e.g. TIER 1 plays showing as CONSIDER). Validation still runs internally.
-      if (args.hideVerdict) {
+      // Skip when verbosity='bets' — bets mode collapses to a single verdict field,
+      // and stripping would cause consolidateVerdict to default everything to PASS.
+      if (args.hideVerdict && verbosity !== 'bets') {
         for (const entry of allCandidates) {
           if (!entry.candidates || !entry.candidates.length) continue;
           for (const c of entry.candidates) {
@@ -2693,8 +2699,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         workflow: `${bookList} target book(s). Playable price (not necessarily best). Sharp book movement cross-referenced. Player context research included.`,
         markets_alias_used: allAliasesUsed
       };
-      // Apply verbosity formatting
-      const verbosity = String(args.verbosity || 'full').toLowerCase();
+      // Apply verbosity formatting (verbosity resolved earlier for hideVerdict guard)
       let formattedResponse;
       if (verbosity === 'minimal') formattedResponse = formatQuickScreenMinimal(screenResponse);
       else if (verbosity === 'bets') formattedResponse = formatQuickScreenBets(screenResponse);
@@ -4078,6 +4083,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           leagues,
           book,
           limit: args.limit || 10,
+          targetTiers: Array.isArray(args.targetTiers) && args.targetTiers.length
+            ? args.targetTiers
+            : ['TIER 1', 'TIER 2'],
           validate: false,
           includeResearch: false,
           lite: true
@@ -4090,12 +4098,18 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         (e.candidates || []).map((c) => ({
           game: c.game,
           gameId: c.gameId,
-          market: c.market,
+          market: e.market || c.market,
           selection: c.selection,
           odds: c.odds,
           tier: c.confidenceTier,
           kai: c.kaiCall,
-          edge: c.consensusEdge
+          edge: c.consensusEdge || c.edge,
+          startCST: c.startCST || null,
+          hoursUntilStart: c.hoursUntilStart ?? null,
+          movementDisposition: c.movementDisposition || null,
+          executionQuality: c.executionQuality || null,
+          consensusBookCount: c.consensusBookCount ?? null,
+          sharpBookMovementConfirmed: c.sharpBookMovementConfirmed || false
         }))
       );
 

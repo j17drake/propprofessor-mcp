@@ -59,7 +59,7 @@ describe('DEFAULT_LEAGUES', () => {
   const { DEFAULT_LEAGUES } = require('../lib/propprofessor-shared-utils');
 
   it('exports every league the PropProfessor backend supports', () => {
-    const expected = ['NBA', 'MLB', 'NFL', 'NHL', 'WNBA', 'NCAAB', 'NCAAF', 'Soccer', 'Tennis', 'UFC'];
+    const expected = ['NBA', 'NBASL', 'MLB', 'NFL', 'NHL', 'WNBA', 'NCAAB', 'NCAAF', 'Soccer', 'Tennis', 'UFC'];
     assert.deepEqual([...DEFAULT_LEAGUES], expected);
   });
 

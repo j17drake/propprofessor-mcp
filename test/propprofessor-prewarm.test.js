@@ -48,7 +48,7 @@ describe('propprofessor-prewarm', () => {
       delete process.env.PROPPROFESSOR_MCP_PREWARM_LEAGUES;
       const { getPreWarmConfig } = require('../lib/mcp-runtime-config');
       const config = getPreWarmConfig();
-      const expectedLeagues = ['NBA', 'MLB', 'NFL', 'NHL', 'WNBA', 'NCAAB', 'NCAAF', 'Soccer', 'Tennis', 'UFC'];
+      const expectedLeagues = ['NBA', 'NBASL', 'MLB', 'NFL', 'NHL', 'WNBA', 'NCAAB', 'NCAAF', 'Soccer', 'Tennis', 'UFC'];
       assert.deepEqual(config.leagues, expectedLeagues);
     });
 
