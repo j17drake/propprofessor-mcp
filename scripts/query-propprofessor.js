@@ -434,6 +434,7 @@ function renderUfcCardOutput(result, logger = console) {
   logger.log(lines.join('\n'));
 }
 
+// eslint-disable-next-line complexity
 async function main({ argv = process.argv, client = createPropProfessorClient(), logger = console } = {}) {
   const { command, opts } = parseArgs(argv);
 

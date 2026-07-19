@@ -1,5 +1,5 @@
 'use strict';
-
+/* eslint-disable max-lines */
 /**
  * MCP tool handlers (extracted from scripts/propprofessor-mcp-server.js in v2.0.0).
  *
@@ -662,7 +662,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
    * objects far longer than needed, ballooning RSS by 500+ MB per call.
    */
   const _maybeGc = typeof global.gc === 'function'
-    ? () => { try { global.gc(); } catch (_) { /* best-effort */ } }
+    ? () => { try { global.gc(); } catch { /* best-effort */ } }
     : () => {};
 
   // Single shared response cache — backed directly by LruCache (lib/propprofessor-lru-cache.js).
@@ -1066,6 +1066,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     return response;
   }
 
+  // eslint-disable-next-line complexity
   async function runValidatePlayImpl(client, args = {}) {
     const league = String(args.league || '').trim();
     const gameId = String(args.gameId || '').trim();
@@ -1434,7 +1435,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Fall back to screen snapshot's edge when the re-fetched row lacks it
       // (the detail endpoint doesn't always compute consensusEdge).
       const edge = Number(matchingRow?.consensusEdge || args.screenConsensusEdge || 0);
-      const clv = Number(matchingRow?.clvProxyPct || 0);
       const riskFlagsSuffix = _riskFlags.length > 0 ? ` — ${_riskFlags.join(', ')}` : '';
 
       if (cbk >= 10 && _disposition === 'supportive_clean') {
@@ -2163,6 +2163,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // quick_screen: Accepts any book(s) via the `books` param and runs
     // sharp_plays + player_context for each (league, market) pair.
     // Defaults to ['NoVigApp'].
+    // eslint-disable-next-line complexity
     async quick_screen(args = {}) {
       // Reset per-call tier hysteresis so each screen call starts clean
       // (prevents cross-call tier drift from stale cache state).
@@ -2731,7 +2732,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         let estimatedSizeBytes = 0;
         try {
           estimatedSizeBytes = JSON.stringify(formattedResponse).length;
-        } catch (_) { /* non-serializable — skip caching */ }
+        } catch { /* non-serializable — skip caching */ }
         responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs, estimatedSizeBytes);
       }
       _maybeGc();
@@ -2814,7 +2815,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     }),
                     25000
                   );
-                } catch (e) {
+                } catch {
                   return [];
                 }
                 const rows = Array.isArray(screenResult?.result) ? screenResult.result : [];
