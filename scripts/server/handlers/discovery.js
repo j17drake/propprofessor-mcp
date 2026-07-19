@@ -6,7 +6,7 @@
  */
 
 const { defined } = require('./handler-utils');
-const { validatePositiveEvCandidates } = require('../../../scripts/server/handlers'); // shared helper
+const { validatePositiveEvCandidates } = require('../../../lib/validate-ev-candidates');
 
 function createDiscoveryHandlers(client, ctx) {
   return {
