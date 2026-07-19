@@ -43,7 +43,7 @@ test('check-version-consistency fails when changelog heading is missing', () => 
       encoding: 'utf8'
     });
     assert.equal(result.status, 1, 'expected the script to fail');
-    assert.match(result.stderr, /CHANGELOG\.md is missing a heading for package version 1\.0\.4/);
+    assert.match(result.stderr, /CHANGELOG\.md top heading is "## 1\.0\.3" but package\.json version is "1\.0\.4"/);
   } finally {
     rmSync(fixture.dir, { recursive: true, force: true });
   }
