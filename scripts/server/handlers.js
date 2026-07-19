@@ -3192,20 +3192,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
-    // ─── Player Context ─────────────────────────────────────────────
-    async player_context(args = {}) {
-      const player = typeof args.player === 'string' ? args.player.trim() : '';
-      if (!player) {
-        return { ok: false, error: 'player argument is required' };
-      }
-      return ok(await getPlayerContext({
-        player,
-        sport: typeof args.sport === 'string' && args.sport.length > 0 ? args.sport : null,
-        gameTime: typeof args.gameTime === 'string' && args.gameTime.length > 0 ? args.gameTime : null,
-        maxAgeMinutes: Number.isFinite(Number(args.maxAgeMinutes)) ? Number(args.maxAgeMinutes) : 60,
-        useXurl: args.useXurl === true
-      }));
-    },
 
     async sharp_consensus(args = {}) {
       const league = String(args.league || 'Tennis').trim();
@@ -3464,27 +3450,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return runGetPlayDetailsImpl(client, args);
     },
 
-    /**
-     * mlb_game_context: pull game-level context for an MLB game.
-     * Returns probable/confirmed pitchers, venue + park factor, hourly
-     * weather at first pitch, and lineup lock status with a risk flag
-     * for weather/park effects.
-     */
-    async mlb_game_context(args = {}) {
-      const gamePk = String(args.gamePk || '').trim();
-      if (!gamePk) {
-        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gamePk is required' } };
-      }
-      if (!/^\d{4,}$/.test(gamePk)) {
-        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'gamePk must be a numeric MLB game ID' } };
-      }
-      try {
-        const result = await getMlbGameContext({ gamePk });
-        return result;
-      } catch (err) {
-        return { ok: false, gamePk, error: { code: 'API_ERROR', message: err?.message || String(err) } };
-      }
-    },
 
     /**
      * validate_play (v2.1.8): bundle a get_play_details + player_context +
@@ -3507,9 +3472,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       return ok(result);
     },
 
-    async league_presets() {
-      return { ok: true, result: buildLeaguePresetSummary() };
-    },
 
     async health_status() {
       const authFile = resolveAuthFile();
@@ -3581,99 +3543,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
-    // ─── Bet Management ─────────────────────────────────────────────
-    // Consolidated from get_hidden_bets + hide_bet + unhide_bet + clear_hidden_bets
-    // (4 tools → 1) in v1.6.3.
-    async manage_hidden_bets(args = {}) {
-      const { action } = args;
-      if (action === 'list') {
-        const result = await client.getHiddenBets();
-        return { ok: true, action, result };
-      }
-      if (action === 'hide') {
-        if (!args.bet || typeof args.bet !== 'object') {
-          const error = new Error('The bet parameter is required and must be an object.');
-          error.code = 'MISSING_BET';
-          error.category = 'validation';
-          error.status = 400;
-          throw error;
-        }
-        const result = await client.hideBet(args.bet);
-        return { ok: true, action, result };
-      }
-      if (action === 'unhide') {
-        if (!args.id) {
-          const error = new Error('The id parameter is required.');
-          error.code = 'MISSING_ID';
-          error.category = 'validation';
-          error.status = 400;
-          throw error;
-        }
-        const result = await client.unhideBet(args.id);
-        return { ok: true, action, result };
-      }
-      if (action === 'clear') {
-        const result = await client.clearHiddenBets();
-        return { ok: true, action, result };
-      }
-      const error = new Error(`Unknown action: ${action}. Must be one of: list, hide, unhide, clear.`);
-      error.code = 'INVALID_ACTION';
-      error.category = 'validation';
-      error.status = 400;
-      throw error;
-    },
 
-    // ─── Fantasy Optimizer ──────────────────────────────────────────────
-    async fantasy_optimizer(args = {}) {
-      // v2.x.x: apply numeric defaults here so the upstream slipgen backend
-      // doesn't KeyError on missing keys (it reads minOdds/minLegEV/minHoursAway
-      // etc. directly from the body with no defaults of its own). Without
-      // this, callers that omit these fields get 500s that surface as
-      // "'minOdds'"/"'minLegEV'"/"'minHoursAway'" from the backend.
-      const num = (v, fallback) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
-      const filters = {
-        isLive: args.is_live !== undefined ? Boolean(args.is_live) : Boolean(args.isLive),
-        showBreakOnly: args.showBreakOnly,
-        showTimeoutOnly: args.showTimeoutOnly,
-        showPeriodEndOnly: args.showPeriodEndOnly,
-        timeAvailable: args.timeAvailable,
-        userState: args.userState,
-        hideNCAAPlayerProps: args.hideNCAAPlayerProps,
-        fantasyApps: Array.isArray(args.fantasyApps) ? args.fantasyApps : ['PrizePicks'],
-        sportsbooks: Array.isArray(args.sportsbooks)
-          ? args.sportsbooks
-          : ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle'],
-        leagues: Array.isArray(args.leagues) ? args.leagues : Array.from(DEFAULT_LEAGUES),
-        league: args.league,
-        market: args.market,
-        minOdds: num(args.minOdds, -1000),
-        maxOdds: num(args.maxOdds, 1000),
-        minValue: num(args.minValue, -100),
-        maxValue: num(args.maxValue, 100),
-        minLegEV: num(args.minLegEV, -100),
-        maxLegEV: num(args.maxLegEV, 100),
-        minSlipEV: num(args.minSlipEV, -100),
-        maxSlipEV: num(args.maxSlipEV, 100),
-        hiddenBets: Array.isArray(args.hiddenBets) ? args.hiddenBets : [],
-        liveStatus: Array.isArray(args.liveStatus) ? args.liveStatus : [],
-        periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : ['Full Game'],
-        minHoursAway: num(args.minHoursAway, 0),
-        maxHoursAway: num(args.maxHoursAway, 336),
-        minLiquidity: num(args.minLiquidity, 0),
-        maxLiquidity: num(args.maxLiquidity, 1000)
-      };
-      const result = await client.queryFantasyPicks(filters);
-      return {
-        ok: true,
-        count: Array.isArray(result) ? result.length : 0,
-        result: Array.isArray(result) ? result : []
-      };
-    },
 
-    async clear_score_timeline() {
-      clearScoreTimeline();
-      return { ok: true, message: 'Score timeline cache cleared. Tier trajectory data reset.' };
-    },
 
     // ─── Line Shopping ──────────────────────────────────────────────
     async find_best_price(args = {}) {
@@ -3775,25 +3646,6 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
-    async get_market_registry(args = {}) {
-      const { getMarketsForSport } = require('../../lib/propprofessor-market-registry');
-      const sport = String(args.sport || '').trim();
-      const book = args.book ? String(args.book).trim() : null;
-      if (!sport) {
-        return { ok: false, error: { code: 'MISSING_PARAMS', message: 'sport is required' } };
-      }
-      const markets = getMarketsForSport(sport, book);
-      return {
-        ok: true,
-        sport,
-        book: book || 'default',
-        markets,
-        note:
-          sport.toUpperCase() === 'SOCCER'
-            ? 'Soccer uses Draw No Bet (not Moneyline), Match Handicap (not Spread), and Total Goals'
-            : undefined
-      };
-    },
 
     async get_started(args = {}) {
       const userType = args.user_type || 'intermediate';
