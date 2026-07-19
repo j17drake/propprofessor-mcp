@@ -3717,65 +3717,60 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       }
       const parsed = parseNaturalLanguagePropQuery(query);
 
-      // Parse only — no tool execution. Return the parsed components
-      // and suggested tool + args so the calling agent can decide what
-      // to call next. This keeps ask fast (no network calls) and gives
-      // the agent full control over the workflow.
+      // Execute the appropriate tool based on the parsed query.
+      // One call = one answer — no more parse-only suggest-then-call-again pattern.
 
       const isValidationQuery = /\b(should i bet|is .* safe|validate|check .* play)\b/i.test(query);
 
-      let suggestedTool, suggestedArgs, workflow;
+      // Build pure-args objects for each branch so we can attach
+      // _suggestedTool metadata regardless of which path was taken.
+      const queryArgs = {
+        query, parsed: {
+          league: parsed.league, book: parsed.book,
+          market: parsed.market, side: parsed.side,
+          line: parsed.line, player: parsed.player,
+          rawText: parsed.raw
+        }
+      };
+
+      let result, executedTool, executedArgs;
 
       if (isValidationQuery && parsed.player) {
-        suggestedTool = 'validate_play';
-        suggestedArgs = {
+        executedTool = 'validate_play';
+        executedArgs = {
           ...(parsed.league ? { league: parsed.league } : {}),
           selection: parsed.player,
           ...(parsed.book ? { book: parsed.book } : {})
         };
-        workflow = 'Call validate_play with the returned args to get a BET/CONSIDER/PASS verdict.';
+        result = await handlers.validate_play(executedArgs);
       } else if (parsed.book) {
-        suggestedTool = 'quick_screen';
-        suggestedArgs = {
+        executedTool = 'quick_screen';
+        executedArgs = {
           books: [parsed.book],
           ...(parsed.league ? { leagues: [parsed.league] } : {}),
           ...(parsed.market ? { markets: [parsed.market] } : {})
         };
-        workflow = 'Call quick_screen with the returned args to get ranked plays for this book.';
+        result = await handlers.quick_screen(executedArgs);
       } else if (parsed.player) {
-        suggestedTool = 'player_context';
-        suggestedArgs = {
+        executedTool = 'player_context';
+        executedArgs = {
           player: parsed.player,
           ...(parsed.league ? { sport: parsed.league } : {})
         };
-        workflow = 'Call player_context with the returned args to check injury/news risk.';
+        result = await handlers.player_context(executedArgs);
       } else {
-        suggestedTool = 'quick_screen';
-        suggestedArgs = {
-          mode: 'recommended',
-          ...(parsed.league ? { leagues: [parsed.league] } : {}),
-          ...(parsed.market ? { markets: [parsed.market] } : {})
-        };
-        workflow = 'Call quick_screen with the returned args for a broad recommended-bets scan.';
+        executedTool = 'quick_screen';
+        executedArgs = { mode: 'recommended' };
+        result = await handlers.quick_screen(executedArgs);
       }
 
+      // Preserve the debug surface — agents can see what was called and
+      // with what args, alongside the actual result.
       return {
-        ok: true,
-        query,
-        parsed: {
-          league: parsed.league,
-          book: parsed.book,
-          market: parsed.market,
-          side: parsed.side,
-          line: parsed.line,
-          player: parsed.player,
-          rawText: parsed.raw
-        },
-        suggestedTool: {
-          tool: suggestedTool,
-          args: suggestedArgs
-        },
-        workflow
+        ok: result && result.ok !== false,
+        ...queryArgs,
+        _executed: { tool: executedTool, args: executedArgs },
+        result
       };
     },
 
