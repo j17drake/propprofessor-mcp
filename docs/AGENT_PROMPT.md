@@ -13,7 +13,7 @@ A favorable line at a single soft book is not an edge — it could be a stale li
 The PropProfessor tools are built around this principle:
 
 - `sharp_plays` only returns a "Bet candidate" when a **non-target** sharp book confirms the movement.
-- `recommended_bets` requires green movement quality (supportive label + high quality + strong consensus + positive CLV) for TIER 1.
+- `quick_screen` (with `targetTiers`) requires green movement quality (supportive label + high quality + strong consensus + positive CLV) for TIER 1.
 - `sharp_consensus` checks 6 time windows (1h–48h) for sustained agreement across all sharp books.
 - `quick_screen` bundles sharp consensus + target-book price + player research into one call — the recommended starting point for any agent.
 
