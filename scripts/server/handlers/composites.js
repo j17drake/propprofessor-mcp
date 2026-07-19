@@ -242,14 +242,14 @@ function createCompositesHandlers(client, ctx) {
     async today(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues
         : args.league ? [args.league]
-        : ['NBA', 'WNBA', 'MLB', 'NFL'];
+        : Array.from(DEFAULT_LEAGUES);
       const book = args.book || 'NoVigApp';
 
       const [slateRes, pendingRes, statsRes, backtestRes] = await Promise.all([
         ctx.handlers.quick_screen({
           leagues,
           book,
-          limit: args.limit || 10,
+          limit: args.limit || 100,
           targetTiers: Array.isArray(args.targetTiers) && args.targetTiers.length
             ? args.targetTiers
             : ['TIER 1', 'TIER 2'],
