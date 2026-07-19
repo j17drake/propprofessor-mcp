@@ -256,10 +256,10 @@ function createCompositesHandlers(client, ctx) {
           validate: false,
           includeResearch: false,
           lite: true
-        }).catch(() => ({ ok: true, results: [] })),
-        ctx.handlers.get_pick_history({ status: 'pending', days: 1 }).catch(() => ({ ok: true, picks: [] })),
-        ctx.handlers.get_pick_stats({ days: args.statsDays || 30 }).catch(() => ({ ok: true, stats: null })),
-        Promise.resolve().then(() => getBacktestSummary({ days: args.statsDays || 30 })).catch(() => ({ ok: false, stats: null }))
+        }).catch((err) => ({ ok: false, _error: true, error: `quick_screen: ${err.message}`, results: [] })),
+        ctx.handlers.get_pick_history({ status: 'pending', days: 1 }).catch((err) => ({ ok: false, _error: true, error: `history: ${err.message}`, picks: [] })),
+        ctx.handlers.get_pick_stats({ days: args.statsDays || 30 }).catch((err) => ({ ok: false, _error: true, error: `stats: ${err.message}`, stats: null })),
+        Promise.resolve().then(() => getBacktestSummary({ days: args.statsDays || 30 })).catch((err) => ({ ok: false, _error: true, error: `backtest: ${err.message}`, stats: null }))
       ]);
 
       const slate = (slateRes.results || []).flatMap((e) =>
@@ -316,6 +316,7 @@ function createCompositesHandlers(client, ctx) {
       const now = new Date().toISOString();
       const alerts = [];
 
+      const errors = [];
       for (const league of leagues) {
         try {
           const screenResult = await ctx.handlers.screen_ranked({
@@ -391,8 +392,8 @@ function createCompositesHandlers(client, ctx) {
               }))
             });
           }
-        } catch {
-          // League failed to scan — skip, continue with others
+        } catch (err) {
+          errors.push({ league, error: err?.message || String(err) });
         }
       }
 
@@ -408,7 +409,8 @@ function createCompositesHandlers(client, ctx) {
         totalAlerts: alerts.length,
         alerts,
         leaguesChecked: leagues,
-        lastCheckedAt: now
+        lastCheckedAt: now,
+        ...(errors.length > 0 ? { errors } : {})
       };
     },
 
