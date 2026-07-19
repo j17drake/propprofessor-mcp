@@ -1,3 +1,9 @@
+## 2.9.0
+
+- Backtest summary: `getBacktestSummary()` wired into `today()` response (sampleSize, settled, byTier, note — honest reporting, never fabricated ROI).
+- Lint hygiene: cleared 30+ ESLint errors across `lib/`, `test/`, `scripts/`. Fixed tennis schedule duplicate-key data corruption (`Rybakina`/`Zhang` shadowing WTA entry).
+- Docs: normalized retired `recommended_bets`/`sharp_plays` references to `quick_screen` in RESPONSE_SHAPES.md, HERMES_SKILL.md, PERFORMANCE.md. Updated tool composition map. Staking plan now calls `quick_screen` directly.
+
 ## 2.8.0
 
 - `quick_screen` minimal formatter now includes `gameId`, `playId`, `selectionKey`, `finalConfidenceTier`, `displayTier`, `finalVerdict`, `hoursUntilStart`, `kaiCall`, `riskScore`, `consensusBookCount`, and `rationale` so agents can chain `quick_screen → validate_play` without special-casing verbosity.
