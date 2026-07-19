@@ -22,7 +22,13 @@ const { createMockClient } = require('./fixtures/mock-client');
 
 function createHandlers(overrides = {}) {
   const { client } = createMockClient(overrides);
-  return createMcpHandlers({ client });
+  const handlers = createMcpHandlers({ client });
+  // Stub player_context so research doesn't hit Nitter/network and hang.
+  // Handler-integration tests cover screen, validation, and tier logic, not
+  // research — which is tested separately in the 'research scoping' block
+  // that uses its own explicit stub.
+  handlers.player_context = async () => ({ riskFlag: 'clean', tweets: [], news: [] });
+  return handlers;
 }
 
 // ─── screen_ranked ─────────────────────────────────────────────────
@@ -308,7 +314,8 @@ describe('handler integration: quick_screen', () => {
     const result = await handlers.quick_screen({
       leagues: ['NBA'],
       markets: ['Moneyline'],
-      limit: 5
+      limit: 5,
+      includeResearch: false
     });
     assert.equal(result.ok, true);
     let seen = 0;
@@ -332,7 +339,8 @@ describe('handler integration: quick_screen', () => {
       leagues: ['NBA'],
       markets: ['Moneyline'],
       limit: 5,
-      validate: false
+      validate: false,
+      includeResearch: false
     });
     assert.equal(result.ok, true);
     let seen = 0;
@@ -351,7 +359,8 @@ describe('handler integration: quick_screen', () => {
     const result = await handlers.quick_screen({
       leagues: ['NBA'],
       markets: ['Moneyline'],
-      limit: 5
+      limit: 5,
+      includeResearch: false
     });
     assert.equal(result.ok, true);
     let seen = 0;
@@ -481,7 +490,9 @@ describe('handler integration: recommended_bets', () => {
       leagues: ['NBA'],
       markets: ['Moneyline'],
       bankroll: 1000,
-      limit: 10
+      limit: 10,
+      includeResearch: false,
+      hideVerdict: false
     });
 
     assert.equal(result.ok, true);
@@ -509,7 +520,9 @@ describe('handler integration: recommended_bets', () => {
       markets: ['Moneyline'],
       targetTiers: ['TIER 1'],
       bankroll: 1000,
-      limit: 10
+      limit: 10,
+      includeResearch: false,
+      hideVerdict: false
     });
 
     assert.equal(result.ok, true);
@@ -532,7 +545,9 @@ describe('handler integration: recommended_bets', () => {
       leagues: ['NBA'],
       markets: ['Moneyline', 'Spread', 'Total'],
       bankroll: 1000,
-      limit: 10
+      limit: 10,
+      includeResearch: false,
+      hideVerdict: false
     });
 
     assert.equal(result.ok, true);
@@ -546,7 +561,9 @@ describe('handler integration: recommended_bets', () => {
       leagues: ['NBA'],
       markets: ['Moneyline'],
       bankroll: 1000,
-      limit: 10
+      limit: 10,
+      includeResearch: false,
+      hideVerdict: false
     });
     assert.equal(result.ok, true);
     let seen = 0;
@@ -570,7 +587,9 @@ describe('handler integration: recommended_bets', () => {
       markets: ['Moneyline'],
       bankroll: 1000,
       limit: 10,
-      validate: false
+      validate: false,
+      includeResearch: false,
+      hideVerdict: false
     });
     assert.equal(result.ok, true);
     let seen = 0;

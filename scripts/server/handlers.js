@@ -471,7 +471,7 @@ function applyFinalVerdict(target) {
   const validatedVerdict = target.validatedVerdict || null;
   // validatedTier / displayTier are BET/CONSIDER/PASS verdicts. The real
   // confidence tier (TIER 1/2/3/4) lives in validatedConfidenceTier.
-  const validatedTier = target.validatedConfidenceTier || target.confidenceTier || 'TIER 4';
+  let validatedTier = target.validatedConfidenceTier || target.confidenceTier || 'TIER 4';
   let verdict = validatedVerdict || target.displayTier || target.kaiCall || 'PASS';
 
   const riskFlags = target.validatedRiskFlags || [];
@@ -490,6 +490,14 @@ function applyFinalVerdict(target) {
   // can never ship a stale BET. Idempotent: CONSIDER/PASS are left alone.
   if ((target.validatedConsensusDrift || target.validatedUnverified) && verdict === 'BET') {
     verdict = 'CONSIDER';
+  }
+
+  // PASS verdicts always force TIER 4 — a play can't be 'high confidence
+  // PASS' in PropProfessor's model. This must happen here (not only in
+  // promoteFinalVerdictToDisplay) so that finalConfidenceTier is set
+  // consistently with finalVerdict from the start.
+  if (verdict === 'PASS') {
+    validatedTier = 'TIER 4';
   }
 
   target.finalVerdict = verdict;
@@ -3231,18 +3239,20 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         targetTiers,
         limit,
         is_live: false,
+        includeResearch: false,
         compact: Boolean(args.compact),
         fields: Array.isArray(args.fields) ? args.fields : undefined,
         include: Array.isArray(args.include) ? args.include : undefined,
         skipHistory: args.skipHistory === true
       });
-      if (!recResult.ok || !recResult.totalRecommended) {
+      if (!recResult.ok || !recResult.totalCandidates) {
         return {
           ok: true,
           bankroll,
           totalStake: 0,
           playCount: 0,
           stakes: [],
+          remainingBankroll: bankroll,
           warnings: ['No recommended plays found for the given criteria'],
           summary: 'No plays to stake'
         };
