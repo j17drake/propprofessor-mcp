@@ -35,10 +35,62 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
 ## ⚡ Quickstart (30 seconds)
 
 1. **Install:** `npm install -g propprofessor-mcp` (or clone + `npm install` for dev)
-2. **Wire your MCP client** (Claude Desktop / Cursor / Hermes) — add to its MCP config:
+2. **Wire your MCP client** — pick your client below:
+
+   **Claude Desktop** (`claude_desktop_config.json`):
    ```json
-   {"mcpServers": {"propprofessor": {"command": "propprofessor-mcp", "args": []}}}
+   {
+     "mcpServers": {
+       "propprofessor": {
+         "command": "npx",
+         "args": ["propprofessor-mcp"]
+       }
+     }
+   }
    ```
+
+   **Cline** (`cline_mcp_settings.json`):
+   ```json
+   {
+     "mcpServers": {
+       "propprofessor": {
+         "command": "npx",
+         "args": ["propprofessor-mcp"],
+         "env": {}
+       }
+     }
+   }
+   ```
+
+   **Cursor** — Settings → Features → MCP Servers → Add:
+   ```
+   Name: propprofessor
+   Type: command
+   Command: npx propprofessor-mcp
+   ```
+
+   **Continue.dev** (`~/.continue/config.json`):
+   ```json
+   {
+     "experimental": {
+       "mcpServers": {
+         "propprofessor": {
+           "command": "npx",
+           "args": ["propprofessor-mcp"]
+         }
+       }
+     }
+   }
+   ```
+
+   **Hermes** (`~/.hermes/config.yaml`):
+   ```yaml
+   mcp_servers:
+     propprofessor:
+       command: npx
+       args: [propprofessor-mcp]
+   ```
+
 3. **Auth (one-time):** `node scripts/pp-login.js` — opens a browser for PropProfessor login and persists cookies for the server to use.
 4. **Ask your agent:** _"What are tonight's sharpest plays on Fliff?"_
 

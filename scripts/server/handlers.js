@@ -17,6 +17,7 @@ const { createStateHandlers } = require('./handlers/state');
 const { createPicksHandlers } = require('./handlers/picks');
 const { createPricingHandlers } = require('./handlers/pricing');
 const { defined, resolveMarkets, buildPositiveEvTarget, VERDICT_FIELDS, stripVerdictFields } = require('./handlers/handler-utils');
+const { ok, fail } = require('../../lib/response-envelope');
 const {
   createPropProfessorClient,
   getCookieExpiryInfo,
@@ -2651,7 +2652,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs, estimatedSizeBytes);
       }
       _maybeGc();
-      return formattedResponse;
+      return ok(formattedResponse);
     },
 
     // ─── Betting ────────────────────────────────────────────────────
@@ -3196,13 +3197,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       if (!player) {
         return { ok: false, error: 'player argument is required' };
       }
-      return getPlayerContext({
+      return ok(await getPlayerContext({
         player,
         sport: typeof args.sport === 'string' && args.sport.length > 0 ? args.sport : null,
         gameTime: typeof args.gameTime === 'string' && args.gameTime.length > 0 ? args.gameTime : null,
         maxAgeMinutes: Number.isFinite(Number(args.maxAgeMinutes)) ? Number(args.maxAgeMinutes) : 60,
         useXurl: args.useXurl === true
-      });
+      }));
     },
 
     async sharp_consensus(args = {}) {
@@ -3501,7 +3502,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Reset per-call tier hysteresis so each screen call starts clean
       // (prevents cross-call tier drift from stale cache state).
       clearTierCache();
-      return await runValidatePlayImpl(client, args);
+      const result = await runValidatePlayImpl(client, args);
+      return ok(result);
     },
 
     async league_presets() {
@@ -4049,8 +4051,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         status: p.status
       }));
 
-      return {
-        ok: true,
+      return ok({
         asOf: new Date().toISOString(),
         leagues,
         book,
@@ -4059,7 +4060,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         stats: statsRes.stats || null,
         backtest: backtestRes.ok ? backtestRes : null,
         summary: `${slate.length} sharp plays, ${pendingPicks.length} pending picks, ${statsRes.stats && statsRes.stats.winRate ? statsRes.stats.winRate : 'n/a'} lifetime win rate`
-      };
+      });
     },
 
     // ─── Alerts ─────────────────────────────────────────────────────

@@ -25,6 +25,7 @@ const { clearTierCache } = require('../lib/propprofessor-risk-score');
 const { validateArgs, normalizeArgs } = require('../lib/mcp-arg-validator');
 const { getPreWarmConfig } = require('../lib/mcp-runtime-config');
 const { prewarmOddsHistoryCache } = require('../lib/propprofessor-prewarm');
+const { RateLimiter } = require('../lib/rate-limiter');
 
 const mapWithConcurrency = mapWithConcurrencyFromHandlers;
 
@@ -45,7 +46,8 @@ const TOOL_MODE = (() => {
 
 function createMcpServer({
   handlers = createMcpHandlers(),
-  toolDefinitions = buildToolDefinitions({ mode: TOOL_MODE })
+  toolDefinitions = buildToolDefinitions({ mode: TOOL_MODE }),
+  rateLimiter = new RateLimiter({ maxCalls: Number(process.env.PROPPROFESSOR_RATE_LIMIT || 25), windowMs: 60000 })
 } = {}) {
   const toolMap = new Map(toolDefinitions.map((tool) => [tool.name, tool]));
   let initialized = false;
@@ -107,6 +109,16 @@ function createMcpServer({
       const handler = handlers[toolName];
       if (!toolMap.has(toolName) || typeof handler !== 'function') {
         return createJsonRpcError(id, -32601, `Unknown tool: ${toolName}`);
+      }
+      // Rate-limit check — reject early if the agent is calling too fast,
+      // preventing runaway loops from triggering an upstream ban.
+      const rateCheck = rateLimiter.check(toolName);
+      if (!rateCheck.ok) {
+        return createJsonRpcSuccess(id, {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, error: rateCheck }, null, 2) }],
+          structuredContent: { ok: false, error: rateCheck },
+          isError: true
+        });
       }
       // Enforce inputSchema at the server. The MCP client is expected to
       // validate, but the server shouldn't trust that — a misbehaving
@@ -188,7 +200,23 @@ function createMcpServer({
   };
 }
 
+// Clean-start: claim PID file, kill any orphaned process, and clean up on exit
+function claimPidFile() {
+  const PID_FILE = '/tmp/propprofessor-mcp.pid';
+  try {
+    const oldPid = require('fs').readFileSync(PID_FILE, 'utf8').trim();
+    if (oldPid) {
+      try { process.kill(parseInt(oldPid, 10), 'SIGTERM'); } catch { /* process already dead */ }
+    }
+  } catch { /* no PID file — fresh start */ }
+  require('fs').writeFileSync(PID_FILE, String(process.pid));
+  process.on('exit', () => { try { require('fs').unlinkSync(PID_FILE); } catch {} });
+  process.on('SIGTERM', () => process.exit(0));
+  process.on('SIGINT', () => process.exit(0));
+}
+
 async function serveStdio(options = {}) {
+  claimPidFile();
   const { createPropProfessorClient } = require('../lib/propprofessor-api');
   const client = options.client || createPropProfessorClient();
   const handlers = createMcpHandlers({ client });

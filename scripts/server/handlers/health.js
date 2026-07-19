@@ -12,6 +12,8 @@ const {
   getCookieExpiryInfo
 } = require('../../../lib/propprofessor-api');
 
+const { ok, fail } = require('../../../lib/response-envelope');
+
 /**
  * @param {import('../../lib/propprofessor-api').PropProfessorClient} client
  * @param {import('./handler-context').HandlerContext} ctx
@@ -45,13 +47,10 @@ function createHealthHandlers(client, ctx) {
       };
 
       if (!authValid) {
-        return { ok: false, auth: authSection };
+        return fail('AUTH_EXPIRED', 'Auth missing or expired. Run: pp-query login', { auth: authSection });
       }
 
       const result = await client.healthStatus();
-      // Surface cache hit/miss/eviction stats so operators can verify
-      // caches are working. Without this, a misconfigured cache would
-      // silently underperform.
       const responseCacheStats = responseCache && typeof responseCache.stats === 'function'
         ? responseCache.stats()
         : {};
@@ -61,8 +60,7 @@ function createHealthHandlers(client, ctx) {
       const oddsTotalLooks = oddsHistoryCacheStats.hits + oddsHistoryCacheStats.misses;
       const oddsHistoryHitRate = oddsTotalLooks > 0 ? oddsHistoryCacheStats.hits / oddsTotalLooks : 0;
 
-      return {
-        ok: true,
+      return ok({
         auth: authSection,
         result,
         backend: {
@@ -90,7 +88,7 @@ function createHealthHandlers(client, ctx) {
             ttlMs: DEFAULT_ODDS_HISTORY_CACHE_TTL_MS || 300000
           }
         }
-      };
+      });
     }
   };
 }

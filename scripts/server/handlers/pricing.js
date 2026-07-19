@@ -4,6 +4,8 @@
  * Pricing handler: find_best_price.
  */
 
+const { ok } = require('../../../lib/response-envelope');
+
 function createPricingHandlers(client, ctx) {
   return {
     async find_best_price(args = {}) {
@@ -35,7 +37,7 @@ function createPricingHandlers(client, ctx) {
       if (marketResolution.aliasesUsed.length) {
         result.markets_alias_used = marketResolution.aliasesUsed;
       }
-      return result;
+      return ok(result);
     }
   };
 }

@@ -25,9 +25,9 @@ describe('propprofessor-tool-definitions', () => {
   });
 
   describe('lite mode', () => {
-    it('returns only the 13 lite tools when mode is "lite"', () => {
+    it('returns 15 lite tools when mode is "lite"', () => {
       const tools = buildToolDefinitions({ mode: 'lite' });
-      assert.equal(tools.length, 14);
+      assert.equal(tools.length, 15);
     });
 
     it('every lite tool is in LITE_MODE_TOOLS', () => {
@@ -49,7 +49,8 @@ describe('propprofessor-tool-definitions', () => {
       assert.ok(!names.has('ufc_card'), 'ufc_card should be full-only');
       assert.ok(!names.has('manage_hidden_bets'), 'admin tools should be full-only');
       assert.ok(!names.has('clear_score_timeline'), 'admin tools should be full-only');
-      assert.ok(!names.has('health_status'), 'meta tools should be full-only');
+      // health_status IS in lite mode — zero-risk health check for all agents
+      assert.ok(names.has('health_status'), 'health_status should be in lite mode');
       assert.ok(!names.has('league_presets'), 'meta tools should be full-only');
       assert.ok(!names.has('get_started'), 'meta tools should be full-only');
     });
