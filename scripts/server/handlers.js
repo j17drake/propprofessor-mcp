@@ -10,6 +10,10 @@
  * No behavior change vs. v1.7.0 — this is a pure structural refactor.
  */
 
+const { createHandlerContext } = require('./handler-context');
+const { createHealthHandlers } = require('./handlers/health');
+const { createMetaHandlers } = require('./handlers/meta');
+const { createStateHandlers } = require('./handlers/state');
 const {
   createPropProfessorClient,
   getCookieExpiryInfo,
@@ -649,6 +653,7 @@ function stripVerdictFields(candidate) {
 }
 
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
+  const ctx = createHandlerContext({ client });
   const { getCacheTtlMs, getCacheMaxEntries, getCacheMaxEntrySizeBytes } = require('../../lib/mcp-runtime-config');
   const { LruCache } = require('../../lib/propprofessor-lru-cache');
 
@@ -4264,6 +4269,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     }
   };
+
+  // Extracted module handlers — merge in so they override inline defs
+  Object.assign(handlers, createHealthHandlers(client, ctx));
+  Object.assign(handlers, createMetaHandlers(client, ctx));
+  Object.assign(handlers, createStateHandlers(client, ctx));
 
   return handlers;
 }
