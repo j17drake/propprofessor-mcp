@@ -7,10 +7,12 @@
  * from the createMcpHandlers() closure in handlers.js so that extracted
  * modules can access them without reaching into the monolith.
  *
+ * Updated v2.10.0: accepts `handlers` reference for cross-calling handlers.
+ *
  * Usage:
  *   const { createHandlerContext } = require('./handler-context');
  *   const ctx = createHandlerContext({ client });
- *   // ctx.client, ctx.maybeGc, ctx.responseCache, ctx.canonicalScreenCache, etc.
+ *   // ctx.client, ctx.responseCache, ctx.handlers, etc.
  */
 
 const {
@@ -44,7 +46,10 @@ function createHandlerContext({ client } = {}) {
     cacheMaxEntries: getCacheMaxEntries(),
     canonicalScreenCache,
     maybeGc: _maybeGc,
-    clearTierCache
+    clearTierCache,
+    // Set externally after handlers are built — extracted modules use this
+    // to call sibling handlers (e.g. quick_screen -> sharp_plays)
+    handlers: null
   };
 }
 
