@@ -10,18 +10,19 @@
  * Usage:
  *   const { createHandlerContext } = require('./handler-context');
  *   const ctx = createHandlerContext({ client });
- *   // ctx.client, ctx.maybeGc, ctx.responseCache, etc.
+ *   // ctx.client, ctx.maybeGc, ctx.responseCache, ctx.canonicalScreenCache, etc.
  */
 
-function createHandlerContext({ client } = {}) {
-  const {
-    getCacheTtlMs,
-    getCacheMaxEntries,
-    getCacheMaxEntrySizeBytes
-  } = require('../../lib/mcp-runtime-config');
-  const { LruCache } = require('../../lib/propprofessor-lru-cache');
-  const { clearTierCache } = require('../../lib/propprofessor-risk-score');
+const {
+  getCacheTtlMs,
+  getCacheMaxEntries,
+  getCacheMaxEntrySizeBytes
+} = require('../../lib/mcp-runtime-config');
+const { LruCache } = require('../../lib/propprofessor-lru-cache');
+const { clearTierCache } = require('../../lib/propprofessor-risk-score');
+const { createCanonicalScreenCache } = require('../../lib/propprofessor-shared-utils');
 
+function createHandlerContext({ client } = {}) {
   const _maybeGc = typeof global.gc === 'function'
     ? () => { try { global.gc(); } catch { /* best-effort */ } }
     : () => {};
@@ -30,12 +31,18 @@ function createHandlerContext({ client } = {}) {
   const responseCacheTtlMs = getCacheTtlMs();
   const responseCacheMaxEntrySizeBytes = getCacheMaxEntrySizeBytes();
 
+  const canonicalScreenCache = createCanonicalScreenCache({
+    ttlMs: responseCacheTtlMs,
+    maxEntries: 100
+  });
+
   return {
     client,
     responseCache,
     responseCacheTtlMs,
     responseCacheMaxEntrySizeBytes,
     cacheMaxEntries: getCacheMaxEntries(),
+    canonicalScreenCache,
     maybeGc: _maybeGc,
     clearTierCache
   };

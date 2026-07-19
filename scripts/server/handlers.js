@@ -14,6 +14,9 @@ const { createHandlerContext } = require('./handler-context');
 const { createHealthHandlers } = require('./handlers/health');
 const { createMetaHandlers } = require('./handlers/meta');
 const { createStateHandlers } = require('./handlers/state');
+const { createPicksHandlers } = require('./handlers/picks');
+const { createPricingHandlers } = require('./handlers/pricing');
+const { defined, resolveMarkets, buildPositiveEvTarget, VERDICT_FIELDS, stripVerdictFields } = require('./handlers/handler-utils');
 const {
   createPropProfessorClient,
   getCookieExpiryInfo,
@@ -128,55 +131,6 @@ const {
 const { parseNaturalLanguagePropQuery } = require('../../lib/propprofessor-query-parser');
 
 // Strip undefined values so they don't override API client defaults via spread
-function defined(obj) {
-  const result = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) result[k] = v;
-  }
-  return result;
-}
-
-// ALL_SCREEN_BOOKS is imported from propprofessor-sharp-books.js
-
-/**
- * Resolve market alias(es) in args using the league context.
- * Returns an object with resolved market(s) and alias info for resultMeta.
- *
- * @param {Object} args - The args object containing market/markets
- * @param {string} league - League name (required for alias lookup)
- * @param {string} [defaultMarket='Moneyline'] - Default market if none provided
- * @returns {{ single: string, array: string[], aliasesUsed: string[] }}
- */
-function resolveMarkets(args, league, defaultMarket = 'Moneyline') {
-  const leagueKey = league ? String(league).trim().toUpperCase() : '';
-  const result = { single: defaultMarket, array: [], aliasesUsed: [] };
-
-  // Markets array takes precedence — always resolve it and derive single from it
-  if (Array.isArray(args.markets) && args.markets.length) {
-    result.array = args.markets.map((m) => {
-      const resolved = resolveMarketName(m, leagueKey);
-      if (resolved.wasAliased) {
-        result.aliasesUsed.push(`${m} → ${resolved.resolved}`);
-      }
-      return resolved.resolved;
-    });
-    result.single = result.array[0];
-  } else if (Array.isArray(args.markets) && args.markets.length === 0) {
-    // Empty array stays empty
-    result.array = [];
-  } else if (args.market !== undefined && args.market !== null) {
-    // No markets array, but single market was provided — pass through unchanged
-    result.single = String(args.market).trim();
-    result.array = [result.single];
-  }
-
-  // If only markets array provided (no single market explicit), use first resolved
-  if (args.market === undefined && result.array.length > 0) {
-    result.single = result.array[0];
-  }
-
-  return result;
-}
 
 // league preset inspector
 function buildLeaguePresetSummary() {
@@ -202,26 +156,6 @@ function buildLeaguePresetSummary() {
       sharpBookResearch: getSharpBookContext({ league, market: league === 'MLB' ? 'Moneyline' : undefined })
     };
   });
-}
-
-function buildPositiveEvTarget(play = {}) {
-  const homeTeam = String(play.homeTeam || '').trim();
-  const awayTeam = String(play.awayTeam || '').trim();
-  const participant = String(play.participant || play.selection || '').trim();
-  const selection = String(play.selection || participant).trim();
-  const game = homeTeam && awayTeam ? `${awayTeam} vs ${homeTeam}` : String(play.game || play.matchup || '').trim();
-  return {
-    book: String(play.book || play.sportsbook || '').trim(),
-    playType: String(play.market || play.marketType || '').trim(),
-    pick: selection,
-    selection,
-    participant,
-    game,
-    odds: play.odds,
-    league: String(play.league || '').trim(),
-    gameId: play.gameId ?? play.game_id ?? null,
-    selectionId: play.selectionId ?? play.selection_id ?? null
-  };
 }
 
 function createOddsHistoryMemoizedQuery(client) {
@@ -623,35 +557,8 @@ function stripLiteResponse(response) {
 }
 
 /**
- * Strip BET/CONSIDER/PASS verdict fields from candidate rows.
- * Keeps tier-based signal (confidenceTier, edge, movement, risk) while
- * removing the oscillating verdict layer that confuses agents and users.
- *
- * Applied per-row; call after validation merge but before response assembly.
+ * Hint the JS engine that now is a good time to run GC.
  */
-const VERDICT_FIELDS = [
-  'kaiCall',
-  'displayTier',
-  'finalVerdict',
-  'finalConfidenceTier',
-  'validatedTier',
-  'validatedVerdict',
-  'validatedConfidenceTier',
-  'validatedConsensusDrift',
-  'validatedDriftReason',
-  'validatedUnverified',
-  'validatedReconcileOverridden',
-  'validatedReconcileReason',
-  'validatedRiskFlags',
-  'rationale',
-];
-
-function stripVerdictFields(candidate) {
-  for (const field of VERDICT_FIELDS) {
-    delete candidate[field];
-  }
-}
-
 function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   const ctx = createHandlerContext({ client });
   const { getCacheTtlMs, getCacheMaxEntries, getCacheMaxEntrySizeBytes } = require('../../lib/mcp-runtime-config');
@@ -679,11 +586,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
   // Canonical screen cache for stable (gameId, market, book) tuples.
   // Keyed on canonical tuple rather than full request signature.
-  // Only used when gameId is present (full-league scans bypass).
-  const canonicalScreenCache = createCanonicalScreenCache({
-    ttlMs: responseCacheTtlMs,
-    maxEntries: 100
-  });
+  const canonicalScreenCache = ctx.canonicalScreenCache;
 
   // ─── Screen implementations (used by both the cache-wrapped handlers and
   // direct callers like recommended_bets → handlers.screen_ranked). ───
@@ -4274,6 +4177,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   Object.assign(handlers, createHealthHandlers(client, ctx));
   Object.assign(handlers, createMetaHandlers(client, ctx));
   Object.assign(handlers, createStateHandlers(client, ctx));
+  Object.assign(handlers, createPicksHandlers(client, ctx));
+  Object.assign(handlers, createPricingHandlers(client, ctx));
 
   return handlers;
 }
