@@ -1,3 +1,7 @@
+## 2.9.1
+
+- Dependabot: fixed high-severity `adm-zip` transitive vulnerability via npm overrides pin (safe, no breaking changes).
+
 ## 2.9.0
 
 - Backtest summary: `getBacktestSummary()` wired into `today()` response (sampleSize, settled, byTier, note — honest reporting, never fabricated ROI).
