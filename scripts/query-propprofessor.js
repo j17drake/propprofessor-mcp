@@ -10,7 +10,8 @@ const {
   createPropProfessorClient,
   DEFAULT_USER_AUTH_FILE,
   installAuthFile,
-  inspectAuthSetup
+  inspectAuthSetup,
+  resolveAuthFile
 } = require('../lib/propprofessor-api');
 const { analyzePlayerPropBet } = require('../lib/propprofessor-analysis');
 const { getLocalTimezone, getOddsHistoryLookbackHours } = require('../lib/mcp-runtime-config');
