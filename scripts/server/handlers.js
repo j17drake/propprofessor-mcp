@@ -115,6 +115,7 @@ const { sortRows } = require('../../lib/propprofessor-sort-utils');
 const {
   getPickHistory,
   getPickStats,
+  getBacktestSummary,
   logPick,
   readCheckpoint,
   resolvePick,
@@ -3224,7 +3225,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const targetTiers =
         Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
       const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-      const recResult = await handlers.recommended_bets({
+      const recResult = await handlers.quick_screen({
         leagues,
         markets,
         targetTiers,
@@ -4076,7 +4077,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         : ['NBA', 'WNBA', 'MLB', 'NFL'];
       const book = args.book || 'NoVigApp';
 
-      const [slateRes, pendingRes, statsRes] = await Promise.all([
+      const [slateRes, pendingRes, statsRes, backtestRes] = await Promise.all([
         handlers.quick_screen({
           leagues,
           book,
@@ -4089,7 +4090,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           lite: true
         }).catch(() => ({ ok: true, results: [] })),
         handlers.get_pick_history({ status: 'pending', days: 1 }).catch(() => ({ ok: true, picks: [] })),
-        handlers.get_pick_stats({ days: args.statsDays || 30 }).catch(() => ({ ok: true, stats: null }))
+        handlers.get_pick_stats({ days: args.statsDays || 30 }).catch(() => ({ ok: true, stats: null })),
+        Promise.resolve().then(() => getBacktestSummary({ days: args.statsDays || 30 })).catch(() => ({ ok: false, stats: null }))
       ]);
 
       const slate = (slateRes.results || []).flatMap((e) =>
@@ -4129,6 +4131,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         slate,
         pendingPicks,
         stats: statsRes.stats || null,
+        backtest: backtestRes.ok ? backtestRes : null,
         summary: `${slate.length} sharp plays, ${pendingPicks.length} pending picks, ${statsRes.stats && statsRes.stats.winRate ? statsRes.stats.winRate : 'n/a'} lifetime win rate`
       };
     },
