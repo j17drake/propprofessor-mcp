@@ -16,10 +16,20 @@ const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const changelog = fs.readFileSync(changelogPath, 'utf8');
 
 const version = packageJson.version;
-const changelogHeading = new RegExp(`^##\\s+${version.replace(/\./g, '\\.')}$`, 'm');
 
-if (!changelogHeading.test(changelog)) {
-  fail(`CHANGELOG.md is missing a heading for package version ${version}`);
+// Find the FIRST ## X.Y.Z heading in the changelog
+const changelogLines = changelog.split('\n');
+const topLineIdx = changelogLines.findIndex(l => /^##\s+\d+\.\d+\.\d+/.test(l));
+if (topLineIdx === -1) {
+  fail('CHANGELOG.md has no version headings');
+}
+
+const topHeading = changelogLines[topLineIdx].trim();
+const expectedHeading = `## ${version}`;
+if (topHeading !== expectedHeading) {
+  fail(
+    `CHANGELOG.md top heading is "${topHeading}" but package.json version is "${version}"`
+  );
 }
 
 const githubRef = process.env.GITHUB_REF || '';
