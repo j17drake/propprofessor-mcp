@@ -1435,6 +1435,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // Fall back to screen snapshot's edge when the re-fetched row lacks it
       // (the detail endpoint doesn't always compute consensusEdge).
       const edge = Number(matchingRow?.consensusEdge || args.screenConsensusEdge || 0);
+      const clv = Number(matchingRow?.clvProxyPct || 0);
       const riskFlagsSuffix = _riskFlags.length > 0 ? ` — ${_riskFlags.join(', ')}` : '';
 
       if (cbk >= 10 && _disposition === 'supportive_clean') {
@@ -1457,6 +1458,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         _actionableSummary = `Marginal — only ${cbk} book${cbk > 1 ? 's' : ''} in consensus. Skip unless you have a strong read${riskFlagsSuffix}.`;
       } else {
         _actionableSummary = `No comp book consensus. Pass${riskFlagsSuffix}.`;
+      }
+      // CLV nuance: append a note for significant CLV values
+      if (clv > 4) {
+        _actionableSummary += ` Strong CLV (${clv.toFixed(1)}%) confirms the move direction.`;
+      } else if (clv < -4) {
+        _actionableSummary += ` Weak CLV (${clv.toFixed(1)}%) — line moved against you. Reduce stake or pass.`;
       }
     } else {
       _actionableSummary = 'PASS — one or more hard checks failed.';
