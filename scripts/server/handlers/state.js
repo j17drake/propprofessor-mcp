@@ -6,15 +6,14 @@
  */
 
 const {
-  clearScoreTimeline,
-  getScoreTimelineStats
+  clearScoreTimeline
 } = require('../../../lib/propprofessor-risk-score');
 
 /**
- * @param {import('../../lib/propprofessor-api').PropProfessorClient} client
- * @param {import('./handler-context').HandlerContext} ctx
+ * @param {import('../../../lib/propprofessor-api').PropProfessorClient} client
+ * @param {import('./handler-context').HandlerContext} _ctx
  */
-function createStateHandlers(client, ctx) {
+function createStateHandlers(client, _ctx) {
   return {
     async clear_score_timeline() {
       clearScoreTimeline();

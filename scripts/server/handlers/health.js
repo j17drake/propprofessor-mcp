@@ -18,7 +18,7 @@ const {
  */
 function createHealthHandlers(client, ctx) {
   const { responseCache, responseCacheTtlMs } = ctx || {};
-  const { getOddsHistoryCache } = require('../../../lib/propprofessor-shared-utils');
+  const { getOddsHistoryCache, DEFAULT_ODDS_HISTORY_CACHE_TTL_MS } = require('../../../lib/mcp-runtime-config');
 
   return {
     async health_status() {
@@ -87,7 +87,7 @@ function createHealthHandlers(client, ctx) {
             misses: oddsHistoryCacheStats.misses || 0,
             evictions: oddsHistoryCacheStats.evictions || 0,
             hitRate: Number(oddsHistoryHitRate.toFixed(4)),
-            ttlMs: require('../../../lib/propprofessor-shared-utils').DEFAULT_ODDS_HISTORY_CACHE_TTL_MS || 300000
+            ttlMs: DEFAULT_ODDS_HISTORY_CACHE_TTL_MS || 300000
           }
         }
       };
