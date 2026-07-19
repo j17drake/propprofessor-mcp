@@ -2126,8 +2126,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             : Array.from(DEFAULT_LEAGUES);
       const markets =
         Array.isArray(args.markets) && args.markets.length ? args.markets : args.market ? [args.market] : null; // null = use per-league defaults below
-      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
-      const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 50;
+      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 100;
+      const maxPerMarket = Number.isFinite(Number(args.maxPerMarket)) ? Number(args.maxPerMarket) : null;
+      const scanLimit = Number.isFinite(Number(args.scanLimit)) ? Number(args.scanLimit) : 100;
       const lookbackHours = Number.isFinite(Number(args.lookbackHours)) ? Number(args.lookbackHours) : 6;
       const includeResearch = args.includeResearch !== undefined ? Boolean(args.includeResearch) : true;
       const debug = Boolean(args.debug);
@@ -2217,10 +2218,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
               const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
               if (!candidates.length) continue;
 
+              const perMarketCap = maxPerMarket || limit;
               allCandidates.push({
                 league,
                 market,
-                candidates: candidates.slice(0, limit).map(mapCandidateRow)
+                candidates: candidates.slice(0, perMarketCap).map(mapCandidateRow)
               });
             } catch (error) {
               const categorized = categorizeError(error);
@@ -2688,7 +2690,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const markets = resolvedMarketsByLeague[firstLeague] || ['Moneyline', 'Spread', 'Total'];
       const targetTiers =
         Array.isArray(args.targetTiers) && args.targetTiers.length ? args.targetTiers : ['TIER 1', 'TIER 2'];
-      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 10;
+      const limit = Number.isFinite(Number(args.limit)) ? Number(args.limit) : 100;
       // Parallelize per-league work — previously a serial for-of loop, which
       // meant 7 leagues × 3 markets = 21 sequential screen_ranked calls by
       // default. mapWithConcurrency(4) keeps the backend from being hammered
