@@ -500,6 +500,10 @@ function promoteFinalVerdictToDisplay(target) {
   if (target.finalVerdict === 'PASS') {
     target.confidenceTier = 'TIER 4';
   }
+  // Add quick summary for agent decision-making
+  const odds = target.odds ? ` at ${target.odds}` : '';
+  const selection = target.selection || target.participant || target.pick || '';
+  target.summary = `${target.finalVerdict} ${selection}${odds}`.trim();
 }
 
 /**
@@ -2372,9 +2376,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       const bookList = targetBooks.length === 1 ? targetBooks[0] : targetBooks.join(', ');
 
       // === validate: run validate_play on returned candidates ===
-      // validateAll (default true) validates EVERY candidate. validateTop is only a cap, honored when validate is false.
-      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
-      const validateAll = args.validate !== false; // default true
+      // validateAll defaults to false (changed 2026-07-20) to only validate top candidates
+      // validateTop limits validation to N best candidates when validate is false/omitted
+      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 10;
+      const validateAll = args.validate === true; // default false, validate top 10 only
 
       if (validateAll || validateTop > 0) {
         const validationCache = new Map(); // gameId → validated result, shared across candidates
@@ -2392,10 +2397,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             if (!validateAll && !topN.includes(candidate)) continue;
             if (!candidate.gameId || !candidate.selection) continue;
 
-            // Per-gameId+market cache: same game, same market candidates (e.g. Over 8.5, Under 8.5)
-            // share one validate_play call. Market-scoped to prevent Moneyline validation from
-            // being applied to Total Runs candidates for the same game.
-            const qsCacheKey = `${candidate.gameId}::${entry.market}`;
+            // Per-gameId+selection+market cache: same game + same selection shares one validate_play call.
+            // The original key (gameId::market) incorrectly shared Over/Under validation on the same game.
+            const qsCacheKey = `${candidate.gameId}::${candidate.selection}::${entry.market}`;
             if (validationCache.has(qsCacheKey)) {
               const cached = validationCache.get(qsCacheKey);
               if (cached) {
@@ -2410,7 +2414,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             validationPromises.push(
               (async () => {
                 try {
-                  const result = await runValidatePlayImpl(client, {
+                  const VALIDATION_TIMEOUT_MS = 15000;
+                  const validatePromise = runValidatePlayImpl(client, {
                     league: entry.league,
                     gameId: candidate.gameId,
                     selection: candidate.selection,
@@ -2432,6 +2437,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     // movementDisposition to 'insufficient'.
                     screenSharpBookConfirmed: candidate.sharpBookMovementConfirmed || false
                   });
+                  const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`Validation timeout for ${candidate.gameId}:${candidate.selection}`)), VALIDATION_TIMEOUT_MS)
+                  );
+                  const result = await Promise.race([validatePromise, timeoutPromise]);
                   if (candidate.gameId && result && result.ok) {
                     validationCache.set(qsCacheKey, result);
                   }
@@ -2655,8 +2664,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         try {
           estimatedSizeBytes = JSON.stringify(formattedResponse).length;
         } catch { /* non-serializable — skip caching */ }
+        // Per-league caches already filter empty responses; aggregate cache stores whatever we got
         responseCache.set(args._aggregateCacheKey, formattedResponse, responseCacheTtlMs, estimatedSizeBytes);
       }
+      // Log large responses for monitoring
+      try {
+        const responseSize = JSON.stringify(formattedResponse).length;
+        if (responseSize > 500000) { // 500KB
+          console.warn(`[PropProfessor MCP] Large quick_screen response: ${(responseSize / 1024).toFixed(1)}KB`);
+        }
+      } catch { /* ignore */ }
       _maybeGc();
       return ok(formattedResponse);
     },
@@ -2858,24 +2875,25 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       );
 
       // === validate: run validate_play on returned plays ===
-      // validateAll (default true) validates EVERY play. validateTop is only a cap, honored when validate is false.
-      const validateTopRB = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 0;
-      const validateAll = args.validate !== false; // default true
+      // validateAll defaults to false (2026-07-20) to only validate top candidates
+      // validateTopRB limits validation to N best plays when validate is false/omitted
+      const validateTopRB = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 10;
+      const validateAllRB = args.validate === true; // default false, validate top 10 only
 
-      if (validateAll || validateTopRB > 0) {
+      if (validateAllRB || validateTopRB > 0) {
         const validationCache = new Map();
         const validationPromises = [];
 
         for (const leagueEntry of allRecommended) {
           if (!leagueEntry.plays || !leagueEntry.plays.length) continue;
-          const sorted = validateAll
+          const sorted = validateAllRB
             ? leagueEntry.plays
             : [...leagueEntry.plays].sort((a, b) => (b.screenScore || 0) - (a.screenScore || 0));
           const topN = sorted.slice(0, validateTopRB);
 
           for (const play of leagueEntry.plays) {
-            // validateAll => validate everything; else only top-N (capped)
-            if (!validateAll && !topN.includes(play)) continue;
+            // validateAllRB => validate everything; else only top-N (capped)
+            if (!validateAllRB && !topN.includes(play)) continue;
             if (!play.gameId || !play.selection) continue;
 
             // Per-gameId+market cache: plays from the same game+market share one validate_play call.
@@ -2895,7 +2913,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             validationPromises.push(
               (async () => {
                 try {
-                  const result = await runValidatePlayImpl(client, {
+                  const VALIDATION_TIMEOUT_MS = 15000;
+                  const validatePromise = runValidatePlayImpl(client, {
                     league: leagueEntry.league,
                     gameId: play.gameId,
                     selection: play.selection,
@@ -2915,6 +2934,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
                     // movementDisposition to 'insufficient'.
                     screenSharpBookConfirmed: play.sharpBookMovementConfirmed || false
                   });
+                  const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`Validation timeout for ${play.gameId}:${play.selection}`)), VALIDATION_TIMEOUT_MS)
+                  );
+                  const result = await Promise.race([validatePromise, timeoutPromise]);
                   if (play.gameId && result && result.ok) {
                     validationCache.set(rbCacheKey, result);
                   }
