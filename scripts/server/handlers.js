@@ -1169,7 +1169,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     const screenTier = args.screenTier || (matchingRow && matchingRow.screenTier);
     const screenKaiCall = args.screenKaiCall || (matchingRow && matchingRow.screenKaiCall);
     // Prefer the agent's already-returned tier for consistency, unless research/exec downgrades.
-    let tier = screenTier || matchingRow?.confidenceTier || 'TIER 4';
+    // Fallback chain: screenTier → confidenceTier → kaiCall→tier mapping → 'TIER 4'
+    let tier = screenTier || matchingRow?.confidenceTier || null;
+    if (!tier) {
+      const kaiCall = screenKaiCall || matchingRow?.kaiCall;
+      if (kaiCall === 'BET') tier = 'TIER 1';
+      else if (kaiCall === 'CONSIDER') tier = 'TIER 2';
+      else tier = 'TIER 4';
+    }
     let lookupStatus = 'resolved';
     let reasonType = 'signal';
 
