@@ -1661,18 +1661,49 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         : client.queryScreenOddsBestComps.bind(client);
 
     const payloads = [];
-    for (const market of marketQuery) {
-      const payload = await queryFn({
-        market,
-        league: 'Tennis',
-        // Always query with ALL_SCREEN_BOOKS for tennis — the backend only
-        // returns multi-book data (consensus, history) for secondary sports
-        // when the complete book list is passed. The requestedBooks filter
-        // is applied below via requirePreferredBook.
-        books: ALL_SCREEN_BOOKS,
-        is_live: false
-      });
-      payloads.push(payload);
+
+    // ===== SCHEDULE-FIRST DISCOVERY =====
+    // Use Sofascore as primary schedule source — covers ATP/WTA/Challenger/ITF.
+    // Falls back to traditional screen query below if unavailable.
+    try {
+      const { getTodayTennisSchedule } = require('../../lib/propprofessor-schedule');
+      const scheduleGames = await getTodayTennisSchedule();
+      const todayGameIds = scheduleGames
+        .filter((g) => {
+          const d = new Date(g.startTimestamp).toISOString().slice(0, 10);
+          return d === new Date().toISOString().slice(0, 10);
+        })
+        .map((g) => g.gameId)
+        .filter(Boolean);
+
+      if (todayGameIds.length > 0) {
+        for (const gid of todayGameIds) {
+          try {
+            const p = await queryFn({
+              league: 'Tennis',
+              market,
+              games: [gid],
+              participants: [],
+              books: ALL_SCREEN_BOOKS,
+              is_live: false
+            });
+            if (p) payloads.push(p);
+          } catch { /* skip unresolvable games */ }
+        }
+      }
+    } catch { /* schedule unavailable — fall through to screen query */ }
+
+    // ===== TRADITIONAL SCREEN QUERY (fallback) =====
+    if (payloads.length === 0) {
+      for (const market of marketQuery) {
+        const payload = await queryFn({
+          market,
+          league: 'Tennis',
+          books: ALL_SCREEN_BOOKS,
+          is_live: false
+        });
+        payloads.push(payload);
+      }
     }
 
     const rows = payloads.flatMap((payload) => extractScreenRows(payload));
