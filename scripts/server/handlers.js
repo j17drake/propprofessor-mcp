@@ -2196,52 +2196,57 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       let cardWindowFallthrough = null; // set ONLY when today is dead and we fall through to 'next'
       let nextDayMerged = null; // set when today is alive AND tomorrow's rows are merged in
 
-      // Fan out leagues concurrently with concurrency=4.
-      // Previously serialized 10 leagues × 3 markets = 30 sequential HTTP calls;
-      // now bounded by max(per-call) rather than sum(per-call) — ~3-5x speedup.
+      // Fan out league×market pairs concurrently with concurrency=8.
+      // Previously: outer league loop at concurrency=4, inner market loop serial.
+      // Now: flat fan-out — all pairs in one pool, ~3× faster on 3-market scans.
+      const leagueMarketPairs = [];
+      for (const league of leagues) {
+        for (const market of resolvedMarketsByLeague[league] || []) {
+          leagueMarketPairs.push({ league, market });
+        }
+      }
+
       await mapWithConcurrency(
-        leagues,
-        async (league) => {
-          for (const market of resolvedMarketsByLeague[league] || []) {
-            try {
-              const spResult = await handlers.sharp_plays({
-                targetBooks,
-                league,
-                market,
-                limit: scanLimit,
-                scanLimit,
-                lookbackHours,
-                is_live: false,
-                strict: false,
-                includePasses: true,
-                includeResearch: false,
-                cardWindow: 'all', // always scan all — filter below
-                debug
-              });
+        leagueMarketPairs,
+        async ({ league, market }) => {
+          try {
+            const spResult = await handlers.sharp_plays({
+              targetBooks,
+              league,
+              market,
+              limit: scanLimit,
+              scanLimit,
+              lookbackHours,
+              is_live: false,
+              strict: false,
+              includePasses: true,
+              includeResearch: false,
+              cardWindow: 'all', // always scan all — filter below
+              debug
+            });
 
-              const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
-              if (!candidates.length) continue;
+            const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
+            if (!candidates.length) return;
 
-              const perMarketCap = maxPerMarket || limit;
-              allCandidates.push({
-                league,
-                market,
-                candidates: candidates.slice(0, perMarketCap).map(mapCandidateRow)
-              });
-            } catch (error) {
-              const categorized = categorizeError(error);
-              allCandidates.push({
-                league,
-                market,
-                candidates: [],
-                error: categorized.message,
-                code: categorized.code,
-                recovery: categorized.recovery
-              });
-            }
+            const perMarketCap = maxPerMarket || limit;
+            allCandidates.push({
+              league,
+              market,
+              candidates: candidates.slice(0, perMarketCap).map(mapCandidateRow)
+            });
+          } catch (error) {
+            const categorized = categorizeError(error);
+            allCandidates.push({
+              league,
+              market,
+              candidates: [],
+              error: categorized.message,
+              code: categorized.code,
+              recovery: categorized.recovery
+            });
           }
         },
-        { concurrency: 4 }
+        { concurrency: 8 }
       );
 
       // Post-filter by card window when 'today' or 'next' is requested.
@@ -2622,7 +2627,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         tierStats: (() => {
           try {
             const stats = getPickStats({ days: 90 });
-            return stats?.stats?.byTier || null;
+            const backtest = getBacktestSummary({ days: 90 });
+            return {
+              byTier: stats?.stats?.byTier || null,
+              backtest: backtest?.ok ? backtest : null
+            };
           } catch { return null; }
         })(),
         _meta:
@@ -3093,8 +3102,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           market: matchMarket,
           book
         });
-      } catch {
-        // validation failed — surface what we have
+      } catch (err) {
+        validation = { _error: true, error: err.message };
       }
 
       // Step 4: Line shop
@@ -3106,8 +3115,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           market: matchMarket,
           selection: match.selection
         });
-      } catch {
-        // line shop failed — not critical
+      } catch (err) {
+        bestPrice = { _error: true, error: err.message };
       }
 
       // Step 5: Staking recommendation
@@ -3124,8 +3133,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           staking =
             stakingStakes.find((p) => p.selection && p.selection.toLowerCase().includes(selection.toLowerCase())) ||
             null;
-        } catch {
-          // staking failed — not critical
+        } catch (err) {
+          staking = { _error: true, error: err.message };
         }
       }
 

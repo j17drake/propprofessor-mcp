@@ -533,8 +533,8 @@ function createCompositesHandlers(client, ctx) {
           market: matchMarket,
           book
         });
-      } catch {
-        // validation failed — surface what we have
+      } catch (err) {
+        validation = { _error: true, error: err.message };
       }
 
       let bestPrice = null;
@@ -545,8 +545,8 @@ function createCompositesHandlers(client, ctx) {
           market: matchMarket,
           selection: match.selection
         });
-      } catch {
-        // line shop failed — not critical
+      } catch (err) {
+        bestPrice = { _error: true, error: err.message };
       }
 
       let staking = null;
@@ -562,8 +562,8 @@ function createCompositesHandlers(client, ctx) {
           staking =
             stakingStakes.find((p) => p.selection && p.selection.toLowerCase().includes(selection.toLowerCase())) ||
             null;
-        } catch {
-          // staking failed — not critical
+        } catch (err) {
+          staking = { _error: true, error: err.message };
         }
       }
 

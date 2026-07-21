@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 'use strict';
 
+process.on('unhandledRejection', (reason) => {
+  process.stderr.write(`[propprofessor-mcp] Unhandled Rejection: ${reason?.stack || reason}\n`);
+});
+process.on('uncaughtException', (error) => {
+  process.stderr.write(`[propprofessor-mcp] Uncaught Exception: ${error.stack || error}\n`);
+});
+
 /**
  * PropProfessor MCP server entry point.
  *
