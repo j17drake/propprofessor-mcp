@@ -2122,6 +2122,26 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       };
     },
 
+    // scan: Simplified one-call entry point. Same engine as quick_screen
+    // but with agent-friendly defaults and cleaner output. The preferred
+    // tool for AI agents — quick_screen remains for backward compat.
+    async scan(args = {}) {
+      // Map sport→league for user ergonomics
+      const sport = String(args.sport || '').trim().toLowerCase();
+      const leagueMap = { tennis: 'Tennis', nba: 'NBA', mlb: 'MLB', nfl: 'NFL', nhl: 'NHL', wnba: 'WNBA', ufc: 'UFC', soccer: 'Soccer', ncaab: 'NCAAB', ncaaf: 'NCAAF', nbasl: 'NBASL' };
+      const resolvedLeague = args.league || (sport ? (leagueMap[sport] || args.sport) : undefined);
+      
+      return handlers.quick_screen({
+        ...args,
+        league: resolvedLeague,
+        book: args.book || 'NoVigApp',
+        verbosity: args.verbosity || 'bets',
+        lite: args.lite !== false,
+        sortBy: args.sortBy || 'edge',
+        sortDir: args.sortDir || 'desc'
+      });
+    },
+
     // quick_screen: Accepts any book(s) via the `books` param and runs
     // sharp_plays + player_context for each (league, market) pair.
     // Defaults to ['NoVigApp'].
