@@ -473,6 +473,70 @@ function applyFinalVerdict(target) {
 }
 
 /**
+ * Post-validation check: flag plays on the same game+market that contradict
+ * each other (e.g. Over 19.5 BET alongside Under 19.5 BET). The system
+ * evaluates each line independently, so a match with split market signals
+ * can ship two TIER 1 plays in opposite directions — which is noise, not
+ * signal. This function downgrades the weaker play to CONSIDER.
+ */
+function flagContradictoryPlays(plays) {
+  if (!Array.isArray(plays) || plays.length < 2) return;
+
+  // Group by gameId+market
+  const groups = {};
+  for (const p of plays) {
+    const key = `${p.gameId}||${p.market}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  }
+
+  for (const key of Object.keys(groups)) {
+    const group = groups[key];
+    if (group.length < 2) continue;
+
+    // Find opposing over/under pairs within the same game+market
+    getOpposingPair: for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i];
+        const b = group[j];
+        const selA = String(a.selection || '').toLowerCase();
+        const selB = String(b.selection || '').toLowerCase();
+
+        // Check if they're opposing (Over X vs Under X on same line)
+        const aMatch = selA.match(/^(over|under)\s+(\d+\.?\d*)/);
+        const bMatch = selB.match(/^(over|under)\s+(\d+\.?\d*)/);
+        if (!aMatch || !bMatch) continue;
+        if (aMatch[2] !== bMatch[2]) continue;  // different lines, not contradictory
+        if (aMatch[1] === bMatch[1]) continue;  // same direction
+
+        // Both are BET/TIER 1 — flag the weaker one
+        const edgeA = Number(a.edge || 0);
+        const edgeB = Number(b.edge || 0);
+
+        const weaker = edgeA <= edgeB ? a : b;
+        const stronger = edgeA <= edgeB ? b : a;
+
+        weaker.finalWarnings = [...(weaker.finalWarnings || []), 'contradictory-signal'];
+        if (weaker.finalVerdict === 'BET' || weaker.kaiCall === 'BET') {
+          weaker.finalVerdict = 'CONSIDER';
+          weaker.finalConfidenceTier = 'TIER 2';
+          weaker.displayTier = 'CONSIDER';
+          weaker.kaiCall = 'CONSIDER';
+        }
+
+        // Flag both with a reference to the contradiction
+        if (!stronger.finalWarnings) stronger.finalWarnings = [];
+        if (!stronger.finalWarnings.includes('contradictory-signal')) {
+          stronger.finalWarnings = [...stronger.finalWarnings, 'contradictory-signal'];
+        }
+
+        break getOpposingPair; // handle one pair per group at most
+      }
+    }
+  }
+}
+
+/**
  * Promote the authoritative merged verdict (finalVerdict / finalConfidenceTier)
  * into the agent-facing display fields (displayTier, confidenceTier, kaiCall)
  * so consumers that read the PRIMARY fields — not the buried finalVerdict —
@@ -2534,6 +2598,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
+      // Post-validation: downgrade contradictory same-game+market plays
+      for (const entry of allCandidates) {
+        if (entry.candidates && entry.candidates.length) {
+          flagContradictoryPlays(entry.candidates);
+        }
+      }
+
       const validatedCount = allCandidates.reduce(
         (sum, entry) => sum + (entry.candidates || []).filter((c) => c._validated).length,
         0
@@ -3029,6 +3100,13 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           vr.play._validated = true;
           applyFinalVerdict(vr.play);
           promoteFinalVerdictToDisplay(vr.play);
+        }
+      }
+
+      // Post-validation: downgrade contradictory same-game+market plays
+      for (const entry of allRecommended) {
+        if (entry.plays && entry.plays.length) {
+          flagContradictoryPlays(entry.plays);
         }
       }
 
