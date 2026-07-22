@@ -208,7 +208,19 @@ function createMcpServer({
 }
 
 // Clean-start: claim PID file, kill any orphaned process, and clean up on exit
+// NOTE: PID file is DISABLED for stdio MCP mode because each MCP client spawns
+// its own process via command+args. The PID file caused `hermes mcp test` (and
+// reconnect spawns) to SIGTERM the session's live server process, triggering
+// ClosedResourceError on every subsequent tool call. The MCP client's stdio
+// transport already manages the process lifecycle correctly on its own.
 function claimPidFile() {
+  if (process.env.PROPPROFESSOR_MCP_NDJSON === 'true') {
+    // Stdio MCP transport — the Hermes MCP client manages lifecycle.
+    // Register SIGTERM/SIGINT handlers for clean shutdown without PID file.
+    process.on('SIGTERM', () => process.exit(0));
+    process.on('SIGINT', () => process.exit(0));
+    return;
+  }
   const PID_FILE = '/tmp/propprofessor-mcp.pid';
   try {
     const oldPid = require('fs').readFileSync(PID_FILE, 'utf8').trim();
@@ -217,7 +229,7 @@ function claimPidFile() {
     }
   } catch { /* no PID file — fresh start */ }
   require('fs').writeFileSync(PID_FILE, String(process.pid));
-  process.on('exit', () => { try { require('fs').unlinkSync(PID_FILE); } catch {} });
+  process.on('exit', () => { try { require('fs').unlinkSync(PID_FILE); } catch { /* best-effort */ } });
   process.on('SIGTERM', () => process.exit(0));
   process.on('SIGINT', () => process.exit(0));
 }

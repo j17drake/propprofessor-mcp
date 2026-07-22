@@ -45,7 +45,7 @@ function createMockClient({ screenPayloads = {}, historyByGame = {}, healthPaylo
     queryScreenOddsBestComps: [],
     queryOddsHistory: [],
     querySportsbook: [],
-    queryFantasyPicks: [],
+    queryBackendFantasyPicks: [],
     healthStatus: 0,
     getHiddenBets: 0,
     hideBet: [],
@@ -95,9 +95,9 @@ function createMockClient({ screenPayloads = {}, historyByGame = {}, healthPaylo
         return Promise.resolve([]);
       },
 
-      queryFantasyPicks(filters = {}) {
-        track('queryFantasyPicks', filters);
-        calls.queryFantasyPicks.push(filters);
+      queryBackendFantasyPicks(filters = {}) {
+        track('queryBackendFantasyPicks', filters);
+        calls.queryBackendFantasyPicks.push(filters);
         return Promise.resolve({ rows: [] });
       },
 

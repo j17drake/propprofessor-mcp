@@ -8,7 +8,7 @@
 const { defined } = require('./handler-utils');
 const { validatePositiveEvCandidates } = require('../../../lib/validate-ev-candidates');
 
-function createDiscoveryHandlers(client, ctx) {
+function createDiscoveryHandlers(client, _ctx) {
   return {
     async ev_candidates(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues : undefined;

@@ -16,7 +16,6 @@ const { getPlayerContext } = require('../../../lib/propprofessor-player-context'
 const { getMlbGameContext } = require('../../../lib/propprofessor-mlb-game-context');
 const { clearScoreTimeline } = require('../../../lib/propprofessor-risk-score');
 const { getMarketsForSport } = require('../../../lib/propprofessor-market-registry');
-const { DEFAULT_LEAGUES } = require('../../../lib/propprofessor-shared-utils');
 const { getLeagueRankingPreset } = require('../../../lib/propprofessor-mcp-ranked-screen');
 const { getSharpBookComparisonSet, getSharpBookContext } = require('../../../lib/propprofessor-sharp-books');
 
@@ -53,7 +52,7 @@ function buildLeaguePresetSummary() {
  * @param {import('../../../lib/propprofessor-api').PropProfessorClient} client
  * @param {import('./handler-context').HandlerContext} ctx
  */
-function createContextPluginsHandlers(client, ctx) {
+function createContextPluginsHandlers(client, _ctx) {
   return {
     async player_context(args = {}) {
       const player = typeof args.player === 'string' ? args.player.trim() : '';
@@ -86,39 +85,17 @@ function createContextPluginsHandlers(client, ctx) {
     },
 
     async fantasy_optimizer(args = {}) {
-      const num = (v, fallback) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
       const filters = {
-        isLive: args.is_live !== undefined ? Boolean(args.is_live) : Boolean(args.isLive),
-        showBreakOnly: args.showBreakOnly,
-        showTimeoutOnly: args.showTimeoutOnly,
-        showPeriodEndOnly: args.showPeriodEndOnly,
-        timeAvailable: args.timeAvailable,
-        userState: args.userState,
-        hideNCAAPlayerProps: args.hideNCAAPlayerProps,
-        fantasyApps: Array.isArray(args.fantasyApps) ? args.fantasyApps : ['PrizePicks'],
-        sportsbooks: Array.isArray(args.sportsbooks)
-          ? args.sportsbooks
-          : ['FanDuel', 'DraftKings', 'BetMGM', 'Caesars', 'Pinnacle'],
-        leagues: Array.isArray(args.leagues) ? args.leagues : Array.from(DEFAULT_LEAGUES),
-        league: args.league,
-        market: args.market,
-        minOdds: num(args.minOdds, -1000),
-        maxOdds: num(args.maxOdds, 1000),
-        minValue: num(args.minValue, -100),
-        maxValue: num(args.maxValue, 100),
-        minLegEV: num(args.minLegEV, -100),
-        maxLegEV: num(args.maxLegEV, 100),
-        minSlipEV: num(args.minSlipEV, -100),
-        maxSlipEV: num(args.maxSlipEV, 100),
-        hiddenBets: Array.isArray(args.hiddenBets) ? args.hiddenBets : [],
-        liveStatus: Array.isArray(args.liveStatus) ? args.liveStatus : [],
-        periodTypes: Array.isArray(args.periodTypes) ? args.periodTypes : ['Full Game'],
-        minHoursAway: num(args.minHoursAway, 0),
-        maxHoursAway: num(args.maxHoursAway, 336),
-        minLiquidity: num(args.minLiquidity, 0),
-        maxLiquidity: num(args.maxLiquidity, 1000)
+        fantasyApps: Array.isArray(args.fantasyApps) && args.fantasyApps.length
+          ? args.fantasyApps
+          : ['PrizePicks'],
+        leagues: Array.isArray(args.leagues) && args.leagues.length
+          ? args.leagues
+          : ['NBA', 'MLB', 'WNBA', 'Tennis', 'NHL', 'NFL', 'UFC', 'Soccer']
       };
-      const result = await client.queryFantasyPicks(filters);
+      if (args.market) filters.market = args.market;
+      if (args.isLive === true) filters.isLive = true;
+      const result = await client.queryBackendFantasyPicks(filters);
       return {
         ok: true,
         count: Array.isArray(result) ? result.length : 0,

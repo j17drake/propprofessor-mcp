@@ -20,8 +20,8 @@ const { createContextPluginsHandlers } = require('./handlers/context-plugins');
 const { createDiscoveryHandlers } = require('./handlers/discovery');
 const { createConsensusHandlers } = require('./handlers/consensus');
 const { createCompositesHandlers } = require('./handlers/composites');
-const { defined, resolveMarkets, buildPositiveEvTarget, VERDICT_FIELDS, stripVerdictFields } = require('./handlers/handler-utils');
-const { ok, fail } = require('../../lib/response-envelope');
+const { defined, resolveMarkets, buildPositiveEvTarget, stripVerdictFields } = require('./handlers/handler-utils');
+const { ok } = require('../../lib/response-envelope');
 const {
   createPropProfessorClient,
   getCookieExpiryInfo,
@@ -38,12 +38,10 @@ const {
 const { rankLeagueScreenRows } = require('../../lib/screen-ranker');
 const { extractScreenRows } = require('../../lib/screen-parser');
 const {
-  resolveMarketName,
   DEFAULT_LEAGUES,
   mapWithConcurrency,
   createCrossCallMemoizedQuery,
   canonicalizeScreenArgs,
-  createCanonicalScreenCache,
   parseGameStartMs
 } = require('../../lib/propprofessor-shared-utils');
 const { getLocalTimezone, localDateKey } = require('../../lib/mcp-runtime-config');
@@ -83,7 +81,6 @@ const {
 } = require('../../lib/propprofessor-mcp-ranked-screen');
 const {
   getSharpBookComparisonSet,
-  getSharpBookContext,
   ALL_SCREEN_BOOKS,
   uniqueBooks
 } = require('../../lib/propprofessor-sharp-books');
@@ -92,7 +89,6 @@ const { categorizeError } = require('../../lib/propprofessor-mcp-stdio');
 const { computeMovementDisposition } = require('../../lib/propprofessor-movement-disposition');
 const { reconcileValidateOverride } = require('../../lib/validate-reconcile');
 const { runSharpPlays } = require('../../lib/propprofessor-sharp-plays-service');
-const { correctTennisTimes } = require('../../lib/propprofessor-tennis');
 const {
   analyzeMultiWindow,
   summarizeResults,
@@ -102,10 +98,8 @@ const {
 const {
   getConfidenceTierStable,
   clearTierCache,
-  clearScoreTimeline,
   suggestStakes
 } = require('../../lib/propprofessor-risk-score');
-const { getPlayerContext } = require('../../lib/propprofessor-player-context');
 const { getMlbGameContext, findMlbGamePk } = require('../../lib/propprofessor-mlb-game-context');
 const { getGameContext } = require('../../lib/propprofessor-game-context');
 const { runResearchOnTopRows } = require('../../lib/propprofessor-research-runner');
@@ -136,32 +130,6 @@ const {
 const { parseNaturalLanguagePropQuery } = require('../../lib/propprofessor-query-parser');
 
 // Strip undefined values so they don't override API client defaults via spread
-
-// league preset inspector
-function buildLeaguePresetSummary() {
-  const leagues = ['NBA', 'WNBA', 'MLB', 'NFL', 'NHL', 'UFC', 'SOCCER', 'TENNIS', 'NCAAB', 'NCAAF'];
-  return leagues.map((league) => {
-    const preset = getLeagueRankingPreset(league);
-    const isSharpLeague = ['NBA', 'NFL', 'MLB'].includes(league);
-    const sharpMainMarkets = isSharpLeague ? getSharpBookComparisonSet({ league, market: 'Moneyline' }) : undefined;
-    const sharpProps = isSharpLeague
-      ? getSharpBookComparisonSet({ league, market: league === 'MLB' ? 'Player Strikeouts' : 'Player Points' })
-      : undefined;
-
-    return {
-      ...preset,
-      sharpMainMarkets,
-      sharpProps,
-      sharpBookVariants: isSharpLeague
-        ? {
-            mainMarkets: sharpMainMarkets,
-            playerProps: sharpProps
-          }
-        : undefined,
-      sharpBookResearch: getSharpBookContext({ league, market: league === 'MLB' ? 'Moneyline' : undefined })
-    };
-  });
-}
 
 function createOddsHistoryMemoizedQuery(client) {
   // Cross-call LRU cache (shared process-wide, 5-min TTL). The previous
@@ -474,10 +442,15 @@ function applyFinalVerdict(target) {
 
 /**
  * Post-validation check: flag plays on the same game+market that contradict
- * each other (e.g. Over 19.5 BET alongside Under 19.5 BET). The system
+ * each other (e.g. Over 173.5 BET alongside Under 179.5 BET for the same game). The system
  * evaluates each line independently, so a match with split market signals
- * can ship two TIER 1 plays in opposite directions — which is noise, not
- * signal. This function downgrades the weaker play to CONSIDER.
+ * can ship TIER 1 plays in opposite directions — which is noise, not
+ * signal. This function picks the stronger side per game+market and
+ * downgrades the weaker side to CONSIDER.
+ *
+ * Unlike the old implementation which only caught exact same-line
+ * opposites (Over 179.5 vs Under 179.5), this version detects ANY
+ * Over-vs-Under conflict regardless of line number.
  */
 function flagContradictoryPlays(plays) {
   if (!Array.isArray(plays) || plays.length < 2) return;
@@ -494,43 +467,70 @@ function flagContradictoryPlays(plays) {
     const group = groups[key];
     if (group.length < 2) continue;
 
-    // Find opposing over/under pairs within the same game+market
-    getOpposingPair: for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        const a = group[i];
-        const b = group[j];
-        const selA = String(a.selection || '').toLowerCase();
-        const selB = String(b.selection || '').toLowerCase();
+    // Split into over and under buckets
+    const overPlays = [];
+    const underPlays = [];
+    for (const p of group) {
+      const sel = String(p.selection || '').toLowerCase();
+      if (sel.startsWith('over')) overPlays.push(p);
+      else if (sel.startsWith('under')) underPlays.push(p);
+      // Non-total plays (ML/spread) don't have over/under, skip them
+    }
 
-        // Check if they're opposing (Over X vs Under X on same line)
-        const aMatch = selA.match(/^(over|under)\s+(\d+\.?\d*)/);
-        const bMatch = selB.match(/^(over|under)\s+(\d+\.?\d*)/);
-        if (!aMatch || !bMatch) continue;
-        if (aMatch[2] !== bMatch[2]) continue;  // different lines, not contradictory
-        if (aMatch[1] === bMatch[1]) continue;  // same direction
+    if (overPlays.length === 0 || underPlays.length === 0) continue;
+    // Both sides are present — need to pick one
 
-        // Both are BET/TIER 1 — flag the weaker one
-        const edgeA = Number(a.edge || 0);
-        const edgeB = Number(b.edge || 0);
+    // Score each side by movement quality
+    function movementScore(play) {
+      const m = String(play.movementDisposition || '');
+      if (m === 'supportive_clean') return 3;
+      if (m === 'supportive_bouncy') return 2;
+      if (m === 'insufficient') return 1;
+      return -1; // adverse_full or unknown
+    }
 
-        const weaker = edgeA <= edgeB ? a : b;
-        const stronger = edgeA <= edgeB ? b : a;
+    const overMovScore = overPlays.reduce((s, p) => s + movementScore(p), 0);
+    const underMovScore = underPlays.reduce((s, p) => s + movementScore(p), 0);
+    const overBestEdge = Math.max(...overPlays.map(p => Number(p.edge || 0)));
+    const underBestEdge = Math.max(...underPlays.map(p => Number(p.edge || 0)));
 
-        weaker.finalWarnings = [...(weaker.finalWarnings || []), 'contradictory-signal'];
-        if (weaker.finalVerdict === 'BET' || weaker.kaiCall === 'BET') {
-          weaker.finalVerdict = 'CONSIDER';
-          weaker.finalConfidenceTier = 'TIER 2';
-          weaker.displayTier = 'CONSIDER';
-          weaker.kaiCall = 'CONSIDER';
-        }
+    // Primary: side with more total movement score wins.
+    // Tie-breaker: best edge.
+    let weakerPlays, strongerPlays, detail;
+    if (overMovScore > underMovScore) {
+      weakerPlays = underPlays;
+      strongerPlays = overPlays;
+      detail = 'under-side';
+    } else if (underMovScore > overMovScore) {
+      weakerPlays = overPlays;
+      strongerPlays = underPlays;
+      detail = 'over-side';
+    } else if (overBestEdge > underBestEdge) {
+      weakerPlays = underPlays;
+      strongerPlays = overPlays;
+      detail = 'under-side (tie-broken by edge)';
+    } else {
+      weakerPlays = overPlays;
+      strongerPlays = underPlays;
+      detail = 'over-side (tie-broken by edge)';
+    }
 
-        // Flag both with a reference to the contradiction
-        if (!stronger.finalWarnings) stronger.finalWarnings = [];
-        if (!stronger.finalWarnings.includes('contradictory-signal')) {
-          stronger.finalWarnings = [...stronger.finalWarnings, 'contradictory-signal'];
-        }
+    // Downgrade all plays on the weaker side
+    for (const w of weakerPlays) {
+      w.finalWarnings = [...(w.finalWarnings || []), `contradictory-signal:${detail}`];
+      if (w.finalVerdict === 'BET' || w.kaiCall === 'BET') {
+        w.finalVerdict = 'CONSIDER';
+        w.finalConfidenceTier = 'TIER 2';
+        w.displayTier = 'CONSIDER';
+        w.kaiCall = 'CONSIDER';
+      }
+    }
 
-        break getOpposingPair; // handle one pair per group at most
+    // Flag the stronger side with a note
+    for (const s of strongerPlays) {
+      if (!s.finalWarnings) s.finalWarnings = [];
+      if (!s.finalWarnings.includes('contradictory-signal')) {
+        s.finalWarnings = [...s.finalWarnings, `contradictory-signal:opposing:${detail}`];
       }
     }
   }
@@ -1745,7 +1745,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           try {
             const p = await queryFn({
               league: 'Tennis',
-              market,
+              market: marketQuery[0],
               games: [gid],
               participants: [],
               books: ALL_SCREEN_BOOKS,
@@ -1809,26 +1809,16 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           })
       });
       if (screenResult?.result) {
-        screenResult.result = await correctTennisTimes(screenResult.result);
-
-        // Date window filter: same logic as UFC — when cardWindow='today',
-        // drop rows whose start date doesn't match today's UTC date.
-        const cardWindow = String(args.cardWindow || 'all')
-          .trim()
-          .toLowerCase();
-        if (cardWindow === 'today' || cardWindow === 'next') {
-          const tz = getLocalTimezone();
-          const nowMs = Date.now();
-          const todayKey = localDateKey(nowMs, tz);
-          const nextKey = localDateKey(nowMs + 24 * 60 * 60 * 1000, tz);
-          screenResult.result = screenResult.result.filter((row) => {
-            if (!row) return true; // keep rows without row data
-            const startMs = parseGameStartMs(row.start);
-            if (!startMs) return true; // keep rows without parseable start time
-            const startDateKey = localDateKey(startMs, tz);
-            return cardWindow === 'today' ? startDateKey === todayKey : startDateKey === nextKey;
-          });
-        }
+        // Tennis: NO time correction and NO date window filter.
+        // Rule: if odds are showing on the book, the match hasn't started
+        // regardless of scheduled start time. Tennis match times from feeds
+        // are notoriously unreliable — delayed/rain-postponed/ITF mismatches.
+        // The ESPN time correction pipeline was slow (~2s per match) and added
+        // no value once we accepted that 'live odds = match hasn't started'.
+        // cardWindow filtering (today/next) is skipped for tennis because
+        // stale match times would incorrectly drop valid lines.
+        // Note: cardWindow filtering (today/next) deliberatively skipped here.
+        // The lines below (market alias, cache) run normally.
       }
       // Add market alias info to resultMeta if any aliases were used
       if (marketResolution.aliasesUsed.length) {
@@ -1917,10 +1907,11 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       lookbackHours: getLookbackHours(args),
       requestedMarket
     });
-    const correctedRanked = await correctTennisTimes(ranked);
+    // Tennis time correction removed — see comment in runTennisScreen handler.
+    // EV enrichment uses the same rule: live odds > scheduled start times.
     return {
       ok: true,
-      result: correctedRanked,
+      result: ranked,
       league: 'Tennis',
       freshness: { rowCount: rows.length, newestAgeMs: 0, oldestAgeMs: 0, staleCount: 0, stale: false },
       source: '+ev_enriched',
@@ -1929,34 +1920,42 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
   }
 
   async function runUfcCard(args = {}) {
-    const marketResolution = resolveMarkets(args, 'UFC');
-    const normalizedMarkets = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
-    const market = normalizedMarkets[0];
-    const targetBook = String(args.book || args.targetBook || '').trim();
-    const rankedArgs = {
-      ...args,
-      market,
-      books: targetBook ? [targetBook] : Array.isArray(args.books) ? args.books : []
-    };
-    const rankedResponse = await runLeagueScreen(rankedArgs, 'UFC');
-    const rankedRows = Array.isArray(rankedResponse?.result) ? rankedResponse.result : [];
-    const shortlist = buildUfcShortlist(rankedRows, {
-      ...args,
-      market,
-      targetBook,
-      limit: getLimit(args)
-    });
-    const count = shortlist.shortlistMeta?.filteredCount ?? shortlist.officialCount;
-    const cardWindow = shortlist.shortlistMeta?.cardWindow || shortlist.shortlistCardWindow || null;
-    const eventDate = shortlist.shortlistMeta?.eventDate || shortlist.shortlistEventDate || null;
-    return {
-      ok: true,
-      league: 'UFC',
-      officialPlays: shortlist.bestBets,
-      bestLooks: shortlist.bestLooks,
-      passes: shortlist.bestPasses,
-      summaryText: shortlist.summaryText,
-      count,
+    try {
+      const marketResolution = resolveMarkets(args, 'UFC');
+      const normalizedMarkets = marketResolution.array.length ? marketResolution.array : [marketResolution.single];
+      const market = normalizedMarkets[0];
+      const targetBook = String(args.book || args.targetBook || '').trim();
+      const rankedArgs = {
+        ...args,
+        market,
+        books: targetBook ? [targetBook] : Array.isArray(args.books) ? args.books : []
+      };
+      const rankedResponse = await runLeagueScreen(rankedArgs, 'UFC');
+      const rankedRows = Array.isArray(rankedResponse?.result) ? rankedResponse.result : [];
+      const shortlist = buildUfcShortlist(rankedRows, {
+        ...args,
+        market,
+        targetBook,
+        limit: getLimit(args)
+      });
+      if (!shortlist || typeof shortlist !== 'object') {
+        return {
+          ok: false,
+          league: 'UFC',
+          error: { code: 'UFC_CARD_FAILED', message: 'buildUfcShortlist returned null/undefined' }
+        };
+      }
+      const count = shortlist.shortlistMeta?.filteredCount ?? shortlist.officialCount;
+      const cardWindow = shortlist.shortlistMeta?.cardWindow || shortlist.shortlistCardWindow || null;
+      const eventDate = shortlist.shortlistMeta?.eventDate || shortlist.shortlistEventDate || null;
+      return {
+        ok: true,
+        league: 'UFC',
+        officialPlays: shortlist.bestBets,
+        bestLooks: shortlist.bestLooks,
+        passes: shortlist.bestPasses,
+        summaryText: shortlist.summaryText,
+        count,
       resultMeta: {
         ...rankedResponse.resultMeta,
         source: 'ufc_card',
@@ -1971,6 +1970,14 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
     };
+    } catch (error) {
+      process.stderr.write(`[propprofessor-mcp] ufc_card handler error: ${error.stack || error.message || error}\n`);
+      return {
+        ok: false,
+        league: 'UFC',
+        error: { code: 'UFC_CARD_FAILED', message: error.message || String(error) }
+      };
+    }
   }
 
   // ===== CONSOLIDATED HANDLER MAP =====
@@ -2385,6 +2392,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         const filterBy = (key) => {
           for (const entry of allCandidates) {
             if (!entry.candidates || !entry.candidates.length) continue;
+            // Tennis: NO date filtering — odds presence is the ground truth.
+            // Scheduled match times are unreliable (rain delays, ITF mismatches,
+            // tournaments shifting day-of). If odds are on the book, show it.
+            if (String(entry.league || '').toLowerCase() === 'tennis') continue;
             entry.candidates = entry.candidates.filter((row) => {
               const startMs = parseGameStartMs(row.start);
               if (!startMs) return true; // keep rows without parseable start time
@@ -2417,6 +2428,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           const nextCandidates = [];
           for (const entry of fullCandidatesSnapshot) {
             if (!entry.candidates || !entry.candidates.length) continue;
+            // Tennis: skip next-day merge — tennis entries were never filtered,
+            // so they already contain the full slate. Adding a separate tomorrow
+            // entry would create a duplicate league/market pair.
+            if (String(entry.league || '').toLowerCase() === 'tennis') continue;
             const nextRows = entry.candidates.filter((row) => {
               const startMs = parseGameStartMs(row.start);
               if (!startMs) return true;
@@ -2463,27 +2478,12 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
-      // Apply tennis time correction before returning, so hoursUntilStart
-      // and date-based cardWindow filtering use real match times from ESPN
-      // rather than the raw timestamp embedded in the odds-feed game ID.
-      const hasTennis = leagues.some((l) => String(l).toLowerCase() === 'tennis');
-      if (hasTennis) {
-        const allRows = allCandidates.flatMap((e) => e.candidates).filter(Boolean);
-        if (allRows.length) {
-          await correctTennisTimes(allRows);
-        }
-      }
+      // Tennis time correction and subsequent hoursUntilStart recomputation
+      // removed. Rule: live odds on the book mean the match hasn't started.
+      // Tennis scheduled times are unreliable — we trust odds presence over
+      // any time field. The raw start times embedded in odds-feed game IDs
+      // are good enough for display ordering. No ESPN corrections needed.
 
-      // Recompute hoursUntilStart after tennis time correction
-      for (const entry of allCandidates) {
-        if (!entry.candidates) continue;
-        for (const row of entry.candidates) {
-          const startMs = parseGameStartMs(row.start);
-          if (startMs) {
-            row.hoursUntilStart = Math.round(((startMs - Date.now()) / 3600000) * 10) / 10;
-          }
-        }
-      }
 
       const activeSlate = allCandidates
         .filter((r) => r.candidates && r.candidates.length > 0)
@@ -2505,8 +2505,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // === validate: run validate_play on returned candidates ===
       // validateAll defaults to false (changed 2026-07-20) to only validate top candidates
       // validateTop limits validation to N best candidates when validate is false/omitted
-      const validateTop = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 10;
+      // When validate is explicitly false, skip validation entirely.
       const validateAll = args.validate === true; // default false, validate top 10 only
+      const validateTop = args.validate === false ? 0 : (Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 10);
 
       if (validateAll || validateTop > 0) {
         const validationCache = new Map(); // gameId → validated result, shared across candidates
@@ -3015,8 +3016,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // === validate: run validate_play on returned plays ===
       // validateAll defaults to false (2026-07-20) to only validate top candidates
       // validateTopRB limits validation to N best plays when validate is false/omitted
-      const validateTopRB = Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 10;
+      // When validate is explicitly false, skip validation entirely.
       const validateAllRB = args.validate === true; // default false, validate top 10 only
+      const validateTopRB = args.validate === false ? 0 : (Number.isFinite(Number(args.validateTop)) ? Number(args.validateTop) : 10);
 
       if (validateAllRB || validateTopRB > 0) {
         const validationCache = new Map();
@@ -3149,7 +3151,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           return breakdown;
         })(),
         _meta:
-          (validateAll || validateTopRB > 0)
+          (validateAllRB || validateTopRB > 0)
             ? {
                 validation: {
                   requested: validateTopRB,
@@ -3642,6 +3644,9 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // (prevents cross-call tier drift from stale cache state).
       clearTierCache();
       const result = await runValidatePlayImpl(client, args);
+      if (result && result.ok === false) {
+        return result;
+      }
       return ok(result);
     },
 

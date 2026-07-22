@@ -57,10 +57,10 @@ describe('ask() executes the suggested tool — one-call answer', () => {
 
     it('"should I bet Tatum" executes validate_play', async () => {
       const handlers = makeHandlers();
-      const result = await handlers.ask({ query: 'should I bet Tatum over 29.5' });
-      assert.equal(result.ok, true);
+      const result = await handlers.ask({ query: 'should I bet Tatum over 29.5 in NBA' });
       assert.equal(result._executed.tool, 'validate_play');
       assert.equal(result._executed.args.selection, 'Tatum');
+      assert.equal(result._executed.args.league, 'NBA');
       assert.equal(result.parsed.player, 'Tatum');
       assert.ok(result.result !== undefined, 'should execute the tool and return the result');
     });

@@ -14,3 +14,8 @@ backtest-data/
 coverage/
 circuit-cache.json
 .pytest_cache/
+# scratch scripts (one-off scans)
+scripts/_scan-*
+scripts/scan-*
+scripts/fetch-sofascore.py
+scripts/novig-scan.js

@@ -5,13 +5,11 @@
  * Extracted from createMcpHandlers() in handlers.js.
  */
 
-const { normalizeBookList } = require('../../../lib/propprofessor-mcp-ranked-screen');
-
 /**
  * @param {import('../../../lib/propprofessor-api').PropProfessorClient} client
  * @param {import('./handler-context').HandlerContext} ctx
  */
-function createPicksHandlers(client, ctx) {
+function createPicksHandlers(client, _ctx) {
   return {
     async log_pick(args = {}) {
       const { gameId, market, selection, book, odds, stake, result = null } = args;
@@ -55,7 +53,7 @@ function createPicksHandlers(client, ctx) {
       }
     },
 
-    async get_pick_stats(args = {}) {
+    async get_pick_stats(_args = {}) {
       try {
         const result = await client.getPickStats();
         return { ok: true, result, ...result };

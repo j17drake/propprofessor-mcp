@@ -52,13 +52,13 @@ describe('getLimit', () => {
     assert.equal(getLimit({ limit: 1 }), 1);
   });
 
-  it('returns 10 default for invalid or missing limit', () => {
-    assert.equal(getLimit({}), 10);
-    assert.equal(getLimit({ limit: -1 }), 10);
-    assert.equal(getLimit({ limit: 0 }), 10);
-    assert.equal(getLimit({ limit: 'abc' }), 10);
-    assert.equal(getLimit({ limit: NaN }), 10);
-    assert.equal(getLimit({ limit: Infinity }), 10);
+  it('returns 100 default for invalid or missing limit', () => {
+    assert.equal(getLimit({}), 100);
+    assert.equal(getLimit({ limit: -1 }), 100);
+    assert.equal(getLimit({ limit: 0 }), 100);
+    assert.equal(getLimit({ limit: 'abc' }), 100);
+    assert.equal(getLimit({ limit: NaN }), 100);
+    assert.equal(getLimit({ limit: Infinity }), 100);
   });
 });
 

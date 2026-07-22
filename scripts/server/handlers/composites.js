@@ -8,11 +8,10 @@
  * runLeagueScreen, etc.) — they ONLY use ctx.handlers.* for cross-calls.
  */
 
-const { DEFAULT_LEAGUES, parseGameStartMs } = require('../../../lib/propprofessor-shared-utils');
+const { DEFAULT_LEAGUES } = require('../../../lib/propprofessor-shared-utils');
 const { ok } = require('../../../lib/response-envelope');
 const { getBacktestSummary, readCheckpoint, writeCheckpoint } = require('../../../lib/propprofessor-picks');
 const { suggestStakes } = require('../../../lib/propprofessor-risk-score');
-const { resolveMarkets } = require('./handler-utils');
 const { parseNaturalLanguagePropQuery } = require('../../../lib/propprofessor-query-parser');
 
 function createCompositesHandlers(client, ctx) {

@@ -50,7 +50,7 @@ function createRankedScreenClientStub({
   healthPayload = { ok: true, screen: { reachable: true } }
 } = {}) {
   const calls = {
-    queryFantasyPicks: [],
+    queryBackendFantasyPicks: [],
     querySportsbook: [],
     queryScreenOdds: [],
     queryScreenOddsBestComps: [],
@@ -60,8 +60,8 @@ function createRankedScreenClientStub({
   return {
     calls,
     client: {
-      queryFantasyPicks: async (filters) => {
-        calls.queryFantasyPicks.push(filters);
+      queryBackendFantasyPicks: async (filters) => {
+        calls.queryBackendFantasyPicks.push(filters);
         return [{ id: 'fantasy-row-1', sportsbook: filters?.sportsbook || 'DraftKings6' }];
       },
       querySportsbook: async (filters) => {
@@ -280,6 +280,7 @@ describe('propprofessor MCP server stdio contract', () => {
         'player_context',
         'quick_screen',
         'resolve_pick',
+        'scan',
         'screen_ranked',
         'sharp_alerts',
         'sharp_consensus',
@@ -581,16 +582,16 @@ describe('propprofessor MCP server stdio contract', () => {
     assert.equal(result.ok, true);
     assert.equal(result.count, 1);
     assert.equal(result.result[0].id, 'fantasy-row-1');
-    assert.equal(calls.queryFantasyPicks.length, 1);
-    assert.deepEqual(calls.queryFantasyPicks[0].fantasyApps, ['PrizePicks', 'Underdog']);
-    assert.deepEqual(calls.queryFantasyPicks[0].leagues, ['NBA', 'MLB']);
-    assert.equal(calls.queryFantasyPicks[0].market, 'Fantasy Points');
+    assert.equal(calls.queryBackendFantasyPicks.length, 1);
+    assert.deepEqual(calls.queryBackendFantasyPicks[0].fantasyApps, ['PrizePicks', 'Underdog']);
+    assert.deepEqual(calls.queryBackendFantasyPicks[0].leagues, ['NBA', 'MLB']);
+    assert.equal(calls.queryBackendFantasyPicks[0].market, 'Fantasy Points');
   });
 
   it('fantasy_optimizer handles empty results gracefully', async () => {
     const handlers = createMcpHandlers({
       client: {
-        queryFantasyPicks: async () => []
+        queryBackendFantasyPicks: async () => []
       }
     });
 

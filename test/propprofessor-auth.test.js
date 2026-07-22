@@ -71,21 +71,24 @@ describe('readTokenCache', () => {
   });
 });
 
+// Shared test JWT — 3 dot-separated base64url segments (required by writeTokenCache validation)
+const TEST_JWT = 'eyJhbGciOiJIUzI1NiJ9.dGVzdA.dGVzdA';
+
 describe('writeTokenCache', () => {
   it('writes token data to cache file', () => {
     const authFile = path.join(tmpDir, 'auth.json');
-    writeTokenCache({ token: 'tok_abc', exp: 9999999999, perm: {} }, authFile);
+    writeTokenCache({ token: TEST_JWT, exp: 9999999999, perm: {} }, authFile);
     const cacheFile = getTokenCacheFile(authFile);
     assert.ok(fs.existsSync(cacheFile));
     const written = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-    assert.equal(written.token, 'tok_abc');
+    assert.equal(written.token, TEST_JWT);
     assert.equal(written.exp, 9999999999);
     assert.ok(typeof written.cachedAt === 'number');
   });
 
   it('creates parent directory if needed', () => {
     const authFile = path.join(tmpDir, 'subdir', 'deep', 'auth.json');
-    writeTokenCache({ token: 'tok', exp: 1 }, authFile);
+    writeTokenCache({ token: TEST_JWT, exp: 1 }, authFile);
     assert.ok(fs.existsSync(getTokenCacheFile(authFile)));
   });
 
@@ -94,7 +97,7 @@ describe('writeTokenCache', () => {
   // POSIX 0o600, which is the documented contract for macOS/Linux.
   it('writes token cache with 0o600 permissions', { skip: process.platform === 'win32' }, () => {
     const authFile = path.join(tmpDir, 'auth.json');
-    writeTokenCache({ token: 'tok_perm', exp: 9999999999, perm: {} }, authFile);
+    writeTokenCache({ token: TEST_JWT, exp: 9999999999, perm: {} }, authFile);
     const cacheFile = getTokenCacheFile(authFile);
     const stat = fs.statSync(cacheFile);
     // 0o600 = owner rw, group/other none. Mask out the file-type bits
@@ -106,7 +109,7 @@ describe('writeTokenCache', () => {
 describe('clearTokenCache', () => {
   it('removes cache file if it exists', () => {
     const authFile = path.join(tmpDir, 'auth.json');
-    writeTokenCache({ token: 'tok', exp: 1 }, authFile);
+    writeTokenCache({ token: TEST_JWT, exp: 1 }, authFile);
     assert.ok(fs.existsSync(getTokenCacheFile(authFile)));
     clearTokenCache(authFile);
     assert.ok(!fs.existsSync(getTokenCacheFile(authFile)));
@@ -132,7 +135,7 @@ describe('isTokenCacheValid', () => {
 
   it('returns true when token is far from expiry', () => {
     const farFuture = Math.floor(Date.now() / 1000) + 3600;
-    assert.equal(isTokenCacheValid({ token: 'x', exp: farFuture }), true);
+    assert.equal(isTokenCacheValid({ token: 'eyJhbGciOiJIUzI1NiJ9.dGVzdA.test', exp: farFuture }), true);
   });
 
   it('returns false when within safety margin of expiry', () => {

@@ -6,7 +6,7 @@
 
 const { ok } = require('../../../lib/response-envelope');
 
-function createPricingHandlers(client, ctx) {
+function createPricingHandlers(client, _ctx) {
   return {
     async find_best_price(args = {}) {
       const { resolveMarkets } = require('./handler-utils');
