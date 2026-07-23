@@ -385,6 +385,14 @@ function applyFinalVerdict(target) {
   let validatedTier = target.validatedConfidenceTier || target.confidenceTier || 'TIER 4';
   let verdict = validatedVerdict || target.displayTier || target.kaiCall || 'PASS';
 
+  // Alternate-line guard: these were downgraded by resolveAlternateLines
+  // in the screen ranker. The validateTop re-grade can overwrite the tier,
+  // but alternate lines must never surface as picks — one line per side.
+  if (target.altLineFiltered) {
+    verdict = 'PASS';
+    validatedTier = 'TIER 4';
+  }
+
   const riskFlags = target.validatedRiskFlags || [];
   // A 'bad' that was reconciled back to the screen signal (overridden, no
   // drift) is NOT a real execution failure — do not hard-PASS on it.
@@ -1726,36 +1734,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
     const payloads = [];
 
-    // ===== SCHEDULE-FIRST DISCOVERY =====
-    // Use Sofascore as primary schedule source — covers ATP/WTA/Challenger/ITF.
-    // Falls back to traditional screen query below if unavailable.
-    try {
-      const { getTodayTennisSchedule } = require('../../lib/propprofessor-schedule');
-      const scheduleGames = await getTodayTennisSchedule();
-      const todayGameIds = scheduleGames
-        .filter((g) => {
-          const d = new Date(g.startTimestamp).toISOString().slice(0, 10);
-          return d === new Date().toISOString().slice(0, 10);
-        })
-        .map((g) => g.gameId)
-        .filter(Boolean);
-
-      if (todayGameIds.length > 0) {
-        for (const gid of todayGameIds) {
-          try {
-            const p = await queryFn({
-              league: 'Tennis',
-              market: marketQuery[0],
-              games: [gid],
-              participants: [],
-              books: ALL_SCREEN_BOOKS,
-              is_live: false
-            });
-            if (p) payloads.push(p);
-          } catch { /* skip unresolvable games */ }
-        }
-      }
-    } catch { /* schedule unavailable — fall through to screen query */ }
+    // ===== DIRECT SCREEN QUERY =====
+    // Removed schedule-first discovery (Sofascore/ESPN) — it was unreliable,
+    // failing on both providers and spamming logs. Traditional screen query
+    // with game IDs from the ranker works fine.
 
     // ===== TRADITIONAL SCREEN QUERY (fallback) =====
     if (payloads.length === 0) {
@@ -2524,6 +2506,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             // validateAll => validate everything; else only top-N (capped)
             if (!validateAll && !topN.includes(candidate)) continue;
             if (!candidate.gameId || !candidate.selection) continue;
+            // Skip alt-line rows already downgraded to TIER 4 by resolveAlternateLines
+            // in the screen ranker. Validating them re-derives a fresh tier that
+            // overwrites the downgrade — wasting API calls and surfacing noise.
+            if (candidate.altLineFiltered) continue;
 
             // Per-gameId+selection+market cache: same game + same selection shares one validate_play call.
             // The original key (gameId::market) incorrectly shared Over/Under validation on the same game.
@@ -3035,6 +3021,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             // validateAllRB => validate everything; else only top-N (capped)
             if (!validateAllRB && !topN.includes(play)) continue;
             if (!play.gameId || !play.selection) continue;
+            // Skip alt-line rows already downgraded to TIER 4 by resolveAlternateLines
+            // in the screen ranker. Validating them re-derives a fresh tier that
+            // overwrites the downgrade — wasting API calls and surfacing noise.
+            if (play.altLineFiltered) continue;
 
             // Per-gameId+market cache: plays from the same game+market share one validate_play call.
             // Market-scoped to prevent cross-market validation pollution.
