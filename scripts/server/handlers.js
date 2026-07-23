@@ -2297,6 +2297,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
 
       const allCandidates = [];
       const researchResults = [];
+      const emptySlate = []; // league+market pairs that returned zero candidates
 
       // Date window: always scan 'all' to avoid the two-pass HTTP call explosion
       // on off-days (previously scanned 'today' first, then re-scanned 'all' if empty).
@@ -2337,7 +2338,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             });
 
             const candidates = Array.isArray(spResult?.result) ? spResult.result : [];
-            if (!candidates.length) return;
+            if (!candidates.length) {
+              emptySlate.push({ league, market, reason: 'no candidates returned' });
+              return;
+            }
 
             const perMarketCap = maxPerMarket || limit;
             allCandidates.push({
@@ -2597,6 +2601,26 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         0
       );
 
+      // === Post-filter empty tracking ===
+      // Capture league+market pairs that had candidates at scan time but were
+      // filtered to zero by card window / tier threshold / kaiCall. Gives agents
+      // context for empty results: "15 rows scanned across 5 markets, all below
+      // TIER 1 threshold" vs "no games today at all."
+      for (const entry of allCandidates) {
+        if (!entry.candidates || entry.candidates.length > 0) continue;
+        if (entry.error) continue; // already tracked — backend returned error
+        const wasEmpty = emptySlate.some(
+          (e) => e.league === entry.league && e.market === entry.market
+        );
+        if (!wasEmpty) {
+          emptySlate.push({
+            league: entry.league,
+            market: entry.market,
+            reason: 'all candidates filtered out (card window / tier / kaiCall)'
+          });
+        }
+      }
+
       // === targetTiers filter (agent ergonomics) ===
       // Apply before kaiCall/sort so the sequence is: execute -> validateTop -> tier filter -> kaiCall filter -> sort.
       // When omitted, passes through unchanged (same no-op pattern as filterRowsByKaiCall).
@@ -2730,6 +2754,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         markets,
         totalCandidates: allCandidates.reduce((sum, l) => sum + (l.candidates?.length || 0), 0),
         activeSlate,
+        emptySlate,
         cardWindow: cardWindowFallthrough || cardWindow,
         ...(cardWindowFallthrough ? { cardWindowFallthrough: true } : {}),
         ...(nextDayMerged ? { nextDayMerged: true, nextDayDate: nextDayMerged } : {}),
@@ -4018,7 +4043,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     async today(args = {}) {
       const leagues = Array.isArray(args.leagues) && args.leagues.length ? args.leagues
         : args.league ? [args.league]
-        : ['NBA', 'WNBA', 'MLB', 'NFL'];
+        : Array.from(DEFAULT_LEAGUES);
       const book = args.book || 'NoVigApp';
 
       const [slateRes, pendingRes, statsRes, backtestRes] = await Promise.all([
