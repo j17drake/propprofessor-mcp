@@ -2470,6 +2470,15 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         }
       }
 
+      // === Strip alternate-line candidates (resolveAlternateLines downgrades) ===
+      // These are alt Game Handicap / Total Games lines that the ranker already
+      // marked TIER 4. They're noise — strip them before validation/research so
+      // they don't consume limit slots, inflate response size, or waste API calls.
+      for (const entry of allCandidates) {
+        if (!entry.candidates || !entry.candidates.length) continue;
+        entry.candidates = entry.candidates.filter((c) => !c.altLineFiltered);
+      }
+
       // Tennis time correction and subsequent hoursUntilStart recomputation
       // removed. Rule: live odds on the book mean the match hasn't started.
       // Tennis scheduled times are unreliable — we trust odds presence over
