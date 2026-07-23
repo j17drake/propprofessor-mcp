@@ -534,11 +534,14 @@ function flagContradictoryPlays(plays) {
       }
     }
 
-    // Flag the stronger side with a note
+    // Contradictory Over/Under = market hasn't settled. Neither side should be BET.
     for (const s of strongerPlays) {
-      if (!s.finalWarnings) s.finalWarnings = [];
-      if (!s.finalWarnings.includes('contradictory-signal')) {
-        s.finalWarnings = [...s.finalWarnings, `contradictory-signal:opposing:${detail}`];
+      s.finalWarnings = [...(s.finalWarnings || []), `contradictory-signal:opposing:${detail}`];
+      if (s.finalVerdict === 'BET' || s.kaiCall === 'BET') {
+        s.finalVerdict = 'CONSIDER';
+        s.finalConfidenceTier = 'TIER 2';
+        s.displayTier = 'CONSIDER';
+        s.kaiCall = 'CONSIDER';
       }
     }
   }
