@@ -1287,7 +1287,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
           driftReason = `consensus collapsed (${screenCbk} → ${currentCbk} books)`;
         }
       }
-      if (!consensusDrift && screenExec && screenExec !== 'unknown' && screenExec !== currentExec) {
+      if (!consensusDrift && screenExec && screenExec !== 'unknown' && screenExec !== currentExec && currentExec === 'bad') {
         consensusDrift = true;
         driftReason = 'execution quality changed';
       }
