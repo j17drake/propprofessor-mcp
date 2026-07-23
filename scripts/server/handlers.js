@@ -534,10 +534,18 @@ function flagContradictoryPlays(plays) {
       }
     }
 
-    // Contradictory Over/Under = market hasn't settled. Neither side should be BET.
+    // Contradictory Over/Under = market hasn't settled. Downgrade the stronger
+    // side ONLY if the weaker side also shows supportive movement. If the weaker
+    // side is adverse, the market IS picking a direction — let the stronger side
+    // keep its tier. Both supportive = noise. One supportive + one adverse = signal.
+    const weakerAllSupportive = weakerPlays.every((p) => {
+      const m = String(p.movementDisposition || p.movement || '').toLowerCase();
+      return m.includes('supportive');
+    });
+    
     for (const s of strongerPlays) {
       s.finalWarnings = [...(s.finalWarnings || []), `contradictory-signal:opposing:${detail}`];
-      if (s.finalVerdict === 'BET' || s.kaiCall === 'BET') {
+      if (weakerAllSupportive && (s.finalVerdict === 'BET' || s.kaiCall === 'BET')) {
         s.finalVerdict = 'CONSIDER';
         s.finalConfidenceTier = 'TIER 2';
         s.displayTier = 'CONSIDER';
