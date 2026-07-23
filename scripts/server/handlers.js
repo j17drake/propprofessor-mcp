@@ -116,7 +116,7 @@ const {
   formatQuickScreenStandard,
   formatQuickScreenBets
 } = require('../../lib/propprofessor-formatter');
-const { filterRowsByKaiCall, filterRowsByMinEV } = require('../../lib/propprofessor-row-filter');
+const { filterRowsByKaiCall, filterRowsByMinEV, filterRowsByMovement } = require('../../lib/propprofessor-row-filter');
 const { sortRows } = require('../../lib/propprofessor-sort-utils');
 const {
   getPickHistory,
@@ -792,7 +792,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
     // Both are no-ops when the params are missing.
     if (Array.isArray(response.result)) {
       response.result = sortRows(
-        filterRowsByMinEV(filterRowsByKaiCall(response.result, args.kaiCall), args.minEV),
+        filterRowsByMinEV(filterRowsByMovement(filterRowsByKaiCall(response.result, args.kaiCall), args.movement), args.minEV),
         {
           sortBy: args.sortBy,
           sortDir: args.sortDir
@@ -2104,7 +2104,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       // final result set. Both are no-ops when the params are missing.
       if (Array.isArray(response.result)) {
         response.result = sortRows(
-          filterRowsByMinEV(filterRowsByKaiCall(response.result, args.kaiCall), args.minEV),
+          filterRowsByMinEV(filterRowsByMovement(filterRowsByKaiCall(response.result, args.kaiCall), args.movement), args.minEV),
           {
             sortBy: args.sortBy,
             sortDir: args.sortDir
@@ -2194,7 +2194,10 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         verbosity: args.verbosity || 'bets',
         lite: args.lite !== false,
         sortBy: args.sortBy || 'edge',
-        sortDir: args.sortDir || 'desc'
+        sortDir: args.sortDir || 'desc',
+        // Default: only show plays with supportive movement (clean or bouncy).
+        // The line IS moving the right direction — that's the whole point.
+        movement: args.movement || ['supportive_clean', 'supportive_bouncy']
       });
     },
 
@@ -2647,7 +2650,7 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
       for (const entry of allCandidates) {
         if (!entry.candidates || !entry.candidates.length) continue;
         entry.candidates = sortRows(
-          filterRowsByMinEV(filterRowsByKaiCall(entry.candidates, args.kaiCall), args.minEV),
+          filterRowsByMinEV(filterRowsByMovement(filterRowsByKaiCall(entry.candidates, args.kaiCall), args.movement), args.minEV),
           {
             sortBy: args.sortBy,
           sortDir: args.sortDir
@@ -2950,7 +2953,8 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
             {
               const kaiFiltered =
                 args.kaiCall != null ? filterRowsByKaiCall(recommended, args.kaiCall) : recommended.slice();
-              const filtered = args.minEV != null ? filterRowsByMinEV(kaiFiltered, args.minEV) : kaiFiltered;
+              const movementFiltered = args.movement != null ? filterRowsByMovement(kaiFiltered, args.movement) : kaiFiltered;
+              const filtered = args.minEV != null ? filterRowsByMinEV(movementFiltered, args.minEV) : movementFiltered;
               const sorted = args.sortBy
                 ? sortRows(filtered, { sortBy: args.sortBy, sortDir: args.sortDir })
                 : filtered;
