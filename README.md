@@ -42,8 +42,8 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
    {
      "mcpServers": {
        "propprofessor": {
-         "command": "npx",
-         "args": ["propprofessor-mcp"]
+         "command": "pp",
+         "args": ["--mcp"]
        }
      }
    }
@@ -54,8 +54,8 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
    {
      "mcpServers": {
        "propprofessor": {
-         "command": "npx",
-         "args": ["propprofessor-mcp"],
+         "command": "pp",
+         "args": ["--mcp"],
          "env": {}
        }
      }
@@ -66,7 +66,7 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
    ```
    Name: propprofessor
    Type: command
-   Command: npx propprofessor-mcp
+   Command: pp --mcp
    ```
 
    **Continue.dev** (`~/.continue/config.json`):
@@ -75,8 +75,8 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
      "experimental": {
        "mcpServers": {
          "propprofessor": {
-           "command": "npx",
-           "args": ["propprofessor-mcp"]
+           "command": "pp",
+           "args": ["--mcp"]
          }
        }
      }
@@ -87,8 +87,8 @@ The pipeline extracts odds, hydrates line history, ranks by movement quality + c
    ```yaml
    mcp_servers:
      propprofessor:
-       command: npx
-       args: [propprofessor-mcp]
+       command: pp
+       args: [--mcp]
    ```
 
 3. **Auth (one-time):** `node scripts/pp-login.js` — opens a browser for PropProfessor login and persists cookies for the server to use.
@@ -125,6 +125,9 @@ pp scan mlb tennis -M supportive -n3
 | `pp fantasy` | Fantasy optimizer props |
 | `pp today` | Today's slate + pending picks |
 | `pp health` | Auth + backend health check |
+
+**MCP mode:** `pp --mcp` runs as an MCP stdio server. Connect it to Claude Desktop,
+Cursor, Cline, or any MCP client. Pass `--mode full` for the full 31-tool surface.
 
 All commands support `-j`/`--json` for piping and `--no-color` for CI/Telegram output.
 

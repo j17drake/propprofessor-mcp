@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+const path = require('node:path');
+
 process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[propprofessor-mcp] Unhandled Rejection: ${reason?.stack || reason}\n`);
 });
@@ -282,10 +284,15 @@ async function serveStdio(options = {}) {
 }
 
 if (require.main === module) {
-  serveStdio().catch((err) => {
-    process.stderr.write((err.stack || err.message) + '\n');
-    process.exitCode = 1;
+  // Delegate to unified pp CLI
+  const ppPath = path.resolve(__dirname, '..', 'bin', 'pp');
+  const args = ['--mcp'];
+  if (process.env.PROPPROFESSOR_MCP_MODE) args.push('--mode', process.env.PROPPROFESSOR_MCP_MODE);
+  const result = require('child_process').spawnSync(process.execPath, [ppPath, ...args], {
+    stdio: 'inherit',
+    env: process.env
   });
+  process.exit(result.status ?? 1);
 }
 
 module.exports = {

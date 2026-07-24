@@ -80,6 +80,7 @@ Commands:
   rank       Ranked plays for a league
   fantasy    Fantasy optimizer props
   health     Auth + backend health check
+  --mcp      Run as MCP stdio server (for Claude Desktop, Cursor, etc.)
 
 Run "pp <command> --help" for command-specific help.
 `,
@@ -742,6 +743,18 @@ async function cmdHealth(handlers) {
 async function main() {
   const filteredArgv = process.argv.filter(a => a !== '--no-color' && a !== '--no-colour');
   const { positional, flags } = parseArgs(filteredArgv);
+
+  // ── MCP server mode ──────────────────────────────
+  if (flags.mcp || flags['mcp'] === true) {
+    if (flags['mode']) process.env.PROPPROFESSOR_MCP_MODE = flags['mode'];
+    if (flags['coalesce-ms']) process.env.PROPPROFESSOR_MCP_STDIO_COALESCE_MS = String(flags['coalesce-ms']);
+    const { serveStdio } = require(PROJECT + '/scripts/propprofessor-mcp-server');
+    return serveStdio().catch(err => {
+      console.error(err?.stack || err?.message || String(err));
+      process.exit(1);
+    });
+  }
+
   const command = positional[0] || 'scan';
 
   // Help
