@@ -1,0 +1,542 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * pp — PropProfessor CLI
+ * Direct handler access, no MCP transport.
+ * Usage: pp <command> [args...]
+ */
+
+const PROJECT = __dirname.replace(/\/scripts$/, '');
+const { createPropProfessorClient } = require(PROJECT + '/lib/propprofessor-api');
+const { createMcpHandlers } = require(PROJECT + '/scripts/server/handlers');
+
+// ── color support (Task 8: --no-color) ─────────────────────────
+
+const NO_COLOR = process.argv.some(a =>
+  a === '--no-color' || a === '--no-colour'
+) || process.env.NO_COLOR === '1' || !process.stdout.isTTY;
+
+const TIER_COLORS = NO_COLOR ? {} : { 'TIER 1': '\x1b[32m', 'TIER 2': '\x1b[33m', 'TIER 3': '\x1b[36m', 'TIER 4': '\x1b[31m' };
+const MOVEMENT_COLORS = NO_COLOR ? {} : {
+  supportive_clean: '\x1b[32m', supportive_bouncy: '\x1b[36m',
+  insufficient: '\x1b[33m', adverse_full: '\x1b[31m', adverse_recent: '\x1b[31m'
+};
+const R = NO_COLOR ? '' : '\x1b[0m';
+const B = NO_COLOR ? '' : '\x1b[1m';
+const G = NO_COLOR ? '' : '\x1b[32m';
+const Y = NO_COLOR ? '' : '\x1b[33m';
+const RED = NO_COLOR ? '' : '\x1b[31m';
+const CYAN = NO_COLOR ? '' : '\x1b[36m';
+
+// ── arg parsing ─────────────────────────────────────────────────
+
+function parseArgs(argv) {
+  const positional = [];
+  const flags = {};
+  let i = 2;
+  while (i < argv.length) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+      const key = a.replace(/^--/, '');
+      // Don't consume next token as value if it starts with '-'
+      const val = argv[i + 1] && !argv[i + 1].startsWith('-') ? argv[++i] : true;
+      flags[key] = val;
+    } else if (a.startsWith('-')) {
+      const short = a.replace(/^-/, '');
+      if (short.length === 1) {
+        const val = argv[i + 1] && !argv[i + 1].startsWith('--') && !argv[i + 1].startsWith('-') ? argv[++i] : true;
+        flags[short] = val;
+      } else {
+        const k = short[0];
+        const v = short.slice(1);
+        flags[k] = v || true;
+      }
+    } else {
+      positional.push(a);
+    }
+    i++;
+  }
+  return { positional, flags };
+}
+
+// ── help system (Task 1) ────────────────────────────────────────
+
+function printHelp(command) {
+  const HELP = {
+    '': `pp — PropProfessor CLI
+
+Usage: pp <command> [args...]
+
+Commands:
+  scan       Quick screen — find plays across leagues
+  validate   Validate a specific play
+  game       Get play details for a game
+  today      Today's slate + pending picks
+  picks      Recent pick history
+  fantasy    Fantasy optimizer props
+  health     Auth + backend health check
+
+Run "pp <command> --help" for command-specific help.
+`,
+    scan: `pp scan [leagues...] [flags]
+
+Scan for plays across one or more leagues. Defaults to all leagues.
+
+Flags:
+  -m, --market <name>       Market filter (comma-separated). Default: all
+  -b, --book <name>         Execution book. Default: NoVigApp
+  -t, --tier <1|2|1-2>      Tier filter. Default: 1-2 (TIER 1 + TIER 2)
+  -B, --only-bets           Show only BET verdict plays
+  -M, --movement <type>     Movement filter (supportive, clean, bouncy, adverse)
+  -n, --limit <N>           Max results. Default: 50
+  --sort <field>            Sort by: start, edge, tier. Default: start
+  --asc                     Sort ascending (default: descending)
+  -j, --json                Raw JSON output
+  --validate-all            Full validation on all candidates (slow)
+
+Examples:
+  pp scan tennis wnba
+  pp scan mlb -m "Total Runs" -t 1 -B
+  pp scan -M supportive --asc
+`,
+    validate: `pp validate <playId> [flags]
+
+Validate a specific play by playId.
+
+Flags:
+  -l, --league <name>       League (default: MLB)
+  -m, --market <name>       Market (default: Moneyline)
+  -g, --game-id <id>        Game ID (default: inferred from playId)
+  -b, --book <name>         Book (default: NoVigApp)
+  -j, --json                Raw JSON output
+`,
+    game: `pp game <gameId> [flags]
+
+Fetch play details for a game/market combination.
+
+Flags:
+  -l, --league <name>       League (default: MLB)
+  -m, --market <name>       Market (default: Total Runs)
+  -b, --book <name>         Book (default: NoVigApp)
+  -j, --json                Raw JSON output
+`,
+    today: `pp today [flags]
+
+Show today's slate and pending picks.
+
+Flags:
+  -t, --tier <1|2|1-2>      Tier filter. Default: 1-2
+  -j, --json                Raw JSON output
+`,
+    picks: `pp picks [flags]
+
+Show recent logged picks.
+
+Flags:
+  -n, --limit <N>           Max results. Default: 10
+  -j, --json                Raw JSON output
+`,
+    fantasy: `pp fantasy [flags]
+
+Show fantasy optimizer props from PrizePicks, Underdog, etc.
+
+Flags:
+  -a, --app <name>          Fantasy app (PrizePicks, Underdog, DraftKings6)
+  -l, --league <name>       League filter
+  -j, --json                Raw JSON output
+`,
+    health: `pp health
+
+Check auth + backend health. Always JSON output.
+`
+  };
+  console.log(HELP[command || ''] || HELP['']);
+}
+
+// ── display helpers ─────────────────────────────────────────────
+
+function tierColor(t) {
+  const c = (TIER_COLORS[t] || '');
+  return c + t + R;
+}
+
+function verdictSymbol(v) {
+  if (!v) return '';
+  if (v === 'BET') return G + '● BET' + R;
+  if (v === 'CONSIDER') return Y + '◐ CONSIDER' + R;
+  if (v === 'PASS') return RED + '○ PASS' + R;
+  if (v === 'WON') return G + 'WON' + R;
+  if (v === 'LOST') return RED + 'LOST' + R;
+  return v;
+}
+
+function movementColor(m) {
+  if (!m) return '';
+  return (MOVEMENT_COLORS[m] || '') + m + R;
+}
+
+function clvColor(clv) {
+  if (clv == null) return '';
+  if (clv > 0) return G + '+' + clv + '¢' + R;
+  if (clv < 0) return RED + clv + '¢' + R;
+  return clv + '¢';
+}
+
+// ── formatScan (Task 3: improved output) ────────────────────────
+
+function formatScan(results) {
+  if (!results || !results.length) return 'No plays found.';
+
+  let out = '';
+  let total = 0;
+  for (const r of results) {
+    if (!r.plays || !r.plays.length) continue;
+    total += r.plays.length;
+
+    out += `\n${B}${r.league} › ${r.market}${R}  (${r.plays.length})\n`;
+
+    for (const p of r.plays) {
+      const tier = tierColor(p.tier || p.confidenceTier || '?');
+      const mv = movementColor(p.movement || p.movementDisposition || '');
+      const verdict = verdictSymbol(p.verdict || p.finalVerdict || p.kaiCall || '');
+      const oddsStr = p.odds > 0 ? '+' + p.odds : String(p.odds);
+      const clvStr = clvColor(p.clv);
+      const edgeStr = p.edge != null ? (p.edge >= 0 ? G : RED) + (p.edge).toFixed(1) + '%' + R : '';
+
+      out += `  ${p.selection} @ ${oddsStr}  |  ${tier}  ${verdict}\n`;
+
+      const details = [];
+      if (edgeStr) details.push(edgeStr);
+      if (clvStr) details.push('clv ' + clvStr);
+      details.push('mv ' + mv);
+      if (p.books) details.push(p.books + ' books');
+      if (p.executionQuality) details.push('exec:' + p.executionQuality);
+      if (p.consensusEdge != null) details.push('edge ' + (p.consensusEdge >= 0 ? '+' : '') + (p.consensusEdge * 100).toFixed(1) + '%');
+      out += `    ${details.join('  ·  ')}\n`;
+
+      const matchup = p.game || p.matchup || '';
+      if (matchup || p.startCST) {
+        out += `    ${matchup}  ${p.startCST || ''}\n`;
+      }
+    }
+  }
+  out += `\n${B}${total}${R} plays across ${results.length} markets`;
+  return out;
+}
+
+function formatToday(data) {
+  let out = '';
+  const slate = data.slate || data.data?.slate || [];
+  if (slate.length) {
+    out += `${B}Today's slate${R} (${slate.length} plays)\n`;
+    for (const p of slate) {
+      out += `  ${p.startCST || '?'}  ${p.game || p.matchup}  ${p.selection}  ${p.odds}  ${tierColor(p.tier || '')}\n`;
+    }
+  } else {
+    out += 'No plays on today\'s slate.\n';
+  }
+  const pending = data.pendingPicks || data.data?.pendingPicks || [];
+  if (pending.length) {
+    out += `\n${B}Pending picks${R} (${pending.length})\n`;
+    for (const p of pending.slice(0, 10)) {
+      out += `  ${p.selection || p.pick}  ${p.odds || ''}  ${p.status || ''}\n`;
+    }
+  }
+  return out;
+}
+
+function formatValidate(data) {
+  const d = data.data || data;
+  if (!d || !d.selection) return JSON.stringify(data, null, 2);
+  let out = '';
+  out += `${B}${d.selection}${R}  —  ${verdictSymbol(d.verdict)}  ${tierColor(d.tier)}\n`;
+  out += `odds: ${d.play?.odds || '?'}  |  books: ${d.play?.consensusBookCount || '?'}\n`;
+  out += `movement: ${movementColor(d.verdictSummary?.movementDisposition || '?')}  |  label: ${d.play?.movementLabel || '?'}\n`;
+  out += `execution: ${d.play?.executionQuality || '?'}\n`;
+  if (d.verdictSummary?.actionableSummary) out += d.verdictSummary.actionableSummary + '\n';
+  if (d.reasons?.length) out += 'reasons: ' + d.reasons.join(', ') + '\n';
+  return out;
+}
+
+// ── error formatting (Task 7) ───────────────────────────────────
+
+function formatError(err, context) {
+  const msg = err.message || String(err);
+  if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('auth') || msg.includes('token')) {
+    return 'Auth error: ' + msg + '\nTry "pp health" to check credentials.';
+  }
+  if (msg.includes('timeout') || msg.includes('ETIMEDOUT') || msg.includes('TIMEOUT') || msg.includes('timed out')) {
+    return 'Timeout scanning ' + context + '. Try narrowing leagues or adding --limit N.';
+  }
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many')) {
+    return 'Rate limited. Wait a moment and try again.';
+  }
+  return 'Error: ' + msg;
+}
+
+// ── commands ────────────────────────────────────────────────────
+
+async function cmdScan(handlers, positional, flags) {
+  const leagues = positional.length > 1 ? positional.slice(1) : ['MLB', 'NBA', 'WNBA', 'Tennis', 'UFC', 'NFL', 'NHL', 'Soccer', 'NCAAB', 'NCAAF', 'NBASL'];
+  const markets = flags.m || flags.market || undefined;
+  const marketList = markets ? (Array.isArray(markets) ? markets : markets.split(',')) : undefined;
+  const book = flags.b || flags.book || 'NoVigApp';
+  const tier = flags.t || flags.tier || undefined;
+  const onlyBets = flags.B || flags['only-bets'] || false;
+  const sortBy = flags.sort || 'start';
+  const sortDir = flags.asc ? 'asc' : 'desc';
+  const limit = parseInt(flags.n || flags.limit || 50);
+  const jsonOut = flags.j || flags.json || false;
+  const validateAll = flags['validate-all'] || false;
+
+  const targetTiers = tier ? (tier === '1' ? ['TIER 1'] : tier === '2' ? ['TIER 2'] : ['TIER 1', 'TIER 2']) : ['TIER 1', 'TIER 2'];
+
+  // Task 4 + Task 6: movement filter
+  const MOVEMENT_ALIASES = {
+    'supportive': ['supportive_clean', 'supportive_bouncy'],
+    'clean': ['supportive_clean'],
+    'bouncy': ['supportive_bouncy'],
+    'good': ['supportive_clean', 'supportive_bouncy'],
+    'insufficient': ['insufficient'],
+    'adverse': ['adverse_full', 'adverse_recent'],
+  };
+  const movement = flags.M || flags.movement || undefined;
+  const movementList = movement ? (Array.isArray(movement) ? movement : movement.split(',')) : undefined;
+  const resolvedMovement = movementList
+    ? movementList.flatMap(m => MOVEMENT_ALIASES[m] || [m])
+    : (onlyBets ? ['supportive_clean', 'supportive_bouncy'] : undefined);
+
+  const ctx = 'scan ' + leagues.join(', ');
+  console.error('Scanning ' + leagues.join(', ') + ' on ' + book + '...' +
+    (resolvedMovement ? ' [mv: ' + resolvedMovement.join(',') + ']' : ''));
+
+  // Task 0: validateTop instead of validate:true for perf
+  const res = await handlers.quick_screen({
+    leagues,
+    markets: marketList,
+    books: [book],
+    targetTiers,
+    onlyBets: onlyBets || undefined,
+    movement: resolvedMovement,
+    sortBy,
+    sortDir,
+    limit,
+    lite: true,
+    verbosity: 'bets',
+    validate: validateAll ? true : undefined,
+    validateTop: validateAll ? undefined : 10,
+    includeResearch: false,
+  });
+
+  const results = res.data?.results || res.results || [];
+  if (jsonOut) {
+    console.log(JSON.stringify(results, null, 2));
+  } else {
+    console.log(formatScan(results));
+    const total = results.reduce((s, r) => s + (r.plays || []).length, 0);
+    console.log('\n' + total + ' plays across ' + results.length + ' markets');
+  }
+}
+
+async function cmdValidate(handlers, positional, flags) {
+  const playId = positional[1];
+  if (!playId) { console.error('Usage: pp validate <playId> [--league] [--market] [--game-id] [--book]'); process.exit(1); }
+
+  const league = flags.l || flags.league || 'MLB';
+  const market = flags.m || flags.market || 'Moneyline';
+  const gameId = flags.g || flags['game-id'] || playId.replace(/::.*$/, '').replace(/:$/, '');
+  const book = flags.b || flags.book || 'NoVigApp';
+  const jsonOut = flags.j || flags.json || false;
+
+  console.error('Validating ' + playId.slice(-40) + '...');
+
+  const res = await handlers.validate_play({ league, market, gameId, playId, book });
+  if (jsonOut) {
+    console.log(JSON.stringify(res, null, 2));
+  } else {
+    console.log(formatValidate(res));
+  }
+}
+
+async function cmdGame(handlers, positional, flags) {
+  const gameId = positional[1];
+  if (!gameId) { console.error('Usage: pp game <gameId> [--league] [--market] [--book]'); process.exit(1); }
+
+  const league = flags.l || flags.league || 'MLB';
+  const market = flags.m || flags.market || 'Total Runs';
+  const book = flags.b || flags.book || 'NoVigApp';
+  const jsonOut = flags.j || flags.json || false;
+
+  console.error('Fetching ' + gameId + '...');
+
+  const res = await handlers.get_play_details({
+    league,
+    market,
+    game_ids: [gameId],
+    books: [book],
+  });
+
+  if (jsonOut) {
+    console.log(JSON.stringify(res, null, 2));
+  } else {
+    const rows = res.result || res.data || [];
+    if (!rows.length) { console.log('No data.'); return; }
+    const r = rows[0];
+    console.log(B + (r.awayTeam || 'Away') + ' @ ' + (r.homeTeam || 'Home') + R);
+    console.log('start: ' + r.start + '  |  market: ' + r.market + '  |  defaultKey: ' + r.defaultKey);
+    console.log('movementLabel: ' + r.movementLabel + '  |  grade: ' + r.movementGrade + '  |  disposition: ' + movementColor(r.movementDisposition));
+    if (r.selections) {
+      console.log('\n' + B + 'Lines:' + R);
+      for (const [key, sel] of Object.entries(r.selections)) {
+        const books = Object.keys(sel.odds || {}).join(', ');
+        console.log('  ' + key + ': ' + (sel.selection1 || '') + ' / ' + (sel.selection2 || '') + '  [' + books + ']');
+      }
+    }
+  }
+}
+
+async function cmdToday(handlers, positional, flags) {
+  const tier = flags.t || flags.tier || undefined;
+  const jsonOut = flags.j || flags.json || false;
+
+  console.error('Fetching today...');
+
+  const res = await handlers.today(tier ? { targetTiers: tier === '1' ? ['TIER 1'] : ['TIER 1', 'TIER 2'] } : {});
+  if (jsonOut) {
+    console.log(JSON.stringify(res, null, 2));
+  } else {
+    console.log(formatToday(res));
+  }
+}
+
+// Task 2: picks command
+async function cmdPicks(handlers, positional, flags) {
+  const limit = parseInt(flags.n || flags.limit || 10);
+  const jsonOut = flags.j || flags.json || false;
+
+  console.error('Fetching recent picks...');
+
+  const res = await handlers.get_pick_history({ limit });
+  const picks = Array.isArray(res) ? res : res?.data || res?.result || [];
+
+  if (jsonOut) {
+    console.log(JSON.stringify(picks, null, 2));
+    return;
+  }
+
+  if (!picks.length) {
+    console.log('No recent picks.');
+    return;
+  }
+
+  console.log(B + 'Recent picks' + R + ' (' + picks.length + ')');
+  for (const p of picks) {
+    const verdict = verdictSymbol(p.verdict || p.status || p.outcome || '');
+    console.log('  ' + (p.game || p.matchup || '') + '  ' + (p.selection || '') + '  ' + (p.odds || '') + '  ' + verdict + '  ' + (p.startCST || ''));
+    if (p.edge) console.log('    edge: ' + p.edge + '%  |  tier: ' + (p.tier || ''));
+  }
+}
+
+// Task 5: fantasy command
+async function cmdFantasy(handlers, positional, flags) {
+  const app = flags.a || flags.app || undefined;
+  const league = flags.l || flags.league || undefined;
+  const jsonOut = flags.j || flags.json || false;
+
+  const fantasyApps = app ? (Array.isArray(app) ? app : [app]) : ['PrizePicks', 'Underdog', 'DraftKings6'];
+  const leagues = league ? (Array.isArray(league) ? league : [league]) : undefined;
+
+  console.error('Fetching fantasy props: ' + fantasyApps.join(', ') + (leagues ? ' (' + leagues.join(', ') + ')' : '') + '...');
+
+  const res = await handlers.fantasy_optimizer({
+    fantasyApps,
+    leagues,
+    verbosity: 'standard'
+  });
+
+  if (jsonOut) {
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  const picks = Array.isArray(res) ? res : res?.result || res?.picks || [];
+  if (!picks.length) {
+    console.log('No fantasy props found.');
+    return;
+  }
+
+  const byApp = {};
+  for (const p of picks) {
+    const appName = p.fantasyApp || 'Unknown';
+    if (!byApp[appName]) byApp[appName] = [];
+    byApp[appName].push(p);
+  }
+
+  for (const [appName, appPicks] of Object.entries(byApp)) {
+    console.log('\n' + B + appName + R + '  (' + appPicks.length + ' props)');
+    for (const p of appPicks.slice(0, 15)) {
+      const valStr = p.value ? G + p.value + '%' + R : '';
+      const dir = p.selectionType === 'Over' ? 'O' : p.selectionType === 'Under' ? 'U' : '';
+      console.log('  ' + (p.league || '') + '  ' + (p.participant || '') + ' ' + dir + (p.line || '') + '  ' + (p.selection || '') + '  ' + (p.odds || '') + '  ' + valStr);
+    }
+    if (appPicks.length > 15) console.log('    ... and ' + (appPicks.length - 15) + ' more');
+  }
+}
+
+async function cmdHealth(handlers) {
+  const res = await handlers.health_status();
+  console.log(JSON.stringify(res, null, 2));
+}
+
+// ── main ────────────────────────────────────────────────────────
+
+async function main() {
+  // Strip meta-flags before arg parsing so they don't consume positional args
+  const filteredArgv = process.argv.filter(a => a !== '--no-color' && a !== '--no-colour');
+  const { positional, flags } = parseArgs(filteredArgv);
+  const command = positional[0] || 'scan';
+
+  // Task 1: handle help
+  if (flags.h || flags.help) {
+    const hasExplicitCmd = positional[0] !== undefined;
+    if (hasExplicitCmd && positional[0] !== 'help') {
+      printHelp(positional[0]); // pp scan --help
+    } else {
+      printHelp(positional[1] || ''); // pp -h or pp help [cmd]
+    }
+    process.exit(0);
+  }
+  if (command === 'help') {
+    printHelp(positional[1] || '');
+    process.exit(0);
+  }
+
+  const client = createPropProfessorClient();
+  const handlers = createMcpHandlers({ client });
+
+  const start = Date.now();
+
+  switch (command) {
+    case 'scan':     await cmdScan(handlers, positional, flags); break;
+    case 'validate': await cmdValidate(handlers, positional, flags); break;
+    case 'game':     await cmdGame(handlers, positional, flags); break;
+    case 'today':    await cmdToday(handlers, positional, flags); break;
+    case 'picks':    await cmdPicks(handlers, positional, flags); break;
+    case 'fantasy':  await cmdFantasy(handlers, positional, flags); break;
+    case 'health':   await cmdHealth(handlers); break;
+    default:
+      console.error('Unknown command: ' + command);
+      printHelp('');
+      process.exit(1);
+  }
+
+  console.error('\nDone in ' + ((Date.now() - start) / 1000).toFixed(1) + 's');
+}
+
+// Task 7: improved error handling
+main().catch(e => {
+  const context = process.argv.slice(2).join(' ');
+  console.error(formatError(e, context));
+  process.exit(1);
+});
