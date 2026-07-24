@@ -217,7 +217,7 @@ describe('TIER 1 guardrails', () => {
   });
 
   it('single-book consensus downgrades TIER 1 to TIER 2', () => {
-    const tier = getConfidenceTier(greenTier1Item({ consensusBookCount: 1 }));
+    const tier = getConfidenceTier(greenTier1Item({ consensusBookCount: 1, clvProxyPct: 0, consensusEdge: 1.0 }));
     assert.strictEqual(tier, 'TIER 2');
   });
 
@@ -233,7 +233,7 @@ describe('TIER 1 guardrails', () => {
     // deteriorating is not adverse, so grade stays yellow (not green).
     // The lookup gives TIER 3 for yellow + low risk, so this never hits TIER 1 anyway.
     // But the guardrail is defense-in-depth. Verify it's not TIER 1.
-    const tier = getConfidenceTier(greenTier1Item({ movementLabel: 'deteriorating' }));
+    const tier = getConfidenceTier(greenTier1Item({ movementLabel: 'deteriorating', consensusEdge: 1.0, clvProxyPct: 0 }));
     assert.notStrictEqual(tier, 'TIER 1');
   });
 
@@ -560,6 +560,100 @@ describe('tier grading — tennis field vocabulary', () => {
       tennisItem({ movementGrade: 'red', movementDisposition: 'adverse_full', clv: -1.15, edge: 2.5 })
     );
     assert.equal(tier, 'TIER 4');
+  });
+});
+
+// ─── CLV-based tiering (future-CLV prediction) ─────────────────────────────
+
+describe('CLV-based tier promotion and exemption', () => {
+  it('edge=0 + CLV=4¢ + supportive_clean → TIER 1 (CLV exemption)', () => {
+    // CLV exemption: strong CLV bypasses edge guardrail
+    const tier = getConfidenceTier({
+      movementLabel: 'supportive',
+      movementDisposition: 'supportive_clean',
+      movementQuality: 'high',
+      movementQualityScore: 0.9,
+      executionQuality: 'best',
+      consensusBookCount: 10,
+      steamMove: true,
+      clvProxyPct: 4,
+      consensusEdge: 0,
+      multiWindowScore: 1.0,
+      multiWindowInsufficientData: false,
+      peakAdverseClvPct: 0,
+    });
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('edge=0 + CLV=2¢ + supportive_clean → TIER 2 (below CLV threshold)', () => {
+    // CLV below 3¢ threshold, edge guardrail kicks in
+    const tier = getConfidenceTier({
+      movementLabel: 'supportive',
+      movementDisposition: 'supportive_clean',
+      movementQuality: 'high',
+      movementQualityScore: 0.9,
+      executionQuality: 'best',
+      consensusBookCount: 10,
+      steamMove: true,
+      clvProxyPct: 2,
+      consensusEdge: 0,
+      multiWindowScore: 1.0,
+      multiWindowInsufficientData: false,
+      peakAdverseClvPct: 0,
+    });
+    assert.strictEqual(tier, 'TIER 2');
+  });
+
+  it('yellow + CLV=6¢ + risk≤3 + supportive_bouncy → TIER 1 (high-CLV promotion)', () => {
+    // High-CLV promotion: yellow grade with exceptional CLV
+    const item = {
+      movementLabel: 'supportive',
+      movementDisposition: 'supportive_bouncy',
+      movementQuality: 'medium',
+      movementQualityScore: 0.6,
+      executionQuality: 'playable',
+      consensusBookCount: 8,
+      steamMove: false,
+      clvProxyPct: 6,
+      consensusEdge: 1.0,
+      multiWindowScore: 0.66,
+      multiWindowInsufficientData: false,
+      peakAdverseClvPct: 0,
+    };
+    const tier = getConfidenceTier(item);
+    assert.strictEqual(tier, 'TIER 1');
+  });
+
+  it('yellow + CLV=6¢ + adverse_full → TIER 2 (no promotion on adverse)', () => {
+    // High-CLV but adverse movement — no promotion
+    const item = {
+      movementLabel: 'adverse',
+      movementDisposition: 'adverse_full',
+      executionQuality: 'playable',
+      consensusBookCount: 8,
+      steamMove: false,
+      clvProxyPct: 6,
+      consensusEdge: 1.0,
+    };
+    const tier = getConfidenceTier(item);
+    assert.notStrictEqual(tier, 'TIER 1');
+  });
+
+  it('sharp book confirmation reduces risk score', () => {
+    const baseItem = {
+      movementLabel: 'supportive',
+      executionQuality: 'playable',
+      consensusBookCount: 5,
+      steamMove: false,
+      clvProxyPct: 1,
+      consensusEdge: 1.0,
+      multiWindowScore: 0.5,
+      multiWindowInsufficientData: false,
+      peakAdverseClvPct: 0,
+    };
+    const withoutSharp = calculateRiskScore({ ...baseItem, sharpBookMovementConfirmed: false });
+    const withSharp = calculateRiskScore({ ...baseItem, sharpBookMovementConfirmed: true });
+    assert.ok(withSharp <= withoutSharp, 'sharp confirmed should reduce risk score');
   });
 });
 

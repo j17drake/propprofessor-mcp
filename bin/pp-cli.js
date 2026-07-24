@@ -94,7 +94,7 @@ Flags:
   -B, --only-bets           Show only BET verdict plays
   -M, --movement <type>     Movement filter (supportive, clean, bouncy, adverse)
   -n, --limit <N>           Max results. Default: 50
-  --sort <field>            Sort by: start, edge, tier. Default: start
+  --sort <field>            Sort by: start, edge, tier, clv, momentum. Default: start
   --asc                     Sort ascending (default: descending)
   -j, --json                Raw JSON output
   --fast                    Quick scan (5 fastest leagues)
@@ -239,6 +239,20 @@ function clvColor(clv) {
   return clv + '¢';
 }
 
+function momentumLabel(p) {
+  // Future-CLV signal label: shows what predicts continued movement
+  const parts = [];
+  const movementLabel = (p.movementLabel || p.movementDisposition || '').toLowerCase();
+  const isSupportive = movementLabel.includes('supportive');
+  if (p.steamMove && isSupportive) parts.push(CYAN + 'STEAM' + R);
+  if (p.sharpBookMovementConfirmed) parts.push(G + 'SHARP' + R);
+  const clv = p.clvProxyPct ?? p.clv;
+  if (clv > 5) parts.push(G + 'CLV+5¢' + R);
+  else if (clv > 3) parts.push(CYAN + 'CLV+3¢' + R);
+  if ((p.lastMoveAgeMs || 0) > 0 && (p.lastMoveAgeMs || 0) < 3600000) parts.push(Y + 'FRESH' + R);
+  return parts.length ? parts.join(' ') : '';
+}
+
 function formatScan(results) {
   if (!results || !results.length) return 'No plays found.';
   let out = '';
@@ -263,6 +277,8 @@ function formatScan(results) {
       if (p.executionQuality) details.push('exec:' + p.executionQuality);
       if (p.consensusEdge != null) details.push('edge ' + (p.consensusEdge >= 0 ? '+' : '') + (p.consensusEdge * 100).toFixed(1) + '%');
       out += '    ' + details.join('  ·  ') + '\n';
+      const momentum = momentumLabel(p);
+      if (momentum) out += '    ' + momentum + '\n';
       const matchup = p.game || p.matchup || '';
       if (matchup || p.startCST) out += '    ' + matchup + '  ' + (p.startCST || '') + '\n';
     }
@@ -338,6 +354,14 @@ async function cmdScan(handlers, positional, flags) {
   const onlyBets = flags.B || flags['only-bets'] || false;
   const sortBy = flags.sort || 'start';
   const sortDir = flags.asc ? 'asc' : 'desc';
+
+  // Map sort aliases to handler field names
+  const SORT_FIELD_MAP = {
+    'clv': 'clvProxyPct',
+    'momentum': 'riskScore',
+  };
+  const resolvedSortBy = SORT_FIELD_MAP[sortBy] || sortBy;
+  const resolvedSortDir = sortBy === 'momentum' ? 'asc' : sortDir; // momentum = lowest risk first
   const limit = parseInt(flags.n || flags.limit || 50);
   const jsonOut = flags.j || flags.json || false;
   const validateAll = flags['validate-all'] || false;
@@ -377,8 +401,8 @@ async function cmdScan(handlers, positional, flags) {
       targetTiers,
       onlyBets: onlyBets || undefined,
       movement: resolvedMovement,
-      sortBy,
-      sortDir,
+      sortBy: resolvedSortBy,
+      sortDir: resolvedSortDir,
       limit,
       lite: true,
       verbosity: 'bets',
