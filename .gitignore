@@ -17,5 +17,6 @@ circuit-cache.json
 # scratch scripts (one-off scans)
 scripts/_scan-*
 scripts/scan-*
+scripts/check-*
 scripts/fetch-sofascore.py
 scripts/novig-scan.js

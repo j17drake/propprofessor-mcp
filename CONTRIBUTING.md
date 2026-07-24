@@ -1,94 +1,56 @@
 # Contributing to PropProfessor MCP
 
-Thanks for your interest. This document covers how to set up locally, add tools, and ship changes.
+PRs welcome! This is a community-driven project — fixes, features, docs, and test improvements all help.
 
-## Development Setup
+## Getting Started
 
-```bash
-git clone https://github.com/j17drake/propprofessor-mcp.git
-cd propprofessor-mcp
-npm install
-```
+1. Fork the repo
+2. `git clone` + `npm install`
+3. `cp config.default.json config.json` and add your auth
+4. `npm run install:verify` should pass (53 offline tests, no auth needed)
 
-`pp-mcp` and `pp-query` are available as local scripts via `node scripts/propprofessor-mcp-server.js` and `node scripts/query-propprofessor.js`.
+## Development Workflow
 
-## Running Tests
+1. **Make changes** in `lib/`, `scripts/`, or `bin/`
+2. **Run offline tests:** `npm run install:verify` — must pass before committing
+3. **Lint:** `npm run lint` — ESLint must be clean
+4. **Full suite:** `npm test` (slower, needs auth)
+5. **Check README consistency:** `npm run check:claims` — verifies tool counts match
 
-```bash
-npm test                         # full suite (966 tests)
-npm run smoke:live               # live API smoke (requires auth.json)
-npm run smoke:player-context     # player context smoke (requires Nitter or X session)
-```
+### CLI development
 
-Tests use Node's built-in `node:test` runner. No external test framework.
+The `pp` CLI lives in `bin/pp-cli.js`. Changes are:
 
-## Project Structure
+- Add a new command function (`cmdXxx`)
+- Add a switch case in `main()`
+- Add help text to `printHelp()`
+- Test with `node bin/pp <command> --no-color`
 
-```
-lib/                          # Shared modules (imported by server + CLI)
-  propprofessor-api.js        # HTTP client for PropProfessor endpoints
-  propprofessor-tool-definitions.js  # MCP tool schemas + descriptions
-  propprofessor-mcp-ranked-screen.js # Ranking pipeline + compact mode
-  propprofessor-sharp-plays.js       # Sharp play classification
-  propprofessor-risk-score.js        # Risk scoring + tier assignment
-  propprofessor-player-context.js    # News/tweets/risk flag
-  ...
+### MCP handler development
 
-scripts/
-  propprofessor-mcp-server.js  # MCP server entrypoint (stdio transport)
-  query-propprofessor.js       # CLI for setup/debugging
-  export-ranked-screen.js      # Export screen data to JSON
-  smoke-live.js                # Live API smoke test
-  smoke-player-context.js      # Player context smoke test
+- Tool definitions: `lib/tool-definitions/`
+- Handlers: `scripts/server/handlers/` (extracted modules) and `scripts/server/handlers.js` (inline)
+- Adding a tool requires updating tool-count assertions in 3 test files (see `scripts/server/handlers.js` header doc)
 
-test/                          # Test files (mirrors lib/ structure)
-```
+## Testing
 
-## Adding a New MCP Tool
+- `lib/` uses Node's built-in `node:test` framework
+- `scripts/server/handlers/` use `node:test` with API mocks
+- New handlers need at least a syntax-check test
+- Smoke tests: `npm run smoke:live` (requires auth)
 
-1. **Define the tool** in `lib/propprofessor-tool-definitions.js`:
-   - Add to `buildToolDefinitions()` with name, description, inputSchema
-   - Follow existing patterns for param types (`string`, `boolean`, `array`, `number`)
+## Pull Request Guidelines
 
-2. **Add the handler** in `scripts/propprofessor-mcp-server.js`:
-   - Add async handler function in the `handlers` object
-   - Validate required params, return `{ ok: true, result: ... }` or `{ ok: false, error: '...' }`
-   - Thread through `compact`, `fields`, `include`, `skipHistory` if it calls screen ranking
+- One feature/fix per PR
+- Include test coverage for new logic
+- Update README if adding/changing a CLI command
+- Run `npm run install:verify` before opening
+- Mention if the change affects the MCP protocol, CLI output, or both
 
-3. **Add tests** in `test/`:
-   - Create `test/propprofessor-<tool-name>.test.js`
-   - Test: happy path, missing params, empty results, error handling
-   - Mock HTTP calls; don't hit live APIs in unit tests
+## Code of Conduct
 
-4. **Update docs**:
-   - Add to tool table in `README.md`
-   - Add changelog entry in `CHANGELOG.md` "Unreleased"
-
-## Code Style
-
-- CommonJS (`require`/`module.exports`) — not ESM
-- `'use strict'` at top of every file
-- Run `npm run lint` and `npm run format:check` before committing
-- Prettier config: `.prettierrc.json` (single quotes, trailing commas, 100 char width)
-
-## Release Process
-
-1. Update version in `package.json`
-2. Move "Unreleased" section in `CHANGELOG.md` to new version heading
-3. Run `npm test` — all 489 must pass
-4. Run `npm run check:version` — version must match across package.json and changelog
-5. Commit, then tag: `git tag v1.0.X && git push origin v1.0.X`
-6. GitHub Actions auto-creates the release
-
-## Reporting Bugs
-
-Open an issue with:
-
-- Tool name + params used
-- Expected vs actual output
-- Node version (`node --version`)
-- Whether it reproduces with `pp-query` CLI or only via MCP client
+Be decent. This is a small project about sports betting data — there's no room for drama.
 
 ## Questions?
 
-Open a discussion or issue. PRs welcome.
+Open a [Discussion](https://github.com/j17drake/propprofessor-mcp/discussions) or an [Issue](https://github.com/j17drake/propprofessor-mcp/issues).

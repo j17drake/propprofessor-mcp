@@ -98,7 +98,49 @@ That's it — your agent now sees 30 tools.
 
 > **Verify your install:** `npm run install:verify` runs the non-API test suite (53 tests, no credentials needed).
 
-> Prefer the CLI? `node scripts/query-propprofessor.js list` shows every command. `node scripts/query-propprofessor.js smart` shows live sharp-money volumes. Run `node scripts/query-propprofessor.js doctor` if anything misbehaves.
+### CLI — `pp`
+
+PropProfessor ships with a fast, standalone CLI that calls handlers directly — no MCP server needed.
+
+```bash
+npm install -g propprofessor-mcp
+pp scan mlb tennis -M supportive -n3
+```
+
+11 commands for scanning, validation, logging, and fantasy:
+
+| Command | Description |
+|---------|-------------|
+| `pp scan [leagues...]` | Find plays across leagues |
+| `pp scan -M supportive` | Filter by movement (clean, bouncy, adverse) |
+| `pp scan --fast` | Quick scan (5 fastest leagues) |
+| `pp scan -B` | Only BET verdict plays |
+| `pp validate <playId>` | Validate a specific play |
+| `pp game <gameId>` | Get full game details |
+| `pp player <name>` | Player context + injury/risk flags |
+| `pp prices <gameId>` | Compare prices across books |
+| `pp log <gameId>` | Log a pick |
+| `pp picks` | Recent pick history |
+| `pp rank <league>` | Ranked plays for a league |
+| `pp fantasy` | Fantasy optimizer props |
+| `pp today` | Today's slate + pending picks |
+| `pp health` | Auth + backend health check |
+
+All commands support `-j`/`--json` for piping and `--no-color` for CI/Telegram output.
+
+Example output (scan filtered by supportive movement):
+
+```
+MLB › Moneyline  (2)
+  Houston Astros @ +127  |  TIER 1  ● BET
+    1.9%  ·  clv +4¢  ·  mv supportive_bouncy  ·  5 books
+    Chicago White Sox vs Houston Astros  Fri, Jul 24, 6:40 PM
+
+Tennis › Total Games  (1)
+  Under 21.5 @ -104  |  TIER 1  ● BET
+    3.4%  ·  mv supportive_clean  ·  16 books
+    Avanesyan vs Oliynykova  Fri, Jul 24, 7:00 AM
+```
 
 ## 🏛 Architecture
 
@@ -495,9 +537,9 @@ the ranking engine, they do NOT prove profitability.
 
 **Is it free?** Code is MIT-licensed. Data requires a paid PropProfessor subscription. No paid tier of the MCP itself.
 
-**Can I run it without an MCP client?** Yes — `pp-query` is a standalone CLI.
+**Can I run it without an MCP client?** Yes — `pp doctor` is a standalone CLI.
 
-**What if I find a bug?** Run `pp-query doctor` first, then [open an issue](https://github.com/j17drake/propprofessor-mcp/issues).
+**What if I find a bug?** Run `pp doctor` first, then [open an issue](https://github.com/j17drake/propprofessor-mcp/issues).
 
 ## ⭐ Support
 
@@ -526,9 +568,9 @@ Release: push a `v*` tag → CI runs lint + tests on Node 20 + 22 → auto-creat
 
 - [Quick Start](README.md#quick-start) — install, auth, MCP client configs, troubleshooting
 - [Auth & Session Management](README.md#mcp-client-setup) — auth flow, session management
+- [CLI Reference](README.md#cli--pp) — `pp` command reference
 - [CONFIG.md](CONFIG.md) — env vars, book config
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to add a tool
-- [SECURITY.md](SECURITY.md) — auth handling, threat model
 - [MAINTAINERS.md](MAINTAINERS.md) — release process
 - [docs/METHODOLOGY.md](docs/METHODOLOGY.md) — full ranking methodology
 - [docs/BACKTESTING.md](docs/BACKTESTING.md) — tier validation

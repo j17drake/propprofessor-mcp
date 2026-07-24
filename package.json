@@ -29,6 +29,7 @@
   },
   "files": [
     "lib/",
+    "bin/",
     "scripts/",
     "config.default.json",
     "README.md",
@@ -47,13 +48,10 @@
   },
   "homepage": "https://github.com/j17drake/propprofessor-mcp#readme",
   "keywords": [
-    "mcp",
-    "mcp-server",
-    "model-context-protocol",
-    "propprofessor",
-    "sports-betting",
-    "cli",
-    "ai-agent"
+    "mcp", "mcp-server", "model-context-protocol",
+    "propprofessor", "sports-betting",
+    "cli", "ai-agent", "odds-analysis", "sharp-money",
+    "sportsbook", "line-movement", "consensus"
   ],
   "author": "James Drake",
   "license": "MIT",
