@@ -245,7 +245,7 @@ function momentumLabel(p) {
   const movementLabel = (p.movementLabel || p.movementDisposition || '').toLowerCase();
   const isSupportive = movementLabel.includes('supportive');
   if (p.steamMove && isSupportive) parts.push(CYAN + 'STEAM' + R);
-  if (p.sharpBookMovementConfirmed) parts.push(G + 'SHARP' + R);
+  if (p.sharpBookMovementConfirmed || p.pinnacle) parts.push(G + 'SHARP' + R);
   const clv = p.clvProxyPct ?? p.clv;
   if (clv > 5) parts.push(G + 'CLV+5¢' + R);
   else if (clv > 3) parts.push(CYAN + 'CLV+3¢' + R);
