@@ -1492,12 +1492,17 @@ function createMcpHandlers({ client = createPropProfessorClient() } = {}) {
         if (_disposition === 'supportive_clean') parts.push('clean movement');
         else if (_disposition === 'supportive_bouncy') parts.push('direction right, bouncy path');
         else if (_disposition === 'adverse_recent' || _disposition === 'adverse_full') parts.push('movement went against');
+        else if (_disposition === 'insufficient') parts.push('no directional signal');
         const cbk = Number(matchingRow?.consensusBookCount || 0);
-        if (cbk >= 5) parts.push(`${cbk} books agree`);
+        if (cbk >= 3) parts.push(`${cbk} books`);
         const edgeVal = Number(matchingRow?.consensusEdge || args.screenConsensusEdge || 0);
-        if (edgeVal > 1) parts.push(`+${edgeVal.toFixed(1)}% edge`);
+        if (edgeVal > 0) parts.push(`+${edgeVal.toFixed(1)}% edge`);
+        const clvVal = Number(matchingRow?.clvProxyPct ?? 0);
+        if (clvVal > 0) parts.push(`+${clvVal.toFixed(1)}% CLV`);
+        else if (clvVal < 0) parts.push(`${clvVal.toFixed(1)}% CLV`);
+        else parts.push('0% CLV');
         if (consensusDrift && driftReason) parts.push(`drift: ${driftReason}`);
-        return parts.length ? parts.join('. ') + '.' : null;
+        return parts.length ? parts.join(' · ') : null;
       })()
     };
 
